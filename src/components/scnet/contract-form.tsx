@@ -83,32 +83,33 @@ export function ContractForm({ selectedPlan }: { selectedPlan: SelectedPlan | nu
       toast.error("Confere o telefone: DDD + 8 ou 9 dígitos.");
       return;
     }
-    if (nextErrors.intent) {
+    if (nextErrors.intent || !intent) {
       toast.error("Escolha uma opção: Quero contratar ou Já sou cliente.");
       return;
     }
 
     const trimmedName = name.trim();
     const whatsapp = `${ddi}${phone.replace(/\D/g, "")}`;
+    const chosenIntent = intent;
 
     trackLeadEvent();
     void submitContractInBackground({
       name: trimmedName,
       ddi,
       phone,
-      intent,
+      intent: chosenIntent,
       plan: selectedPlan ?? undefined,
     });
 
     const handoff = {
       nome: trimmedName,
       whatsapp,
-      intencao: intent,
+      intencao: chosenIntent,
       ...(selectedPlan ? { plano: selectedPlan.name, preco: selectedPlan.price } : {}),
     };
     writeContractHandoffCookie(handoff);
 
-    void navigate({ to: "/contratacao", search: { ...handoff, intencao: handoff.intencao } });
+    void navigate({ to: "/contratacao", search: handoff });
   }
 
   return (
@@ -126,12 +127,12 @@ export function ContractForm({ selectedPlan }: { selectedPlan: SelectedPlan | nu
       <p className="font-display text-2xl font-extrabold text-brand-deep">Contrate agora</p>
       <div className="mt-4 space-y-3">
         <div className="space-y-1.5">
-          <label className={label(errors.name)} htmlFor="nome-contrate">
+          <label className={label(!!errors.name)} htmlFor="nome-contrate">
             Nome
           </label>
           <input
             id="nome-contrate"
-            className={field(errors.name)}
+            className={field(!!errors.name)}
             value={name}
             onChange={(e) => {
               setName(capitalizeName(e.target.value));
@@ -142,19 +143,19 @@ export function ContractForm({ selectedPlan }: { selectedPlan: SelectedPlan | nu
           />
         </div>
         <div className="space-y-1.5">
-          <label className={label(errors.phone)} htmlFor="tel-contrate">
+          <label className={label(!!errors.phone)} htmlFor="tel-contrate">
             Telefone / WhatsApp
           </label>
           <div className="grid grid-cols-[4.5rem_minmax(0,1fr)] gap-2">
             <input
               aria-label="DDI"
-              className={field(errors.phone) + " text-center"}
+              className={field(!!errors.phone) + " text-center"}
               value={ddi}
               onChange={(e) => setDdi("+" + e.target.value.replace(/\D/g, "").slice(0, 3))}
             />
             <input
               id="tel-contrate"
-              className={field(errors.phone)}
+              className={field(!!errors.phone)}
               value={phone}
               inputMode="tel"
               onChange={(e) => {
@@ -166,7 +167,7 @@ export function ContractForm({ selectedPlan }: { selectedPlan: SelectedPlan | nu
           </div>
         </div>
         <div className="space-y-1.5">
-          <span className={label(errors.intent)}>O que você precisa?</span>
+          <span className={label(!!errors.intent)}>O que você precisa?</span>
           <div className="grid grid-cols-2 gap-2">
             {(
               [

@@ -118,12 +118,12 @@ export function LeadForm({ variant = "hero" }: { variant?: "hero" | "light" }) {
       </p>
       <div className="mt-4 space-y-3">
         <div className="space-y-1.5">
-          <label className={label(errors.name)} htmlFor={`nome-${variant}`}>
+          <label className={label(!!errors.name)} htmlFor={`nome-${variant}`}>
             Nome
           </label>
           <input
             id={`nome-${variant}`}
-            className={field(errors.name)}
+            className={field(!!errors.name)}
             value={name}
             onChange={(e) => {
               setName(capitalizeName(e.target.value));
@@ -134,19 +134,19 @@ export function LeadForm({ variant = "hero" }: { variant?: "hero" | "light" }) {
           />
         </div>
         <div className="space-y-1.5">
-          <label className={label(errors.phone)} htmlFor={`tel-${variant}`}>
+          <label className={label(!!errors.phone)} htmlFor={`tel-${variant}`}>
             Telefone / WhatsApp
           </label>
           <div className="grid grid-cols-[4.5rem_minmax(0,1fr)] gap-2">
             <input
               aria-label="DDI"
-              className={field(errors.phone) + " text-center"}
+              className={field(!!errors.phone) + " text-center"}
               value={ddi}
               onChange={(e) => setDdi("+" + e.target.value.replace(/\D/g, "").slice(0, 3))}
             />
             <input
               id={`tel-${variant}`}
-              className={field(errors.phone)}
+              className={field(!!errors.phone)}
               value={phone}
               inputMode="tel"
               onChange={(e) => {
