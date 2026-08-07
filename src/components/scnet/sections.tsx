@@ -158,7 +158,7 @@ export function Promise_() {
 /* ---------------- Diferenciais ---------------- */
 const diffs = [
   { Icon: Zap, title: "Ultra velocidade", text: "Planos até 1 GIGA pra quem não abre mão de carregar tudo na hora." },
-  { Icon: Signal, title: "Wi-Fi 7 Mesh", text: "Sinal forte e rápido em cada cômodo da casa." },
+  { Icon: Wifi, title: "Wi-Fi 7 Mesh", text: "Sinal forte e rápido em cada cômodo da casa." },
   { Icon: Wrench, title: "Suporte rápido, sério!", text: "Chamou, a gente escuta e resolve. Sem enrolação, sem robô travado." },
   { Icon: Trophy, title: "+ 20 anos", text: "A internet mais bem avaliada do Oeste e Litoral catarinense." },
 ];
@@ -197,26 +197,26 @@ const plans = [
     name: "Plano 450",
     price: "109,90",
     desc: "Pra quem quer resolver o dia a dia sem drama: redes sociais, séries e trabalho leve, tudo rodando liso.",
-    cta: "Bora assinar",
+    cta: "Quero este plano",
   },
   {
     name: "Plano 710",
     price: "129,90",
     desc: "Casa com mais gente conectada ao mesmo tempo? Esse aguenta o tranco — aula online, chamada de vídeo e streaming juntos, sem travar.",
-    cta: "Bora assinar",
+    cta: "Quero este plano",
   },
   {
     name: "Plano Infinity",
     price: "139,90",
     desc: "Várias telas, jogo online, home office e streaming em 4K rodando ao mesmo tempo, sem susto.",
-    cta: "Quero o Infinity",
+    cta: "Quero este plano",
     featured: true,
   },
   {
     name: "Plano Infinity Duo",
     price: "159,90",
     desc: "Ideal para ambientes amplos e vários dispositivos conectados — 2 roteadores garantindo Wi-Fi em todo canto.",
-    cta: "Bora assinar",
+    cta: "Quero este plano",
   },
 ];
 
@@ -249,8 +249,8 @@ export function Planos() {
                     MAIS ESCOLHIDO
                   </span>
                 )}
-                <h3 className={`font-ui text-lg font-bold ${p.featured ? "text-zap" : "text-brand"}`}>{p.name}</h3>
-                <p className="mt-3 font-display text-4xl font-extrabold tracking-tight">
+                <h3 className={`font-ui text-2xl font-bold ${p.featured ? "text-zap" : "text-brand"}`}>{p.name}</h3>
+                <p className="mt-3 font-display text-3xl font-extrabold tracking-tight">
                   <span className="align-super text-lg">R$</span> {p.price}
                   <span className={`font-body text-sm font-medium ${p.featured ? "text-primary-foreground/70" : "text-muted-foreground"}`}>
                     /mês
