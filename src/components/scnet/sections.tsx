@@ -618,11 +618,13 @@ export function CtaFinal({ selectedPlan }: { selectedPlan: SelectedPlan | null }
             ))}
           </div>
           <SectionTitle className="text-primary-foreground">
-            Mude agora para a internet mais rápida e mais bem avaliada da região!{" "}
-            <span className="text-zap">Nota 4.9/5 no Google</span>
+            Não vendemos só internet, a gente oferece tranquilidade.
+            <div className="mt-2 text-2xl font-semibold opacity-90">
+              Cuidamos do Wi-Fi, você aproveita o momento!&nbsp;
+            </div>
           </SectionTitle>
           <p className="mt-5 max-w-xl font-body text-lg text-primary-foreground/90">
-            + 20 anos conectando o Oeste e Litoral Catarinense. Chegou a sua vez!
+            + 20 anos conectando o Oeste e Litoral Catarinense. Chegou a sua vez de viver a melhor experiência conectado!
           </p>
         </Reveal>
         <Reveal delay={120} className="w-full lg:justify-self-end">
