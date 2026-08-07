@@ -521,7 +521,13 @@ export function CtaFinal() {
           </div>
         </Reveal>
         <Reveal delay={120} className="max-w-md justify-self-end">
-          <LeadForm variant="light" />
+          <img
+            src={fibraAsset.url}
+            alt="Mulher usando tablet conectado à internet fibra óptica SCNET"
+            width={800}
+            height={800}
+            className="relative w-full drop-shadow-2xl"
+          />
         </Reveal>
       </div>
     </section>
