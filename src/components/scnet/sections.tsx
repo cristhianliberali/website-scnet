@@ -15,7 +15,7 @@ import {
   Building2,
   ArrowRight,
 } from "lucide-react";
-import heroImg from "@/assets/casa-wifi-hero.png";
+import heroAsset from "@/assets/casa-wifi-hero.webp.asset.json";
 import { Button } from "@/components/ui/button";
 import {
   Accordion,
