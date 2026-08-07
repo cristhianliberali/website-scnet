@@ -1,6 +1,8 @@
+import { useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { Toaster } from "@/components/ui/sonner";
 import { Header } from "@/components/scnet/header";
+import type { SelectedPlan } from "@/components/scnet/contract-form";
 import {
   Hero,
   SocialBar,
@@ -36,6 +38,8 @@ export const Route = createFileRoute("/")({
 });
 
 function Index() {
+  const [selectedPlan, setSelectedPlan] = useState<SelectedPlan | null>(null);
+
   return (
     <div className="min-h-screen bg-background font-body">
       <Header />
@@ -44,13 +48,13 @@ function Index() {
         <SocialBar />
         <Promise_ />
         <Diferenciais />
-        <Planos />
+        <Planos onSelectPlan={setSelectedPlan} />
         <Beneficios />
         <ComoContratar />
         <Empresas />
         <Depoimentos />
         <Faq />
-        <CtaFinal />
+        <CtaFinal selectedPlan={selectedPlan} />
       </main>
       <Footer />
       <WhatsFloat />
