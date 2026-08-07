@@ -50,7 +50,7 @@ export function ContractForm({ selectedPlan }: { selectedPlan: SelectedPlan | nu
   const [name, setName] = useState("");
   const [ddi, setDdi] = useState("+55");
   const [phone, setPhone] = useState("");
-  const [intent, setIntent] = useState<Intent>("quero_contratar");
+  const [intent, setIntent] = useState<Intent | null>(null);
 
   const field =
     "w-full rounded-lg border border-primary-foreground/25 bg-primary-foreground/10 px-4 py-3 font-body text-primary-foreground placeholder:text-primary-foreground/50 outline-none backdrop-blur transition focus:border-zap focus:ring-2 focus:ring-zap/40";
