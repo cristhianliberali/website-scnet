@@ -6,7 +6,7 @@ import {
   Zap,
   Wrench,
   Trophy,
-  Trophy,
+  Star,
   Star,
   Users,
   MapPin,
