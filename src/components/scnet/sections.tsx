@@ -458,7 +458,7 @@ export function Depoimentos() {
 }
 
 /* ---------------- FAQ ---------------- */
-const faqs = [
+const faqs: Array<[string, string]> = [
   ["Como verificar se atendem em meu endereço?", "Só digitar seu endereço lá em cima que a gente te fala na hora."],
   ["Tenho contrato com outro provedor, dá pra trocar?", "Dá sim, e a gente ajuda a organizar isso sem dor de cabeça — garantindo seu upgrade de conexão."],
   ["Tem custo de instalação?", "Geralmente é grátis, sujeito a análise de crédito. No Infinity Duo tem uma taxa — um consultor te fala certinho."],
