@@ -42,7 +42,7 @@ function Contratacao() {
   const search = Route.useSearch();
   // URL is the primary source; the cookie only fills in anything missing
   // from it (e.g. someone reloaded a link that dropped the query string).
-  const [data, setData] = useState(search);
+  const [data, setData] = useState<z.infer<typeof searchSchema>>(search);
 
   useEffect(() => {
     const cookie = readContractHandoffCookie();
