@@ -12,4 +12,10 @@ export default defineConfig({
     // nitro/vite builds from this
     server: { entry: "server" },
   },
+  // Force the Node preset outside the Lovable sandbox so `bun run build` produces
+  // a `.output/server/index.mjs` that runs standalone in the Dockerfile (EasyPanel
+  // deploy target). Ignored inside Lovable's own sandbox build (Cloudflare there).
+  nitro: {
+    preset: "node-server",
+  },
 });
