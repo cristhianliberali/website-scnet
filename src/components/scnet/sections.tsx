@@ -169,7 +169,7 @@ export function Diferenciais() {
       <div className="relative mx-auto max-w-7xl px-4">
         <Reveal>
           <SectionTitle className="text-center text-primary-foreground">
-            Por que a galera daqui escolhe a <span className="text-zap">SCNET</span>
+            Porque somos a internet +bem avaliada da região!
           </SectionTitle>
         </Reveal>
         <div className="mt-12 grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
