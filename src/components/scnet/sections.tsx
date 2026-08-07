@@ -5,7 +5,7 @@ import {
   ShieldCheck,
   Zap,
   Wrench,
-  Wrench,
+  Trophy,
   Trophy,
   Star,
   Users,
