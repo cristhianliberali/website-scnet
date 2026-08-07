@@ -98,15 +98,15 @@ export function ContractForm({ selectedPlan }: { selectedPlan: SelectedPlan | nu
     <form
       id="contrate"
       onSubmit={submit}
-      className="w-full scroll-mt-28 rounded-2xl border border-primary-foreground/20 bg-primary-foreground/10 p-5 shadow-2xl backdrop-blur-md sm:p-6"
+      className="w-full scroll-mt-28 rounded-2xl border border-border bg-white p-6 shadow-xl sm:p-8"
     >
       {selectedPlan && (
-        <div className="mb-4 rounded-xl border border-zap/40 bg-zap/15 px-4 py-3 font-ui text-sm font-semibold text-primary-foreground">
-          Plano desejado: <span className="text-zap">{selectedPlan.name}</span> — R${" "}
+        <div className="mb-4 rounded-xl border border-brand/25 bg-brand/10 px-4 py-3 font-ui text-sm font-semibold text-brand-deep">
+          Plano desejado: <span className="text-brand">{selectedPlan.name}</span> — R${" "}
           {selectedPlan.price}/mês
         </div>
       )}
-      <p className="font-display text-xl font-extrabold text-primary-foreground">Contrate agora</p>
+      <p className="font-display text-2xl font-extrabold text-brand-deep">Contrate agora</p>
       <div className="mt-4 space-y-3">
         <div className="space-y-1.5">
           <label className={label} htmlFor="nome-contrate">
