@@ -15,8 +15,7 @@ import {
   Building2,
   ArrowRight,
 } from "lucide-react";
-import heroAsset from "@/assets/casa-wifi-hero.webp.asset.json";
-import fibraAsset from "@/assets/scnet-internet-de-fibra.webp.asset.json";
+import heroImg from "@/assets/casa-wifi-hero.png";
 import { Button } from "@/components/ui/button";
 import {
   Accordion,
@@ -31,7 +30,10 @@ import { Blobs, Reveal, SectionTitle, waLink } from "./shared";
 /* ---------------- Hero ---------------- */
 export function Hero() {
   return (
-    <section id="top" className="gradient-brand relative overflow-hidden pb-20 pt-28 lg:pb-28 lg:pt-36">
+    <section
+      id="top"
+      className="gradient-brand relative overflow-hidden pb-20 pt-28 lg:pb-28 lg:pt-36"
+    >
       <Blobs />
       <div className="relative mx-auto grid max-w-7xl items-center gap-12 px-4 lg:grid-cols-2">
         <div>
@@ -58,7 +60,7 @@ export function Hero() {
         <Reveal delay={200} className="relative">
           <div className="absolute left-1/2 top-1/2 -z-0 h-[70%] w-[70%] -translate-x-1/2 -translate-y-1/2 rounded-full bg-zap/30 blur-3xl" />
           <img
-            src={heroAsset.url}
+            src={heroImg}
             alt="Casa conectada com Wi-Fi de fibra óptica da SCNET"
             width={1024}
             height={1024}
@@ -103,7 +105,9 @@ function Stat({
   const { ref, display } = useCountUp(target, decimals);
   return (
     <div className="flex items-start gap-3">
-      <div className="grid size-11 shrink-0 place-items-center rounded-xl bg-brand/10 text-brand">{icon}</div>
+      <div className="grid size-11 shrink-0 place-items-center rounded-xl bg-brand/10 text-brand">
+        {icon}
+      </div>
       <div className="min-w-0">
         <p className="font-display text-2xl font-extrabold text-brand-deep">
           <span ref={ref}>
@@ -122,10 +126,33 @@ export function SocialBar() {
   return (
     <section className="bg-background py-12">
       <Reveal className="mx-auto grid max-w-7xl gap-8 px-4 sm:grid-cols-2 lg:grid-cols-4">
-        <Stat icon={<MapPin className="size-5" />} target={20} prefix="+" suffix=" anos" text="Conectando o Oeste e Litoral catarinense" />
-        <Stat icon={<Users className="size-5" />} target={30} prefix="+" suffix=" mil" text="Clientes online todos os dias" />
-        <Stat icon={<Star className="size-5" />} target={4.9} decimals={1} suffix="/5 ⭐" text="Nas avaliações do Google" />
-        <Stat icon={<Headset className="size-5" />} target={100} suffix="% local" text="Suporte e equipe técnica com gente da sua cidade" />
+        <Stat
+          icon={<MapPin className="size-5" />}
+          target={20}
+          prefix="+"
+          suffix=" anos"
+          text="Conectando o Oeste e Litoral catarinense"
+        />
+        <Stat
+          icon={<Users className="size-5" />}
+          target={30}
+          prefix="+"
+          suffix=" mil"
+          text="Clientes online todos os dias"
+        />
+        <Stat
+          icon={<Star className="size-5" />}
+          target={4.9}
+          decimals={1}
+          suffix="/5 ⭐"
+          text="Nas avaliações do Google"
+        />
+        <Stat
+          icon={<Headset className="size-5" />}
+          target={100}
+          suffix="% local"
+          text="Suporte e equipe técnica com gente da sua cidade"
+        />
       </Reveal>
     </section>
   );
@@ -137,12 +164,15 @@ export function Promise_() {
     <section className="relative overflow-hidden bg-muted py-20">
       <div className="relative mx-auto max-w-4xl px-4 text-center">
         <Reveal>
-          <SectionTitle className="text-brand-deep">Chega de esperar a página carregar...</SectionTitle>
+          <SectionTitle className="text-brand-deep">
+            Chega de esperar a página carregar...
+          </SectionTitle>
         </Reveal>
         <Reveal delay={100}>
           <p className="mx-auto mt-5 max-w-2xl font-body text-lg text-muted-foreground">
             Streaming travando, reunião caindo, jogo com lag — a SCNET existe pra resolver isso.
-            Infraestrutura própria, tecnologia fibra óptica de ponta e uma equipe que te atende na hora!
+            Infraestrutura própria, tecnologia fibra óptica de ponta e uma equipe que te atende na
+            hora!
           </p>
         </Reveal>
         <Reveal delay={180}>
@@ -157,10 +187,22 @@ export function Promise_() {
 
 /* ---------------- Diferenciais ---------------- */
 const diffs = [
-  { Icon: Zap, title: "Ultra velocidade", text: "Planos até 1 GIGA pra quem não abre mão de carregar tudo na hora." },
+  {
+    Icon: Zap,
+    title: "Ultra velocidade",
+    text: "Planos até 1 GIGA pra quem não abre mão de carregar tudo na hora.",
+  },
   { Icon: Wifi, title: "Wi-Fi 7 Mesh", text: "Sinal forte e rápido em cada cômodo da casa." },
-  { Icon: Wrench, title: "Suporte rápido, sério!", text: "Chamou, a gente escuta e resolve. Sem enrolação, sem robô travado." },
-  { Icon: Trophy, title: "+ 20 anos", text: "A internet mais bem avaliada do Oeste e Litoral catarinense." },
+  {
+    Icon: Wrench,
+    title: "Suporte rápido, sério!",
+    text: "Chamou, a gente escuta e resolve. Sem enrolação, sem robô travado.",
+  },
+  {
+    Icon: Trophy,
+    title: "+ 20 anos",
+    text: "A internet mais bem avaliada do Oeste e Litoral catarinense.",
+  },
 ];
 
 export function Diferenciais() {
@@ -180,7 +222,9 @@ export function Diferenciais() {
                 <div className="grid size-12 place-items-center rounded-xl bg-zap text-zap-ink transition-transform group-hover:scale-110">
                   <d.Icon className="size-6" />
                 </div>
-                <h3 className="mt-4 font-ui text-lg font-bold text-primary-foreground">{d.title}</h3>
+                <h3 className="mt-4 font-ui text-lg font-bold text-primary-foreground">
+                  {d.title}
+                </h3>
                 <p className="mt-2 font-body text-sm text-primary-foreground/85">{d.text}</p>
               </div>
             </Reveal>
@@ -227,9 +271,12 @@ export function Planos() {
     <section id="planos" className="bg-background py-20">
       <div className="mx-auto max-w-7xl px-4">
         <Reveal className="text-center">
-          <SectionTitle className="text-brand-deep">Escolha seu novo plano de internet</SectionTitle>
+          <SectionTitle className="text-brand-deep">
+            Escolha seu novo plano de internet
+          </SectionTitle>
           <p className="mx-auto mt-4 max-w-2xl font-body text-lg text-muted-foreground">
-            Fibra própria, roteador incluso e app Skeelo de bônus. Rápido de assinar, mais rápido ainda de usar.
+            Fibra própria, roteador incluso e app Skeelo de bônus. Rápido de assinar, mais rápido
+            ainda de usar.
           </p>
         </Reveal>
 
@@ -249,20 +296,30 @@ export function Planos() {
                     MAIS ESCOLHIDO
                   </span>
                 )}
-                <h3 className={`font-ui text-2xl font-bold ${p.featured ? "text-zap" : "text-brand"}`}>{p.name}</h3>
+                <h3
+                  className={`font-ui text-2xl font-bold ${p.featured ? "text-zap" : "text-brand"}`}
+                >
+                  {p.name}
+                </h3>
                 <p className="mt-3 font-display text-3xl font-extrabold tracking-tight">
                   <span className="align-super text-lg">R$</span> {p.price}
-                  <span className={`font-body text-sm font-medium ${p.featured ? "text-primary-foreground/70" : "text-muted-foreground"}`}>
+                  <span
+                    className={`font-body text-sm font-medium ${p.featured ? "text-primary-foreground/70" : "text-muted-foreground"}`}
+                  >
                     /mês
                   </span>
                 </p>
-                <p className={`mt-4 font-body text-sm ${p.featured ? "text-primary-foreground/90" : "text-muted-foreground"}`}>
+                <p
+                  className={`mt-4 font-body text-sm ${p.featured ? "text-primary-foreground/90" : "text-muted-foreground"}`}
+                >
                   {p.desc}
                 </p>
                 <ul className="mt-5 space-y-2">
                   {included.map((f) => (
                     <li key={f} className="flex items-center gap-2 font-body text-sm">
-                      <Check className={`size-4 shrink-0 ${p.featured ? "text-zap" : "text-brand"}`} />
+                      <Check
+                        className={`size-4 shrink-0 ${p.featured ? "text-zap" : "text-brand"}`}
+                      />
                       {f}
                     </li>
                   ))}
@@ -273,7 +330,11 @@ export function Planos() {
                   className="mt-6 w-full"
                   asChild
                 >
-                  <a target="_blank" rel="noopener" href={waLink(`Oi! Quero saber mais sobre o ${p.name} da SCNET.`)}>
+                  <a
+                    target="_blank"
+                    rel="noopener"
+                    href={waLink(`Oi! Quero saber mais sobre o ${p.name} da SCNET.`)}
+                  >
                     {p.cta}
                   </a>
                 </Button>
@@ -283,8 +344,8 @@ export function Planos() {
         </div>
 
         <p className="mx-auto mt-8 max-w-3xl text-center font-body text-xs text-muted-foreground">
-          *Instalação gratuita mediante análise de crédito. Fidelidade de 12 meses (CPF) e 24 meses (PJ).
-          Condições podem variar — confirme com um consultor.
+          *Instalação gratuita mediante análise de crédito. Fidelidade de 12 meses (CPF) e 24 meses
+          (PJ). Condições podem variar — confirme com um consultor.
         </p>
 
         <Reveal className="mt-10 rounded-3xl bg-muted p-8 text-center">
@@ -292,7 +353,11 @@ export function Planos() {
             Não sabe qual plano é o seu? Manda um oi no WhatsApp que a gente resolve rapidinho.
           </p>
           <Button variant="whats" size="xl" className="mt-5" asChild>
-            <a target="_blank" rel="noopener" href={waLink("Oi! Me ajuda a escolher o melhor plano da SCNET?")}>
+            <a
+              target="_blank"
+              rel="noopener"
+              href={waLink("Oi! Me ajuda a escolher o melhor plano da SCNET?")}
+            >
               <MessageCircle /> Chamar no WhatsApp
             </a>
           </Button>
@@ -321,7 +386,9 @@ export function Beneficios() {
     <section className="relative overflow-hidden bg-muted py-20">
       <div className="relative mx-auto max-w-7xl px-4">
         <Reveal className="text-center">
-          <SectionTitle className="text-brand-deep">Sua assinatura pode ter mais do que só internet</SectionTitle>
+          <SectionTitle className="text-brand-deep">
+            Sua assinatura pode ter mais do que só internet
+          </SectionTitle>
         </Reveal>
         <div className="mt-12 grid gap-5 sm:grid-cols-2 lg:grid-cols-5">
           {perks.map((p, i) => (
@@ -358,7 +425,9 @@ export function ComoContratar() {
     <section className="bg-background py-20">
       <div className="mx-auto max-w-7xl px-4">
         <Reveal className="text-center">
-          <SectionTitle className="text-brand-deep">Contratar é rápido e simples. Sério.</SectionTitle>
+          <SectionTitle className="text-brand-deep">
+            Contratar é rápido e simples. Sério.
+          </SectionTitle>
         </Reveal>
         <div className="relative mt-14 grid gap-8 lg:grid-cols-4">
           <div className="absolute left-0 right-0 top-7 hidden h-1 rounded-full bg-linear-to-r from-brand-deep to-zap lg:block" />
@@ -392,15 +461,21 @@ export function Empresas() {
       <Blobs />
       <div className="relative mx-auto grid max-w-7xl items-center gap-10 px-4 lg:grid-cols-[minmax(0,1fr)_auto]">
         <Reveal>
-          <SectionTitle className="text-primary-foreground">Seu negócio não pode ficar fora do ar</SectionTitle>
+          <SectionTitle className="text-primary-foreground">
+            Seu negócio não pode ficar fora do ar
+          </SectionTitle>
           <p className="mt-5 max-w-2xl font-body text-lg text-primary-foreground/90">
-            Comércio, escritório, indústria ou condomínio — conexão estável pra vender, atender e manter
-            tudo operando, com suporte prioritário quando precisar.
+            Comércio, escritório, indústria ou condomínio — conexão estável pra vender, atender e
+            manter tudo operando, com suporte prioritário quando precisar.
           </p>
         </Reveal>
         <Reveal delay={120}>
           <Button variant="zap" size="hero" asChild>
-            <a target="_blank" rel="noopener" href={waLink("Oi! Quero um plano SCNET para minha empresa/condomínio.")}>
+            <a
+              target="_blank"
+              rel="noopener"
+              href={waLink("Oi! Quero um plano SCNET para minha empresa/condomínio.")}
+            >
               <Building2 /> Quero um plano pra empresa
             </a>
           </Button>
@@ -412,10 +487,26 @@ export function Empresas() {
 
 /* ---------------- Depoimentos ---------------- */
 const testimonials = [
-  { name: "Juliana M.", city: "Chapecó", text: "Trocamos faz seis meses e não trava mais nada. Home office e Netflix ao mesmo tempo, tranquilo." },
-  { name: "Rafael S.", city: "Itapema", text: "Chamei o suporte num sábado e resolveram no mesmo dia. Atendimento de gente que fala como a gente." },
-  { name: "Camila P.", city: "São Miguel do Oeste", text: "Instalação rápida e o Wi-Fi finalmente pega no quarto dos fundos. Valeu cada real." },
-  { name: "Diego A.", city: "Balneário Piçarras", text: "Jogo online sem lag e as aulas da minha filha sem cair. É isso que eu queria." },
+  {
+    name: "Juliana M.",
+    city: "Chapecó",
+    text: "Trocamos faz seis meses e não trava mais nada. Home office e Netflix ao mesmo tempo, tranquilo.",
+  },
+  {
+    name: "Rafael S.",
+    city: "Itapema",
+    text: "Chamei o suporte num sábado e resolveram no mesmo dia. Atendimento de gente que fala como a gente.",
+  },
+  {
+    name: "Camila P.",
+    city: "São Miguel do Oeste",
+    text: "Instalação rápida e o Wi-Fi finalmente pega no quarto dos fundos. Valeu cada real.",
+  },
+  {
+    name: "Diego A.",
+    city: "Balneário Piçarras",
+    text: "Jogo online sem lag e as aulas da minha filha sem cair. É isso que eu queria.",
+  },
 ];
 
 export function Depoimentos() {
@@ -427,7 +518,11 @@ export function Depoimentos() {
         </Reveal>
         <div className="mt-12 flex snap-x snap-mandatory gap-5 overflow-x-auto pb-4 lg:grid lg:grid-cols-4 lg:overflow-visible">
           {testimonials.map((t, i) => (
-            <Reveal key={t.name} delay={i * 90} className="min-w-[85%] snap-center sm:min-w-[45%] lg:min-w-0">
+            <Reveal
+              key={t.name}
+              delay={i * 90}
+              className="min-w-[85%] snap-center sm:min-w-[45%] lg:min-w-0"
+            >
               <div className="h-full rounded-2xl border border-border bg-card p-6 transition-all duration-300 hover:-translate-y-2 hover:shadow-[0_20px_50px_-20px_color-mix(in_oklab,var(--color-brand)_70%,transparent)]">
                 <div className="flex items-center gap-3">
                   <div className="grid size-11 shrink-0 place-items-center rounded-full gradient-brand font-display font-extrabold text-primary-foreground">
@@ -435,7 +530,9 @@ export function Depoimentos() {
                   </div>
                   <div className="min-w-0">
                     <p className="truncate font-ui font-semibold text-card-foreground">{t.name}</p>
-                    <p className="truncate font-body text-xs text-muted-foreground">{t.city} · Avaliação Google</p>
+                    <p className="truncate font-body text-xs text-muted-foreground">
+                      {t.city} · Avaliação Google
+                    </p>
                   </div>
                 </div>
                 <div className="mt-4 flex gap-1">
@@ -459,11 +556,26 @@ export function Depoimentos() {
 
 /* ---------------- FAQ ---------------- */
 const faqs: Array<[string, string]> = [
-  ["Como verificar se atendem em meu endereço?", "Só digitar seu endereço lá em cima que a gente te fala na hora."],
-  ["Tenho contrato com outro provedor, dá pra trocar?", "Dá sim, e a gente ajuda a organizar isso sem dor de cabeça — garantindo seu upgrade de conexão."],
-  ["Tem custo de instalação?", "Geralmente é grátis, sujeito a análise de crédito. No Infinity Duo tem uma taxa — um consultor te fala certinho."],
-  ["Qual a diferença entre os planos?", "Velocidade e cobertura de Wi-Fi pela casa. Na dúvida, chama no WhatsApp que a gente indica o ideal pra tua rotina."],
-  ["Se der problema, quem resolve?", "Time técnico próprio, local. Nada de fila de call center genérico."],
+  [
+    "Como verificar se atendem em meu endereço?",
+    "Só digitar seu endereço lá em cima que a gente te fala na hora.",
+  ],
+  [
+    "Tenho contrato com outro provedor, dá pra trocar?",
+    "Dá sim, e a gente ajuda a organizar isso sem dor de cabeça — garantindo seu upgrade de conexão.",
+  ],
+  [
+    "Tem custo de instalação?",
+    "Geralmente é grátis, sujeito a análise de crédito. No Infinity Duo tem uma taxa — um consultor te fala certinho.",
+  ],
+  [
+    "Qual a diferença entre os planos?",
+    "Velocidade e cobertura de Wi-Fi pela casa. Na dúvida, chama no WhatsApp que a gente indica o ideal pra tua rotina.",
+  ],
+  [
+    "Se der problema, quem resolve?",
+    "Time técnico próprio, local. Nada de fila de call center genérico.",
+  ],
 ];
 
 export function Faq() {
@@ -471,7 +583,9 @@ export function Faq() {
     <section id="duvidas" className="bg-background py-20">
       <div className="mx-auto max-w-3xl px-4">
         <Reveal className="text-center">
-          <SectionTitle className="text-brand-deep">Perguntas rápidas, respostas diretas</SectionTitle>
+          <SectionTitle className="text-brand-deep">
+            Perguntas rápidas, respostas diretas
+          </SectionTitle>
         </Reveal>
         <Reveal delay={100}>
           <Accordion type="single" collapsible className="mt-10 w-full">
@@ -514,20 +628,22 @@ export function CtaFinal() {
               <a href="#planos">Contratar online</a>
             </Button>
             <Button variant="whats" size="xl" asChild>
-              <a target="_blank" rel="noopener" href={waLink("Oi! Quero contratar a SCNET pelo WhatsApp.")}>
+              <a
+                target="_blank"
+                rel="noopener"
+                href={waLink("Oi! Quero contratar a SCNET pelo WhatsApp.")}
+              >
                 <MessageCircle /> Contratar no WhatsApp
               </a>
             </Button>
           </div>
         </Reveal>
+        {/* TODO: swap for the real photo (scnet-internet-de-fibra) once provided */}
         <Reveal delay={120} className="max-w-md justify-self-end">
-          <img
-            src={fibraAsset.url}
-            alt="Mulher usando tablet conectado à internet fibra óptica SCNET"
-            width={800}
-            height={800}
-            className="relative w-full drop-shadow-2xl"
-          />
+          <div className="animate-float-slow relative mx-auto flex aspect-square w-full max-w-sm items-center justify-center rounded-[2.5rem] border border-primary-foreground/20 bg-primary-foreground/10 shadow-2xl backdrop-blur-md">
+            <div className="absolute inset-0 -z-10 rounded-[2.5rem] bg-zap/20 blur-2xl" />
+            <Wifi className="size-28 text-zap drop-shadow-xl" strokeWidth={1.5} />
+          </div>
         </Reveal>
       </div>
     </section>

@@ -1,6 +1,10 @@
 import { useState, type FormEvent } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
+import { getAttribution } from "@/lib/utm";
+import { getRecaptchaToken } from "@/lib/recaptcha";
+import { getFacebookCookies, trackLeadEvent } from "@/lib/facebook-pixel";
+import { submitLead } from "@/lib/submit-lead";
 import { waLink } from "./shared";
 
 function capitalize(v: string) {
@@ -8,6 +12,32 @@ function capitalize(v: string) {
     .replace(/[^A-Za-zÀ-ÿ\s']/g, "")
     .replace(/\s{2,}/g, " ")
     .replace(/(^|\s)([a-zà-ÿ])/g, (_m, s, c: string) => s + c.toUpperCase());
+}
+
+/**
+ * Sends the lead to the webhook/CRM + Facebook CAPI without blocking the
+ * WhatsApp redirect — a slow or failing backend should never stop someone
+ * from reaching out.
+ */
+async function submitLeadInBackground(name: string, ddi: string, phone: string) {
+  try {
+    const recaptchaToken = await getRecaptchaToken("lead_submit");
+    const { fbc, fbp } = getFacebookCookies();
+    await submitLead({
+      data: {
+        name,
+        ddi,
+        phone,
+        page: window.location.pathname + window.location.search,
+        recaptchaToken,
+        fbc,
+        fbp,
+        attribution: getAttribution(),
+      },
+    });
+  } catch (err) {
+    console.error("Lead submission failed", err);
+  }
 }
 
 function maskPhone(v: string) {
@@ -37,6 +67,8 @@ export function LeadForm({ variant = "hero" }: { variant?: "hero" | "light" }) {
       return;
     }
     toast.success("Show! Estamos te levando pro WhatsApp da SCNET.");
+    trackLeadEvent();
+    void submitLeadInBackground(name.trim(), ddi, phone);
     window.open(
       waLink(
         `Oi! Sou ${name.trim()} (${ddi} ${phone}). Quero contratar a internet da SCNET e saber a cobertura no meu endereço.`,
