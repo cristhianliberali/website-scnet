@@ -610,7 +610,7 @@ export function CtaFinal({ selectedPlan }: { selectedPlan: SelectedPlan | null }
   return (
     <section className="gradient-brand relative overflow-hidden py-24">
       <Blobs />
-      <div className="relative mx-auto grid max-w-[90rem] items-center gap-16 px-4 lg:grid-cols-[1fr_1.15fr]">
+      <div className="relative mx-auto grid max-w-7xl items-center gap-12 px-4 lg:grid-cols-[1fr_580px]">
         <Reveal>
           <div className="mb-4 flex gap-1">
             {[0, 1, 2, 3, 4].map((s) => (
@@ -624,20 +624,6 @@ export function CtaFinal({ selectedPlan }: { selectedPlan: SelectedPlan | null }
           <p className="mt-5 max-w-xl font-body text-lg text-primary-foreground/90">
             + 20 anos conectando o Oeste e Litoral Catarinense. Chegou a sua vez!
           </p>
-          <div className="mt-8 flex flex-wrap gap-3">
-            <Button variant="zap" size="xl" asChild>
-              <a href="#planos">Contratar online</a>
-            </Button>
-            <Button variant="whats" size="xl" asChild>
-              <a
-                target="_blank"
-                rel="noopener"
-                href={waLink("Oi! Quero contratar a SCNET pelo WhatsApp.")}
-              >
-                <MessageCircle /> Contratar no WhatsApp
-              </a>
-            </Button>
-          </div>
         </Reveal>
         <Reveal delay={120} className="w-full lg:justify-self-end">
           <ContractForm selectedPlan={selectedPlan} />
