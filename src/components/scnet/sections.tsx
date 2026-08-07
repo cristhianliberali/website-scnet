@@ -529,7 +529,7 @@ export function CtaFinal() {
 }
 
 /* ---------------- Footer + WhatsApp flutuante ---------------- */
-const footerLinks = [
+const footerLinks: Array<[string, string]> = [
   ["Planos", "#planos"],
   ["Empresas", "#empresas"],
   ["Trabalhe conosco", "#top"],

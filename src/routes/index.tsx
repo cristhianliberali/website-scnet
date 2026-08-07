@@ -1,24 +1,60 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { Toaster } from "@/components/ui/sonner";
+import { Header } from "@/components/scnet/header";
+import {
+  Hero,
+  SocialBar,
+  Promise_,
+  Diferenciais,
+  Planos,
+  Beneficios,
+  ComoContratar,
+  Empresas,
+  Depoimentos,
+  Faq,
+  CtaFinal,
+  Footer,
+  WhatsFloat,
+} from "@/components/scnet/sections";
 
-// No head() here: the home route inherits title/description/og/twitter from
-// __root.tsx, and ships no og:image so serve-time hosting can inject the
-// project's social preview (explicit og:image or latest screenshot).
+const title = "SCNET — Internet fibra óptica no Oeste e Litoral de SC";
+const description =
+  "Wi-Fi rápido e estável na casa toda. Planos de fibra a partir de R$ 109,90/mês, roteador incluso e suporte local. Assine em minutos.";
+
 export const Route = createFileRoute("/")({
+  head: () => ({
+    meta: [
+      { title },
+      { name: "description", content: description },
+      { property: "og:title", content: title },
+      { property: "og:description", content: description },
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary_large_image" },
+    ],
+  }),
   component: Index,
 });
 
-// IMPORTANT: Replace this placeholder. See ./README.md for routing conventions.
 function Index() {
   return (
-    <div
-      className="flex min-h-screen items-center justify-center"
-      style={{ backgroundColor: "#fcfbf8" }}
-    >
-      <img
-        data-lovable-blank-page-placeholder="REMOVE_THIS"
-        src="https://cdn.gpteng.co/blank-app-v1.svg"
-        alt="Your app will live here!"
-      />
+    <div className="min-h-screen bg-background font-body">
+      <Header />
+      <main>
+        <Hero />
+        <SocialBar />
+        <Promise_ />
+        <Diferenciais />
+        <Planos />
+        <Beneficios />
+        <ComoContratar />
+        <Empresas />
+        <Depoimentos />
+        <Faq />
+        <CtaFinal />
+      </main>
+      <Footer />
+      <WhatsFloat />
+      <Toaster />
     </div>
   );
 }
