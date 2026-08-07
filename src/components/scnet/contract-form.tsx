@@ -66,6 +66,10 @@ export function ContractForm({ selectedPlan }: { selectedPlan: SelectedPlan | nu
       toast.error("Confere o telefone: DDD + 8 ou 9 dígitos.");
       return;
     }
+    if (!intent) {
+      toast.error("Escolha uma opção: Quero contratar ou Já sou cliente.");
+      return;
+    }
 
     const trimmedName = name.trim();
     const whatsapp = `${ddi}${phone.replace(/\D/g, "")}`;
