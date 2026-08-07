@@ -16,6 +16,7 @@ import {
   ArrowRight,
 } from "lucide-react";
 import heroAsset from "@/assets/casa-wifi-hero.webp.asset.json";
+import fibraAsset from "@/assets/scnet-internet-de-fibra.webp.asset.json";
 import { Button } from "@/components/ui/button";
 import {
   Accordion,
