@@ -608,9 +608,9 @@ export function Faq() {
 /* ---------------- CTA final ---------------- */
 export function CtaFinal({ selectedPlan }: { selectedPlan: SelectedPlan | null }) {
   return (
-    <section className="gradient-brand relative overflow-hidden py-20">
+    <section className="gradient-brand relative overflow-hidden py-24">
       <Blobs />
-      <div className="relative mx-auto grid max-w-7xl items-center gap-12 px-4 lg:grid-cols-2">
+      <div className="relative mx-auto grid max-w-7xl items-center gap-16 px-4 lg:grid-cols-[1fr_1.15fr]">
         <Reveal>
           <div className="mb-4 flex gap-1">
             {[0, 1, 2, 3, 4].map((s) => (
@@ -639,7 +639,7 @@ export function CtaFinal({ selectedPlan }: { selectedPlan: SelectedPlan | null }
             </Button>
           </div>
         </Reveal>
-        <Reveal delay={120} className="max-w-md justify-self-end">
+        <Reveal delay={120} className="w-full lg:justify-self-end">
           <ContractForm selectedPlan={selectedPlan} />
         </Reveal>
       </div>

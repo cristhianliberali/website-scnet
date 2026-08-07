@@ -16,7 +16,7 @@ const buttonVariants = cva(
         secondary: "bg-secondary text-secondary-foreground shadow-sm hover:bg-secondary/80",
         ghost: "hover:bg-accent hover:text-accent-foreground",
         link: "text-primary underline-offset-4 hover:underline",
-        zap: "font-ui font-bold bg-zap text-zap-ink shadow-lg animate-pulse-glow hover:scale-[1.04] hover:bg-zap/90 transition-transform",
+        zap: "font-ui font-bold bg-zap text-zap-ink shadow hover:bg-zap/90 transition-transform hover:scale-[1.02]",
         brand:
           "font-ui font-semibold gradient-brand text-primary-foreground shadow-lg hover:scale-[1.03] transition-transform",
         onbrand:
