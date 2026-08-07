@@ -108,7 +108,7 @@ export function ContractForm({ selectedPlan }: { selectedPlan: SelectedPlan | nu
     };
     writeContractHandoffCookie(handoff);
 
-    void navigate({ to: "/contratacao", search: handoff });
+    void navigate({ to: "/contratacao", search: { ...handoff, intencao: handoff.intencao } });
   }
 
   return (
