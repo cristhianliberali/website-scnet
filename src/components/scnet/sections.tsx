@@ -610,7 +610,7 @@ export function CtaFinal({ selectedPlan }: { selectedPlan: SelectedPlan | null }
   return (
     <section className="gradient-brand relative overflow-hidden py-24">
       <Blobs />
-      <div className="relative mx-auto grid max-w-7xl items-center gap-16 px-4 lg:grid-cols-[1fr_1.15fr]">
+      <div className="relative mx-auto grid max-w-[90rem] items-center gap-16 px-4 lg:grid-cols-[1fr_1.15fr]">
         <Reveal>
           <div className="mb-4 flex gap-1">
             {[0, 1, 2, 3, 4].map((s) => (
