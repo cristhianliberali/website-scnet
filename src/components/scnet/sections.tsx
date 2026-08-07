@@ -8,7 +8,6 @@ import {
   Trophy,
   Star,
   Users,
-  Users,
   MapPin,
   Headset,
   Check,
