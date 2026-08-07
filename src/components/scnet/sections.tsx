@@ -4,7 +4,7 @@ import {
   Gauge,
   ShieldCheck,
   Zap,
-  Signal,
+  Wrench,
   Wrench,
   Trophy,
   Star,
