@@ -158,8 +158,8 @@ export function ContractForm({ selectedPlan }: { selectedPlan: SelectedPlan | nu
                 className={cn(
                   "rounded-md border px-3 py-2 font-ui text-xs font-medium transition",
                   intent === value
-                    ? "border-primary-foreground/60 bg-primary-foreground/15 text-primary-foreground"
-                    : "border-primary-foreground/20 bg-primary-foreground/5 text-primary-foreground/70 hover:border-primary-foreground/40 hover:bg-primary-foreground/10",
+                    ? "border-brand bg-brand/10 text-brand-deep"
+                    : "border-border bg-white text-muted-foreground hover:border-brand/40 hover:text-brand-deep",
                 )}
               >
                 {text}
@@ -171,7 +171,7 @@ export function ContractForm({ selectedPlan }: { selectedPlan: SelectedPlan | nu
       <Button type="submit" variant="zap" size="xl" className="mt-5 w-full">
         Quero contratar agora
       </Button>
-      <p className="mt-3 text-center font-body text-sm text-primary-foreground/80">
+      <p className="mt-3 text-center font-body text-sm text-muted-foreground">
         Venha para a conexão n°1 da região
       </p>
     </form>
