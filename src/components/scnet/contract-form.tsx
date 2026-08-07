@@ -156,10 +156,10 @@ export function ContractForm({ selectedPlan }: { selectedPlan: SelectedPlan | nu
                 type="button"
                 onClick={() => setIntent(value)}
                 className={cn(
-                  "rounded-lg border px-3 py-2.5 font-ui text-sm font-semibold transition",
+                  "rounded-md border px-3 py-2 font-ui text-xs font-medium transition",
                   intent === value
-                    ? "border-zap bg-zap text-zap-ink"
-                    : "border-primary-foreground/25 bg-primary-foreground/10 text-primary-foreground/90 hover:bg-primary-foreground/20",
+                    ? "border-primary-foreground/60 bg-primary-foreground/15 text-primary-foreground"
+                    : "border-primary-foreground/20 bg-primary-foreground/5 text-primary-foreground/70 hover:border-primary-foreground/40 hover:bg-primary-foreground/10",
                 )}
               >
                 {text}
