@@ -6,6 +6,7 @@ import { getRecaptchaToken } from "@/lib/recaptcha";
 import { getFacebookCookies, trackLeadEvent } from "@/lib/facebook-pixel";
 import { submitLead } from "@/lib/submit-lead";
 import { capitalizeName, isValidPhone, maskPhone } from "@/lib/form-utils";
+import { cn } from "@/lib/utils";
 import { waLink } from "./shared";
 
 /**
@@ -38,16 +39,23 @@ export function LeadForm({ variant = "hero" }: { variant?: "hero" | "light" }) {
   const [name, setName] = useState("");
   const [ddi, setDdi] = useState("+55");
   const [phone, setPhone] = useState("");
+  const [errors, setErrors] = useState<{ name?: boolean; phone?: boolean }>({});
 
   const onBrand = variant === "hero";
 
   function submit(e: FormEvent) {
     e.preventDefault();
-    if (name.trim().length < 3) {
+    const nextErrors = {
+      name: name.trim().length < 3,
+      phone: !isValidPhone(phone),
+    };
+    setErrors(nextErrors);
+
+    if (nextErrors.name) {
       toast.error("Escreve teu nome completo pra gente te chamar direito 🙂");
       return;
     }
-    if (!isValidPhone(phone)) {
+    if (nextErrors.phone) {
       toast.error("Confere o telefone: DDD + 8 ou 9 dígitos.");
       return;
     }
@@ -63,12 +71,32 @@ export function LeadForm({ variant = "hero" }: { variant?: "hero" | "light" }) {
     );
   }
 
-  const label = onBrand
-    ? "font-ui text-sm font-semibold text-primary-foreground/90"
-    : "font-ui text-sm font-semibold text-foreground/80";
-  const field = onBrand
-    ? "w-full rounded-lg border border-primary-foreground/25 bg-primary-foreground/10 px-4 py-3 font-body text-primary-foreground placeholder:text-primary-foreground/50 outline-none backdrop-blur transition focus:border-zap focus:ring-2 focus:ring-zap/40"
-    : "w-full rounded-lg border border-border bg-background px-4 py-3 font-body text-foreground outline-none transition focus:border-brand focus:ring-2 focus:ring-brand/25";
+  const label = (hasError: boolean) =>
+    cn(
+      "font-ui text-sm font-semibold transition",
+      hasError
+        ? "text-red-500"
+        : onBrand
+          ? "text-primary-foreground/90"
+          : "text-foreground/80",
+    );
+  const field = (hasError: boolean) =>
+    cn(
+      "w-full rounded-lg border px-4 py-3 font-body outline-none transition focus:ring-2",
+      onBrand
+        ? cn(
+            "bg-primary-foreground/10 placeholder:text-primary-foreground/50",
+            hasError
+              ? "border-red-400 text-primary-foreground focus:border-red-500 focus:ring-red-300/40"
+              : "border-primary-foreground/25 text-primary-foreground focus:border-zap focus:ring-zap/40",
+          )
+        : cn(
+            "bg-background placeholder:text-muted-foreground",
+            hasError
+              ? "border-red-400 text-foreground focus:border-red-500 focus:ring-red-300/40"
+              : "border-border text-foreground focus:border-brand focus:ring-brand/25",
+          ),
+    );
 
   return (
     <form
@@ -90,35 +118,41 @@ export function LeadForm({ variant = "hero" }: { variant?: "hero" | "light" }) {
       </p>
       <div className="mt-4 space-y-3">
         <div className="space-y-1.5">
-          <label className={label} htmlFor={`nome-${variant}`}>
+          <label className={label(!!errors.name)} htmlFor={`nome-${variant}`}>
             Nome
           </label>
           <input
             id={`nome-${variant}`}
-            className={field}
+            className={field(!!errors.name)}
             value={name}
-            onChange={(e) => setName(capitalizeName(e.target.value))}
+            onChange={(e) => {
+              setName(capitalizeName(e.target.value));
+              if (errors.name) setErrors((prev) => ({ ...prev, name: false }));
+            }}
             placeholder="Maria Silva"
             autoComplete="name"
           />
         </div>
         <div className="space-y-1.5">
-          <label className={label} htmlFor={`tel-${variant}`}>
+          <label className={label(!!errors.phone)} htmlFor={`tel-${variant}`}>
             Telefone / WhatsApp
           </label>
           <div className="grid grid-cols-[4.5rem_minmax(0,1fr)] gap-2">
             <input
               aria-label="DDI"
-              className={field + " text-center"}
+              className={field(!!errors.phone) + " text-center"}
               value={ddi}
               onChange={(e) => setDdi("+" + e.target.value.replace(/\D/g, "").slice(0, 3))}
             />
             <input
               id={`tel-${variant}`}
-              className={field}
+              className={field(!!errors.phone)}
               value={phone}
               inputMode="tel"
-              onChange={(e) => setPhone(maskPhone(e.target.value))}
+              onChange={(e) => {
+                setPhone(maskPhone(e.target.value));
+                if (errors.phone) setErrors((prev) => ({ ...prev, phone: false }));
+              }}
               placeholder="(49) 99999-9999"
             />
           </div>
