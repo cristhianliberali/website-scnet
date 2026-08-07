@@ -16,6 +16,7 @@ import {
   ArrowRight,
 } from "lucide-react";
 import heroImg from "@/assets/casa-wifi-hero.png";
+import logoBranca from "@/assets/logo-scnet-branca.webp";
 import { Button } from "@/components/ui/button";
 import {
   Accordion,
@@ -667,9 +668,7 @@ export function Footer() {
     <footer className="bg-brand-deep py-14 text-primary-foreground">
       <div className="mx-auto grid max-w-7xl gap-10 px-4 md:grid-cols-3">
         <div>
-          <p className="font-display text-2xl font-extrabold">
-            SC<span className="text-zap">NET</span>
-          </p>
+          <img src={logoBranca} alt="SCNET" className="h-9 w-auto object-contain" />
           <p className="mt-3 max-w-xs font-body text-sm text-primary-foreground/75">
             Fibra óptica no Oeste e Litoral de Santa Catarina há mais de 20 anos.
           </p>
