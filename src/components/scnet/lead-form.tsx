@@ -5,14 +5,8 @@ import { getAttribution } from "@/lib/utm";
 import { getRecaptchaToken } from "@/lib/recaptcha";
 import { getFacebookCookies, trackLeadEvent } from "@/lib/facebook-pixel";
 import { submitLead } from "@/lib/submit-lead";
+import { capitalizeName, isValidPhone, maskPhone } from "@/lib/form-utils";
 import { waLink } from "./shared";
-
-function capitalize(v: string) {
-  return v
-    .replace(/[^A-Za-zÀ-ÿ\s']/g, "")
-    .replace(/\s{2,}/g, " ")
-    .replace(/(^|\s)([a-zà-ÿ])/g, (_m, s, c: string) => s + c.toUpperCase());
-}
 
 /**
  * Sends the lead to the webhook/CRM + Facebook CAPI without blocking the
@@ -40,14 +34,6 @@ async function submitLeadInBackground(name: string, ddi: string, phone: string) 
   }
 }
 
-function maskPhone(v: string) {
-  const d = v.replace(/\D/g, "").slice(0, 11);
-  if (d.length <= 2) return d.length ? `(${d}` : "";
-  if (d.length <= 6) return `(${d.slice(0, 2)}) ${d.slice(2)}`;
-  if (d.length <= 10) return `(${d.slice(0, 2)}) ${d.slice(2, 6)}-${d.slice(6)}`;
-  return `(${d.slice(0, 2)}) ${d.slice(2, 7)}-${d.slice(7)}`;
-}
-
 export function LeadForm({ variant = "hero" }: { variant?: "hero" | "light" }) {
   const [name, setName] = useState("");
   const [ddi, setDdi] = useState("+55");
@@ -57,12 +43,11 @@ export function LeadForm({ variant = "hero" }: { variant?: "hero" | "light" }) {
 
   function submit(e: FormEvent) {
     e.preventDefault();
-    const digits = phone.replace(/\D/g, "");
     if (name.trim().length < 3) {
       toast.error("Escreve teu nome completo pra gente te chamar direito 🙂");
       return;
     }
-    if (!/^\d{2}9?\d{8}$/.test(digits)) {
+    if (!isValidPhone(phone)) {
       toast.error("Confere o telefone: DDD + 8 ou 9 dígitos.");
       return;
     }
@@ -112,7 +97,7 @@ export function LeadForm({ variant = "hero" }: { variant?: "hero" | "light" }) {
             id={`nome-${variant}`}
             className={field}
             value={name}
-            onChange={(e) => setName(capitalize(e.target.value))}
+            onChange={(e) => setName(capitalizeName(e.target.value))}
             placeholder="Maria Silva"
             autoComplete="name"
           />

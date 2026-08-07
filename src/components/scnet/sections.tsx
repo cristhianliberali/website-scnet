@@ -26,6 +26,7 @@ import {
 } from "@/components/ui/accordion";
 import { useCountUp } from "@/hooks/use-reveal";
 import { LeadForm } from "./lead-form";
+import { ContractForm, type SelectedPlan } from "./contract-form";
 import { Blobs, Reveal, SectionTitle, waLink } from "./shared";
 
 /* ---------------- Hero ---------------- */
@@ -267,7 +268,7 @@ const plans = [
 
 const included = ["Fibra própria", "Roteador incluso", "App Skeelo", "Instalação grátis*"];
 
-export function Planos() {
+export function Planos({ onSelectPlan }: { onSelectPlan: (plan: SelectedPlan) => void }) {
   return (
     <section id="planos" className="bg-background py-20">
       <div className="mx-auto max-w-7xl px-4">
@@ -332,9 +333,8 @@ export function Planos() {
                   asChild
                 >
                   <a
-                    target="_blank"
-                    rel="noopener"
-                    href={waLink(`Oi! Quero saber mais sobre o ${p.name} da SCNET.`)}
+                    href="#contrate"
+                    onClick={() => onSelectPlan({ name: p.name, price: p.price })}
                   >
                     {p.cta}
                   </a>
@@ -606,7 +606,7 @@ export function Faq() {
 }
 
 /* ---------------- CTA final ---------------- */
-export function CtaFinal() {
+export function CtaFinal({ selectedPlan }: { selectedPlan: SelectedPlan | null }) {
   return (
     <section className="gradient-brand relative overflow-hidden py-20">
       <Blobs />
@@ -639,12 +639,8 @@ export function CtaFinal() {
             </Button>
           </div>
         </Reveal>
-        {/* TODO: swap for the real photo (scnet-internet-de-fibra) once provided */}
         <Reveal delay={120} className="max-w-md justify-self-end">
-          <div className="animate-float-slow relative mx-auto flex aspect-square w-full max-w-sm items-center justify-center rounded-[2.5rem] border border-primary-foreground/20 bg-primary-foreground/10 shadow-2xl backdrop-blur-md">
-            <div className="absolute inset-0 -z-10 rounded-[2.5rem] bg-zap/20 blur-2xl" />
-            <Wifi className="size-28 text-zap drop-shadow-xl" strokeWidth={1.5} />
-          </div>
+          <ContractForm selectedPlan={selectedPlan} />
         </Reveal>
       </div>
     </section>

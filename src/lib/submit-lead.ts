@@ -7,6 +7,9 @@ const leadInputSchema = z.object({
   ddi: z.string().min(1),
   phone: z.string().min(1),
   page: z.string(),
+  intent: z.enum(["quero_contratar", "ja_sou_cliente"]).optional(),
+  plan: z.string().optional(),
+  price: z.string().optional(),
   recaptchaToken: z.string().optional(),
   fbc: z.string().optional(),
   fbp: z.string().optional(),
@@ -35,6 +38,11 @@ async function verifyRecaptcha(token: string | undefined): Promise<RecaptchaResu
 
 function sha256(value: string) {
   return createHash("sha256").update(value.trim().toLowerCase()).digest("hex");
+}
+
+function parsePrice(price: string): number | undefined {
+  const n = Number(price.replace(/\./g, "").replace(",", "."));
+  return Number.isFinite(n) ? n : undefined;
 }
 
 async function sendWebhook(payload: unknown) {
@@ -79,6 +87,14 @@ async function sendFacebookCapiEvent(input: LeadInput) {
               fbc: input.fbc,
               fbp: input.fbp,
             },
+            ...(input.plan
+              ? {
+                  custom_data: {
+                    content_name: input.plan,
+                    ...(input.price ? { value: parsePrice(input.price), currency: "BRL" } : {}),
+                  },
+                }
+              : {}),
           },
         ],
       }),
@@ -104,9 +120,11 @@ export const submitLead = createServerFn({ method: "POST" })
     if (isLikelyBot) return { ok: false, reason: "recaptcha" as const };
 
     const payload = {
-      name: data.name,
-      ddi: data.ddi,
-      phone: data.phone,
+      nome: data.name,
+      whatsapp: `${data.ddi}${data.phone.replace(/\D/g, "")}`,
+      ...(data.plan ? { plano: data.plan } : {}),
+      ...(data.price ? { preco: data.price } : {}),
+      ...(data.intent ? { intencao: data.intent } : {}),
       page: data.page,
       submitted_at: new Date().toISOString(),
       attribution: data.attribution ?? {},
