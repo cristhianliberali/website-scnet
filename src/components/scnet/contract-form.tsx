@@ -53,8 +53,8 @@ export function ContractForm({ selectedPlan }: { selectedPlan: SelectedPlan | nu
   const [intent, setIntent] = useState<Intent | null>(null);
 
   const field =
-    "w-full rounded-lg border border-primary-foreground/25 bg-primary-foreground/10 px-4 py-3 font-body text-primary-foreground placeholder:text-primary-foreground/50 outline-none backdrop-blur transition focus:border-zap focus:ring-2 focus:ring-zap/40";
-  const label = "font-ui text-sm font-semibold text-primary-foreground/90";
+    "w-full rounded-lg border border-border bg-muted/40 px-4 py-3 font-body text-foreground placeholder:text-muted-foreground outline-none transition focus:border-brand focus:ring-2 focus:ring-brand/30";
+  const label = "font-ui text-sm font-semibold text-brand-deep";
 
   function submit(e: FormEvent) {
     e.preventDefault();
@@ -98,15 +98,15 @@ export function ContractForm({ selectedPlan }: { selectedPlan: SelectedPlan | nu
     <form
       id="contrate"
       onSubmit={submit}
-      className="w-full scroll-mt-28 rounded-2xl border border-primary-foreground/20 bg-primary-foreground/10 p-5 shadow-2xl backdrop-blur-md sm:p-6"
+      className="w-full scroll-mt-28 rounded-2xl border border-border bg-white p-6 shadow-xl sm:p-8"
     >
       {selectedPlan && (
-        <div className="mb-4 rounded-xl border border-zap/40 bg-zap/15 px-4 py-3 font-ui text-sm font-semibold text-primary-foreground">
-          Plano desejado: <span className="text-zap">{selectedPlan.name}</span> — R${" "}
+        <div className="mb-4 rounded-xl border border-brand/25 bg-brand/10 px-4 py-3 font-ui text-sm font-semibold text-brand-deep">
+          Plano desejado: <span className="text-brand">{selectedPlan.name}</span> — R${" "}
           {selectedPlan.price}/mês
         </div>
       )}
-      <p className="font-display text-xl font-extrabold text-primary-foreground">Contrate agora</p>
+      <p className="font-display text-2xl font-extrabold text-brand-deep">Contrate agora</p>
       <div className="mt-4 space-y-3">
         <div className="space-y-1.5">
           <label className={label} htmlFor="nome-contrate">
@@ -158,8 +158,8 @@ export function ContractForm({ selectedPlan }: { selectedPlan: SelectedPlan | nu
                 className={cn(
                   "rounded-md border px-3 py-2 font-ui text-xs font-medium transition",
                   intent === value
-                    ? "border-primary-foreground/60 bg-primary-foreground/15 text-primary-foreground"
-                    : "border-primary-foreground/20 bg-primary-foreground/5 text-primary-foreground/70 hover:border-primary-foreground/40 hover:bg-primary-foreground/10",
+                    ? "border-brand bg-brand/10 text-brand-deep"
+                    : "border-border bg-white text-muted-foreground hover:border-brand/40 hover:text-brand-deep",
                 )}
               >
                 {text}
@@ -171,7 +171,7 @@ export function ContractForm({ selectedPlan }: { selectedPlan: SelectedPlan | nu
       <Button type="submit" variant="zap" size="xl" className="mt-5 w-full">
         Quero contratar agora
       </Button>
-      <p className="mt-3 text-center font-body text-sm text-primary-foreground/80">
+      <p className="mt-3 text-center font-body text-sm text-muted-foreground">
         Venha para a conexão n°1 da região
       </p>
     </form>
