@@ -7,7 +7,7 @@ import {
   Wrench,
   Trophy,
   Star,
-  Star,
+  Users,
   Users,
   MapPin,
   Headset,
