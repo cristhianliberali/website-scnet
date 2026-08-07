@@ -53,8 +53,8 @@ export function ContractForm({ selectedPlan }: { selectedPlan: SelectedPlan | nu
   const [intent, setIntent] = useState<Intent | null>(null);
 
   const field =
-    "w-full rounded-lg border border-primary-foreground/25 bg-primary-foreground/10 px-4 py-3 font-body text-primary-foreground placeholder:text-primary-foreground/50 outline-none backdrop-blur transition focus:border-zap focus:ring-2 focus:ring-zap/40";
-  const label = "font-ui text-sm font-semibold text-primary-foreground/90";
+    "w-full rounded-lg border border-border bg-muted/40 px-4 py-3 font-body text-foreground placeholder:text-muted-foreground outline-none transition focus:border-brand focus:ring-2 focus:ring-brand/30";
+  const label = "font-ui text-sm font-semibold text-brand-deep";
 
   function submit(e: FormEvent) {
     e.preventDefault();
