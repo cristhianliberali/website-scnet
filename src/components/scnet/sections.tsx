@@ -226,7 +226,7 @@ export function Planos() {
     <section id="planos" className="bg-background py-20">
       <div className="mx-auto max-w-7xl px-4">
         <Reveal className="text-center">
-          <SectionTitle className="text-brand-deep">Escolhe teu plano e já garante o teu Wi-Fi</SectionTitle>
+          <SectionTitle className="text-brand-deep">Escolha seu novo plano de internet</SectionTitle>
           <p className="mx-auto mt-4 max-w-2xl font-body text-lg text-muted-foreground">
             Fibra própria, roteador incluso e app Skeelo de bônus. Rápido de assinar, mais rápido ainda de usar.
           </p>
