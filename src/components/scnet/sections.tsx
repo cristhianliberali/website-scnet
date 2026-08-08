@@ -40,64 +40,64 @@ import { Blobs, Reveal, SectionTitle, waLink } from "./shared";
 /* ---------------- Hero ---------------- */
 export function Hero() {
   return (
-    <section
-      id="top"
-      className="gradient-brand relative overflow-hidden pb-20 pt-28 lg:pb-28 lg:pt-36"
-    >
-      <Blobs />
-      <div className="relative mx-auto grid max-w-7xl items-center gap-12 px-4 lg:grid-cols-2">
-        <div>
-          <Reveal>
-            <span className="font-ui inline-flex items-center gap-2 rounded-full bg-zap px-4 py-1.5 text-xs font-bold uppercase tracking-wide text-zap-ink">
-              <Zap className="size-4" /> INTERNET FIBRA ÓPTICA NO OESTE E LITORAL DE SC
-            </span>
-          </Reveal>
-          <Reveal delay={80}>
-            <h1 className="mt-5 font-display text-4xl font-extrabold leading-[1.05] tracking-tight text-primary-foreground sm:text-5xl lg:text-6xl">
-              Wi-Fi rápido e estável&nbsp;na casa toda!
-            </h1>
-          </Reveal>
-          <Reveal delay={160}>
-            <p className="mt-5 max-w-xl font-body text-lg text-primary-foreground/90">
-              Internet estável e atendimento humano com gente da sua cidade.
-            </p>
-          </Reveal>
-          <Reveal delay={240} className="mt-8">
-            <Button asChild variant="zap" size="hero" className="shadow-lg">
-              <a href="#planos">
-                Quero ver os planos
-                <ArrowRight className="size-5" />
-              </a>
-            </Button>
-          </Reveal>
-        </div>
-
-        <Reveal delay={200} className="relative">
-          <div className="absolute left-1/2 top-1/2 -z-0 h-[70%] w-[70%] -translate-x-1/2 -translate-y-1/2 rounded-full bg-zap/30 blur-3xl" />
-          <img
-            src={heroImg}
-            alt="Planta baixa de uma casa com sinal de Wi-Fi forte em todos os cômodos"
-            width={1080}
-            height={1080}
-            className="animate-float-slow relative mx-auto w-full max-w-lg md:max-w-xl drop-shadow-2xl"
-          />
-          {[
-            { Icon: Wifi, cls: "left-2 top-6", delay: "0s" },
-            { Icon: Router, cls: "right-4 top-24", delay: "-2s" },
-            { Icon: Gauge, cls: "left-6 bottom-16", delay: "-4s" },
-            { Icon: ShieldCheck, cls: "right-10 bottom-6", delay: "-3s" },
-          ].map(({ Icon, cls, delay }, i) => (
-            <div
-              key={i}
-              style={{ animationDelay: delay }}
-              className={`animate-float absolute ${cls} grid size-14 place-items-center rounded-2xl border border-primary-foreground/25 bg-primary-foreground/15 text-zap backdrop-blur-md`}
-            >
-              <Icon className="size-7" />
-            </div>
-          ))}
+  <section
+    id="top"
+    className="gradient-brand relative overflow-hidden pb-12 pt-20 sm:pb-16 sm:pt-24 lg:pb-28 lg:pt-36"
+  >
+    <Blobs />
+    <div className="relative mx-auto grid max-w-7xl items-center gap-8 px-4 sm:gap-10 lg:grid-cols-2 lg:gap-12">
+      <div>
+        <Reveal>
+          <span className="font-ui inline-flex items-center gap-2 rounded-full bg-zap px-3 py-1 text-[10px] font-bold uppercase tracking-wide text-zap-ink sm:px-4 sm:py-1.5 sm:text-xs">
+            <Zap className="size-3 sm:size-4" /> INTERNET FIBRA ÓPTICA NO OESTE E LITORAL DE SC
+          </span>
+        </Reveal>
+        <Reveal delay={80}>
+          <h1 className="mt-4 font-display text-3xl font-extrabold leading-[1.05] tracking-tight text-primary-foreground sm:text-4xl md:text-5xl lg:text-6xl">
+            Wi-Fi rápido e estável&nbsp;na casa toda!
+          </h1>
+        </Reveal>
+        <Reveal delay={160}>
+          <p className="mt-4 max-w-xl font-body text-base text-primary-foreground/90 sm:text-lg">
+            Internet estável e atendimento humano com gente da sua cidade.
+          </p>
+        </Reveal>
+        <Reveal delay={240} className="mt-6 sm:mt-8">
+          <Button asChild variant="zap" size="hero" className="shadow-lg">
+            <a href="#planos">
+              Quero ver os planos
+              <ArrowRight className="size-5" />
+            </a>
+          </Button>
         </Reveal>
       </div>
-    </section>
+
+      <Reveal delay={200} className="relative">
+        <div className="absolute left-1/2 top-1/2 -z-0 h-[60%] w-[60%] -translate-x-1/2 -translate-y-1/2 rounded-full bg-zap/30 blur-3xl lg:h-[70%] lg:w-[70%]" />
+        <img
+          src={heroImg}
+          alt="Planta baixa de uma casa com sinal de Wi-Fi forte em todos os cômodos"
+          width={1080}
+          height={1080}
+          className="animate-float-slow relative mx-auto w-full max-w-xs drop-shadow-2xl sm:max-w-sm md:max-w-md lg:max-w-xl"
+        />
+        {[
+          { Icon: Wifi, cls: "left-2 top-6", delay: "0s" },
+          { Icon: Router, cls: "right-4 top-24", delay: "-2s" },
+          { Icon: Gauge, cls: "left-6 bottom-16", delay: "-4s" },
+          { Icon: ShieldCheck, cls: "right-10 bottom-6", delay: "-3s" },
+        ].map(({ Icon, cls, delay }, i) => (
+          <div
+            key={i}
+            style={{ animationDelay: delay }}
+            className={`animate-float absolute ${cls} grid size-10 place-items-center rounded-2xl border border-primary-foreground/25 bg-primary-foreground/15 text-zap backdrop-blur-md sm:size-12 lg:size-14`}
+          >
+            <Icon className="size-5 sm:size-6 lg:size-7" />
+          </div>
+        ))}
+      </Reveal>
+    </div>
+  </section>
   );
 }
 
