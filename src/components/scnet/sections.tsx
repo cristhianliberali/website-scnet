@@ -15,6 +15,9 @@ import {
   Building2,
   ArrowRight,
   Clock,
+  Rocket,
+  BookOpen,
+  Globe,
 } from "lucide-react";
 import heroImg from "@/assets/planta-baixa-wifi.webp";
 import logoBranca from "@/assets/logo-scnet-branca.webp";
@@ -227,18 +230,42 @@ export function Diferenciais() {
 }
 
 /* ---------------- Planos ---------------- */
+const planFeatures = {
+  base: [
+    { icon: Globe, text: "Internet fibra óptica" },
+    { icon: Wifi, text: "450 Mega de velocidade" },
+    { icon: Router, text: "1x Roteador Wi-Fi 6 Incluso" },
+    { icon: BookOpen, text: "App Skeelo" },
+    { icon: Wrench, text: "Instalação gratuita*" },
+  ],
+};
+
 const plans = [
   {
     name: "Plano 450",
     price: "109,90",
     desc: "Pra quem quer resolver o dia a dia sem drama: redes sociais, séries e trabalho leve, tudo rodando liso.",
     cta: "Quero este plano",
+    features: [
+      { icon: Globe, text: "Internet fibra óptica" },
+      { icon: Wifi, text: "450 Mega de velocidade" },
+      { icon: Router, text: "1x Roteador Wi-Fi 6 Incluso" },
+      { icon: BookOpen, text: "App Skeelo" },
+      { icon: Wrench, text: "Instalação gratuita*" },
+    ],
   },
   {
     name: "Plano 710",
     price: "129,90",
     desc: "Casa com mais gente conectada ao mesmo tempo? Esse aguenta o tranco — aula online, chamada de vídeo e streaming juntos, sem travar.",
     cta: "Quero este plano",
+    features: [
+      { icon: Globe, text: "Internet fibra óptica" },
+      { icon: Wifi, text: "710 Mega de velocidade" },
+      { icon: Router, text: "1x Roteador Wi-Fi 6 Incluso" },
+      { icon: BookOpen, text: "App Skeelo" },
+      { icon: Wrench, text: "Instalação gratuita*" },
+    ],
   },
   {
     name: "Plano Infinity",
@@ -246,16 +273,28 @@ const plans = [
     desc: "Várias telas, jogo online, home office e streaming em 4K rodando ao mesmo tempo, sem susto.",
     cta: "Quero este plano",
     featured: true,
+    features: [
+      { icon: Globe, text: "Internet fibra óptica" },
+      { icon: Rocket, text: "Sem controle de velocidade" },
+      { icon: Router, text: "1x Roteador Wi-Fi 6 Incluso" },
+      { icon: BookOpen, text: "App Skeelo" },
+      { icon: Wrench, text: "Instalação gratuita*" },
+    ],
   },
   {
     name: "Plano Infinity Duo",
     price: "159,90",
     desc: "Ideal para ambientes amplos e vários dispositivos conectados — 2 roteadores garantindo Wi-Fi em todo canto.",
     cta: "Quero este plano",
+    features: [
+      { icon: Globe, text: "Internet fibra óptica" },
+      { icon: Rocket, text: "Sem controle de velocidade" },
+      { icon: Router, text: "2x Roteadores Wi-Fi 6 Inclusos" },
+      { icon: BookOpen, text: "App Skeelo" },
+      { icon: Wrench, text: "Instalação R$ 100,00 (taxa única)*" },
+    ],
   },
 ];
-
-const included = ["Fibra própria", "Roteador incluso", "App Skeelo", "Instalação grátis*"];
 
 export function Planos({ onSelectPlan }: { onSelectPlan: (plan: SelectedPlan) => void }) {
   return (
@@ -306,14 +345,17 @@ export function Planos({ onSelectPlan }: { onSelectPlan: (plan: SelectedPlan) =>
                   {p.desc}
                 </p>
                 <ul className="mt-5 space-y-2">
-                  {included.map((f) => (
-                    <li key={f} className="flex items-center gap-2 font-body text-sm">
-                      <Check
-                        className={`size-4 shrink-0 ${p.featured ? "text-zap" : "text-brand"}`}
-                      />
-                      {f}
-                    </li>
-                  ))}
+                  {p.features.map((f) => {
+                    const Icon = f.icon;
+                    return (
+                      <li key={f.text} className="flex items-center gap-2 font-body text-sm">
+                        <Icon
+                          className={`size-4 shrink-0 ${p.featured ? "text-zap" : "text-brand"}`}
+                        />
+                        {f.text}
+                      </li>
+                    );
+                  })}
                 </ul>
                 <Button
                   variant={p.featured ? "zap" : "brand"}
@@ -334,8 +376,9 @@ export function Planos({ onSelectPlan }: { onSelectPlan: (plan: SelectedPlan) =>
         </div>
 
         <p className="mx-auto mt-8 max-w-3xl text-center font-body text-xs text-muted-foreground">
-          *Instalação gratuita mediante análise de crédito. Fidelidade de 12 meses (CPF) e 24 meses
-          (PJ). Condições podem variar — confirme com um consultor.
+          *Instalação gratuita para os planos 450, 710 e Infinity. Plano Infinity Duo: instalação
+          R$ 100,00 (taxa única). Fidelidade de 12 meses (CPF) e 24 meses (PJ). Condições podem
+          variar — confirme com um consultor.
         </p>
 
         <Reveal className="mt-10 rounded-3xl bg-muted p-8 text-center">
