@@ -29,9 +29,9 @@ export function Header() {
         scrolled ? "gradient-brand shadow-lg backdrop-blur-md" : "bg-transparent",
       )}
     >
-      <div className="mx-auto grid max-w-7xl grid-cols-[minmax(0,1fr)_auto] items-center gap-4 px-4 py-3 lg:flex lg:justify-between">
+      <div className="mx-auto grid max-w-7xl grid-cols-[minmax(0,1fr)_auto] items-center gap-4 px-4 py-7 lg:flex lg:justify-between">
         <a href="#top" className="shrink-0">
-          <img src={logoBranca} alt="SCNET" className="h-8 w-auto object-contain sm:h-9" />
+          <img src={logoBranca} alt="SCNET" className="h-12 w-auto object-contain sm:h-14" />
         </a>
 
         <nav className="hidden items-center gap-1 font-ui text-sm font-semibold text-primary-foreground/90 lg:flex">
