@@ -376,8 +376,9 @@ export function Planos({ onSelectPlan }: { onSelectPlan: (plan: SelectedPlan) =>
         </div>
 
         <p className="mx-auto mt-8 max-w-3xl text-center font-body text-xs text-muted-foreground">
-          *Instalação gratuita mediante análise de crédito. Fidelidade de 12 meses (CPF) e 24 meses
-          (PJ). Condições podem variar — confirme com um consultor.
+          *Instalação gratuita para os planos 450, 710 e Infinity. Plano Infinity Duo: instalação
+          R$ 100,00 (taxa única). Fidelidade de 12 meses (CPF) e 24 meses (PJ). Condições podem
+          variar — confirme com um consultor.
         </p>
 
         <Reveal className="mt-10 rounded-3xl bg-muted p-8 text-center">
