@@ -763,8 +763,7 @@ function StepPlanos({ selected, onSelect }: { selected: Plan | null; onSelect: (
         })}
       </div>
       <p className="mx-auto mt-8 max-w-3xl text-center font-body text-xs text-muted-foreground">
-        *Instalação gratuita para os planos 450, 710 e Infinity. Plano Infinity Duo: instalação R$
-        100,00 (taxa única). Fidelidade de 12 meses (CPF) e 24 meses (PJ).
+        *Condições sujeitas a análise de crédito e viabilidade técnica. Todos os planos residenciais (CPF) possuem fidelidade de 12 meses.
       </p>
     </div>
   );

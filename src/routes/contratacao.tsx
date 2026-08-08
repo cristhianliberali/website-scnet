@@ -67,7 +67,7 @@ function Contratacao() {
           <Blobs />
           <div className="relative mx-auto max-w-3xl px-4 text-center">
             <h1 className="font-display text-3xl font-extrabold tracking-tight text-primary-foreground sm:text-4xl">
-              Contratação online da sua fibra SCNET
+              Falta pouco para concluir seu pedido!
             </h1>
             <p className="mt-3 font-body text-lg text-primary-foreground/90">
               Quatro passos rápidos: plano, endereço, cadastro e agendamento da instalação.
