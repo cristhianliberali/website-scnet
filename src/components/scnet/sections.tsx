@@ -462,11 +462,11 @@ export function Empresas() {
     <section id="empresas" className="gradient-brand relative overflow-hidden py-20">
       <Blobs />
       <div className="relative mx-auto grid max-w-7xl items-center gap-10 px-4 lg:grid-cols-[minmax(0,1fr)_auto]">
-        <Reveal>
+        <Reveal className="max-w-[522px]">
           <SectionTitle className="text-primary-foreground">
             Seu negócio não pode ficar fora do ar
           </SectionTitle>
-          <p className="mt-5 max-w-2xl font-body text-lg text-primary-foreground/90">
+          <p className="mt-5 font-body text-lg text-primary-foreground/90">
             Comércio, escritório, indústria ou condomínio — conexão estável pra vender, atender e
             manter tudo operando, com suporte prioritário quando precisar.
           </p>
