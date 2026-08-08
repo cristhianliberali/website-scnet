@@ -24,8 +24,6 @@ import disneyLogo from "@/assets/disney.webp";
 import premiereLogo from "@/assets/premiere.webp";
 import nossoFutebolLogo from "@/assets/nosso-futebol.webp";
 import skeeloLogo from "@/assets/skeelo.webp";
-import wifi7Logo from "@/assets/wifi7.webp";
-import meshLogo from "@/assets/mesh.webp";
 import scMovelLogo from "@/assets/scmovel.webp";
 import { Button } from "@/components/ui/button";
 import { plans } from "@/lib/plans";
@@ -345,12 +343,6 @@ const perks = [
     logo: nossoFutebolLogo,
   },
   { name: "App Skeelo", desc: "Livros e audiolivros liberados na assinatura.", logo: skeeloLogo },
-  {
-    name: "Wi-Fi 7",
-    desc: "Mais dispositivos conectados, mais alcance, mais velocidade.",
-    logo: wifi7Logo,
-  },
-  { name: "Rede Mesh", desc: "Rede Mesh para sinal rápido em qualquer cômodo da casa!", logo: meshLogo },
   { name: "SC Móvel", desc: "Internet móvel com 5G nacional.", logo: scMovelLogo },
 ];
 
