@@ -98,7 +98,9 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
         rel: "stylesheet",
         href: appCss,
       },
-      { rel: "icon", href: "/favicon.ico", type: "image/x-icon" },
+      // ?v= busts the browser's favicon cache, which survives a hard refresh.
+      // Bump the number whenever public/favicon.ico changes.
+      { rel: "icon", href: "/favicon.ico?v=2", type: "image/x-icon" },
       ...(SITE_URL ? [{ rel: "canonical", href: SITE_URL }] : []),
       { rel: "preconnect", href: "https://fonts.googleapis.com" },
       { rel: "preconnect", href: "https://fonts.gstatic.com", crossOrigin: "anonymous" },
