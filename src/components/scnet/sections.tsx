@@ -345,14 +345,17 @@ export function Planos({ onSelectPlan }: { onSelectPlan: (plan: SelectedPlan) =>
                   {p.desc}
                 </p>
                 <ul className="mt-5 space-y-2">
-                  {included.map((f) => (
-                    <li key={f} className="flex items-center gap-2 font-body text-sm">
-                      <Check
-                        className={`size-4 shrink-0 ${p.featured ? "text-zap" : "text-brand"}`}
-                      />
-                      {f}
-                    </li>
-                  ))}
+                  {p.features.map((f) => {
+                    const Icon = f.icon;
+                    return (
+                      <li key={f.text} className="flex items-center gap-2 font-body text-sm">
+                        <Icon
+                          className={`size-4 shrink-0 ${p.featured ? "text-zap" : "text-brand"}`}
+                        />
+                        {f.text}
+                      </li>
+                    );
+                  })}
                 </ul>
                 <Button
                   variant={p.featured ? "zap" : "brand"}
