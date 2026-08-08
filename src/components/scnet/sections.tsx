@@ -14,6 +14,7 @@ import {
   MessageCircle,
   Building2,
   ArrowRight,
+  Clock,
 } from "lucide-react";
 import heroImg from "@/assets/casa-wifi-hero.png";
 import logoBranca from "@/assets/logo-scnet-branca.webp";
@@ -612,20 +613,26 @@ export function CtaFinal({ selectedPlan }: { selectedPlan: SelectedPlan | null }
       <Blobs />
       <div className="relative mx-auto grid max-w-7xl items-center gap-12 px-4 lg:grid-cols-[1fr_580px]">
         <Reveal>
-          <div className="mb-4 flex gap-1">
-            {[0, 1, 2, 3, 4].map((s) => (
-              <Star key={s} className="size-6 fill-zap text-zap" />
-            ))}
-          </div>
           <SectionTitle className="text-primary-foreground">
-            Não vendemos só internet, a gente oferece tranquilidade.
-            <div className="mt-2 text-2xl font-semibold opacity-90">
-              Cuidamos do Wi-Fi, você aproveita o momento!&nbsp;
-            </div>
+            Cuidamos do Wi-Fi, você aproveita o momento!&nbsp;
           </SectionTitle>
           <p className="mt-5 max-w-xl font-body text-lg text-primary-foreground/90">
             + 20 anos conectando o Oeste e Litoral Catarinense. Chegou a sua vez de viver a melhor experiência conectado!
           </p>
+          <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:flex-wrap">
+            <div className="flex items-center gap-2 rounded-full bg-primary-foreground/15 px-4 py-2 text-primary-foreground backdrop-blur-sm">
+              <Star className="size-5 fill-zap text-zap" />
+              <span className="font-ui text-sm font-semibold">Nota 4.9/5 no Google!</span>
+            </div>
+            <div className="flex items-center gap-2 rounded-full bg-primary-foreground/15 px-4 py-2 text-primary-foreground backdrop-blur-sm">
+              <Clock className="size-5 text-zap" />
+              <span className="font-ui text-sm font-semibold">Tempo médio de resposta no telefone menos de 1 minuto</span>
+            </div>
+            <div className="flex items-center gap-2 rounded-full bg-primary-foreground/15 px-4 py-2 text-primary-foreground backdrop-blur-sm">
+              <MessageCircle className="size-5 text-zap" />
+              <span className="font-ui text-sm font-semibold">Tempo médio de resposta no WhatsApp menos de 5 minuto</span>
+            </div>
+          </div>
         </Reveal>
         <Reveal delay={120} className="w-full lg:justify-self-end">
           <ContractForm selectedPlan={selectedPlan} />
