@@ -611,7 +611,7 @@ export function CtaFinal({ selectedPlan }: { selectedPlan: SelectedPlan | null }
             </div>
             <div className="flex items-center gap-2 rounded-full bg-primary-foreground/15 px-4 py-2 text-primary-foreground backdrop-blur-sm">
               <MessageCircle className="size-5 text-zap" />
-              <span className="font-ui text-sm font-semibold">Tempo médio de resposta no WhatsApp menos de 5 minuto</span>
+              <span className="font-ui text-sm font-semibold">Tempo médio de resposta no WhatsApp menos de 5 minutos</span>
             </div>
           </div>
         </Reveal>
