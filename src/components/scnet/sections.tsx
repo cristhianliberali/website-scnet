@@ -345,12 +345,6 @@ const perks = [
     logo: nossoFutebolLogo,
   },
   { name: "App Skeelo", desc: "Livros e audiolivros liberados na assinatura.", logo: skeeloLogo },
-  {
-    name: "Wi-Fi 7",
-    desc: "Mais dispositivos conectados, mais alcance, mais velocidade.",
-    logo: wifi7Logo,
-  },
-  { name: "Rede Mesh", desc: "Rede Mesh para sinal rápido em qualquer cômodo da casa!", logo: meshLogo },
   { name: "SC Móvel", desc: "Internet móvel com 5G nacional.", logo: scMovelLogo },
 ];
 
