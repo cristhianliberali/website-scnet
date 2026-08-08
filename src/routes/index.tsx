@@ -45,8 +45,8 @@ function Index() {
       <main>
         <Hero />
         <SocialBar />
-        <Diferenciais />
         <Planos onSelectPlan={setSelectedPlan} />
+        <Diferenciais />
         <Beneficios />
         <ComoContratar />
         <Empresas />
