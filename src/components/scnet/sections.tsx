@@ -256,7 +256,7 @@ const plans = [
   },
   {
     name: "Plano 710",
-    price: "129,90",
+    price: "119,90",
     desc: "Casa com mais gente conectada ao mesmo tempo? Esse aguenta o tranco — aula online, chamada de vídeo e streaming juntos, sem travar.",
     cta: "Quero este plano",
     features: [
