@@ -734,7 +734,7 @@ function StepPlanos({ selected, onSelect }: { selected: Plan | null; onSelect: (
 
               {p.featured && (
                 <span className="absolute -top-3 left-1/2 -translate-x-1/2 rounded-full bg-zap px-4 py-1 font-ui text-xs font-extrabold tracking-wide text-zap-ink">
-                  MAIS ESCOLHIDO
+                  Recomendado
                 </span>
               )}
               <h3 className={cn("font-ui text-2xl font-bold", p.featured ? "text-zap" : "text-brand")}>
