@@ -6,7 +6,6 @@ import type { SelectedPlan } from "@/components/scnet/contract-form";
 import {
   Hero,
   SocialBar,
-  Promise_,
   Diferenciais,
   Planos,
   Beneficios,
@@ -46,7 +45,6 @@ function Index() {
       <main>
         <Hero />
         <SocialBar />
-        <Promise_ />
         <Diferenciais />
         <Planos onSelectPlan={setSelectedPlan} />
         <Beneficios />
