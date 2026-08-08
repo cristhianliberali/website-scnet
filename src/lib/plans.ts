@@ -14,7 +14,7 @@ export const plans: Plan[] = [
   {
     name: "Plano 450",
     price: "109,90",
-    desc: "Pra quem quer resolver o dia a dia sem drama: redes sociais, séries e trabalho leve, tudo rodando liso.",
+    desc: "Pra quem quer resolver o dia a dia sem drama: redes sociais, séries e trabalho leve, tudo rodando leve.",
     cta: "Quero este plano",
     features: [
       { icon: Globe, text: "Internet fibra óptica" },
@@ -27,7 +27,7 @@ export const plans: Plan[] = [
   {
     name: "Plano 710",
     price: "119,90",
-    desc: "Casa com mais gente conectada ao mesmo tempo? Esse aguenta o tranco — aula online, chamada de vídeo e streaming juntos, sem travar.",
+    desc: "Casa com mais gente conectada ao mesmo tempo? Esse aguenta o tranco, aula online, chamada de vídeo e streaming juntos, sem travar.",
     cta: "Quero este plano",
     features: [
       { icon: Globe, text: "Internet fibra óptica" },
@@ -40,7 +40,7 @@ export const plans: Plan[] = [
   {
     name: "Plano Infinity",
     price: "139,90",
-    desc: "Várias telas, jogo online, home office e streaming em 4K rodando ao mesmo tempo, sem susto.",
+    desc: "Várias telas, jogo online, home office e streaming em 4K rodando ao mesmo tempo.",
     cta: "Quero este plano",
     featured: true,
     features: [
@@ -54,7 +54,7 @@ export const plans: Plan[] = [
   {
     name: "Plano Infinity Duo",
     price: "159,90",
-    desc: "Ideal para ambientes amplos e vários dispositivos conectados — 2 roteadores garantindo Wi-Fi em todo canto.",
+    desc: "Ideal para residencias amplas e vários dispositivos conectados, possui 2 roteadores garantindo Wi-Fi em todos os comôdos.",
     cta: "Quero este plano",
     features: [
       { icon: Globe, text: "Internet fibra óptica" },
