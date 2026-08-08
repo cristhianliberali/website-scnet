@@ -201,7 +201,7 @@ export function ContractForm({ selectedPlan }: { selectedPlan: SelectedPlan | nu
         Quero contratar agora
       </Button>
       <p className="mt-3 text-center font-body text-sm text-muted-foreground">
-        Venha para a conexão n°1 da região
+        Mude para a conexão n°1 da região
       </p>
     </form>
   );
