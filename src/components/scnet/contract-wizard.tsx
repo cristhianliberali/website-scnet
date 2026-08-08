@@ -280,6 +280,7 @@ export function ContractWizard({ handoff }: { handoff: ContractHandoff }) {
       if (!address.bairro.trim()) e["bairro"] = "Informe o bairro";
       if (!address.logradouro.trim()) e["logradouro"] = "Informe o logradouro";
       if (!address.numero.trim()) e["numero"] = "Informe o número";
+      if (!address.complemento.trim()) e["complemento"] = "Informe o complemento";
       if (address.tipo === "apartamento" && !address.condominio.trim())
         e["condominio"] = "Informe o nome do condomínio";
     }
@@ -477,12 +478,15 @@ export function ContractWizard({ handoff }: { handoff: ContractHandoff }) {
               />
             </Field>
 
-            <Field label="Complemento (opcional)">
+            <Field label="Complemento" error={errors["complemento"]}>
               <input
-                className={inputCls(false)}
+                className={inputCls(!!errors["complemento"])}
                 value={address.complemento}
                 placeholder="Bloco B, apto 302"
-                onChange={(e) => setAddress((p) => ({ ...p, complemento: e.target.value }))}
+                onChange={(e) => {
+                  setAddress((p) => ({ ...p, complemento: e.target.value }));
+                  clearError("complemento");
+                }}
               />
             </Field>
 
