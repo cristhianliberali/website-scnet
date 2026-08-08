@@ -117,12 +117,12 @@ function Stepper({
   onGo: (i: number) => void;
 }) {
   return (
-    <ol className="flex items-center gap-2 sm:gap-3">
+    <ol className="grid grid-cols-2 gap-2 sm:grid-cols-4 sm:gap-3">
       {steps.map((label, i) => {
         const done = i < current;
         const active = i === current;
         return (
-          <li key={label} className="flex flex-1 items-center gap-2 sm:gap-3">
+          <li key={label} className="flex items-center gap-2 sm:gap-3">
             <button
               type="button"
               onClick={() => done && onGo(i)}
