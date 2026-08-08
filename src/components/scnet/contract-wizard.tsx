@@ -569,7 +569,7 @@ export function ContractWizard({ handoff }: { handoff: ContractHandoff }) {
               />
             </Field>
 
-            <Field label="2° telefone para contato (opcional)" error={errors["telefone2"]} className="sm:col-span-2">
+            <Field label="2° telefone para contato" error={errors["telefone2"]} className="sm:col-span-2">
               <input
                 className={inputCls(!!errors["telefone2"])}
                 value={person.telefone2}
@@ -696,58 +696,71 @@ function StepPlanos({ selected, onSelect }: { selected: Plan | null; onSelect: (
   return (
     <div>
       <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-4">
-        {plans.map((p) => (
-          <div
-            key={p.name}
-            className={cn(
-              "relative flex h-full flex-col rounded-3xl p-6 transition-all duration-300 hover:-translate-y-2",
-              p.featured
-                ? "gradient-brand border-2 border-zap text-primary-foreground shadow-[0_20px_60px_-15px_color-mix(in_oklab,var(--color-zap)_55%,transparent)]"
-                : "border border-border bg-card text-card-foreground",
-              selected?.name === p.name && !p.featured && "border-brand ring-2 ring-brand/30",
-            )}
-          >
-            {p.featured && (
-              <span className="absolute -top-3 left-1/2 -translate-x-1/2 rounded-full bg-zap px-4 py-1 font-ui text-xs font-extrabold tracking-wide text-zap-ink">
-                MAIS ESCOLHIDO
-              </span>
-            )}
-            <h3 className={cn("font-ui text-2xl font-bold", p.featured ? "text-zap" : "text-brand")}>
-              {p.name}
-            </h3>
-            <p className="mt-3 font-display text-3xl font-extrabold tracking-tight">
-              <span className="align-super text-lg">R$</span> {p.price}
+        {plans.map((p) => {
+          const isSelected = selected?.name === p.name;
+          return (
+            <button
+              key={p.name}
+              type="button"
+              onClick={() => onSelect(p)}
+              className={cn(
+                "group relative flex h-full flex-col rounded-3xl p-6 text-left transition-all duration-300 hover:-translate-y-2 focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2",
+                p.featured
+                  ? "gradient-brand border-2 border-zap text-primary-foreground shadow-[0_20px_60px_-15px_color-mix(in_oklab,var(--color-zap)_55%,transparent)] focus-visible:ring-zap"
+                  : "border border-border bg-card text-card-foreground focus-visible:ring-brand",
+                isSelected && !p.featured && "border-brand ring-2 ring-brand/30",
+              )}
+            >
               <span
                 className={cn(
-                  "font-body text-sm font-medium",
-                  p.featured ? "text-primary-foreground/70" : "text-muted-foreground",
+                  "absolute right-4 top-4 grid size-8 place-items-center rounded-full transition",
+                  isSelected
+                    ? p.featured
+                      ? "bg-zap text-zap-ink opacity-100"
+                      : "bg-brand text-primary-foreground opacity-100"
+                    : cn(
+                        "border-2 opacity-0 group-hover:opacity-100",
+                        p.featured ? "border-zap text-zap" : "border-brand text-brand",
+                      ),
                 )}
+                aria-hidden="true"
               >
-                /mês
+                {isSelected ? <CheckCircle2 className="size-5" /> : <Circle className="size-5" />}
               </span>
-            </p>
-            <ul className="mt-5 space-y-2">
-              {p.features.map((f) => {
-                const Icon = f.icon;
-                return (
-                  <li key={f.text} className="flex items-center gap-2 font-body text-sm">
-                    <Icon className={cn("size-4 shrink-0", p.featured ? "text-zap" : "text-brand")} />
-                    {f.text}
-                  </li>
-                );
-              })}
-            </ul>
-            <Button
-              type="button"
-              variant={p.featured ? "zap" : "brand"}
-              size="lg"
-              className="mt-6 w-full"
-              onClick={() => onSelect(p)}
-            >
-              {selected?.name === p.name ? "Continuar com este" : p.cta}
-            </Button>
-          </div>
-        ))}
+
+              {p.featured && (
+                <span className="absolute -top-3 left-1/2 -translate-x-1/2 rounded-full bg-zap px-4 py-1 font-ui text-xs font-extrabold tracking-wide text-zap-ink">
+                  MAIS ESCOLHIDO
+                </span>
+              )}
+              <h3 className={cn("font-ui text-2xl font-bold", p.featured ? "text-zap" : "text-brand")}>
+                {p.name}
+              </h3>
+              <p className="mt-3 font-display text-3xl font-extrabold tracking-tight">
+                <span className="align-super text-lg">R$</span> {p.price}
+                <span
+                  className={cn(
+                    "font-body text-sm font-medium",
+                    p.featured ? "text-primary-foreground/70" : "text-muted-foreground",
+                  )}
+                >
+                  /mês
+                </span>
+              </p>
+              <ul className="mt-5 space-y-2">
+                {p.features.map((f) => {
+                  const Icon = f.icon;
+                  return (
+                    <li key={f.text} className="flex items-center gap-2 font-body text-sm">
+                      <Icon className={cn("size-4 shrink-0", p.featured ? "text-zap" : "text-brand")} />
+                      {f.text}
+                    </li>
+                  );
+                })}
+              </ul>
+            </button>
+          );
+        })}
       </div>
       <p className="mx-auto mt-8 max-w-3xl text-center font-body text-xs text-muted-foreground">
         *Instalação gratuita para os planos 450, 710 e Infinity. Plano Infinity Duo: instalação R$
