@@ -713,7 +713,7 @@ function StepPlanos({ selected, onSelect }: { selected: Plan | null; onSelect: (
             >
               <span
                 className={cn(
-                  "absolute right-4 top-4 grid size-8 place-items-center rounded-full transition",
+                  "absolute right-4 top-4 grid size-7 place-items-center rounded-full transition",
                   isSelected
                     ? p.featured
                       ? "bg-zap text-zap-ink opacity-100"
@@ -725,7 +725,7 @@ function StepPlanos({ selected, onSelect }: { selected: Plan | null; onSelect: (
                 )}
                 aria-hidden="true"
               >
-                {isSelected ? <CheckCircle2 className="size-5" /> : <Circle className="size-5" />}
+                {isSelected ? <CheckCircle2 className="size-4" /> : <Circle className="size-4" />}
               </span>
 
               {p.featured && (
@@ -748,15 +748,11 @@ function StepPlanos({ selected, onSelect }: { selected: Plan | null; onSelect: (
                 </span>
               </p>
               <ul className="mt-5 space-y-2">
-                {p.features.map((f) => {
-                  const Icon = f.icon;
-                  return (
-                    <li key={f.text} className="flex items-center gap-2 font-body text-sm">
-                      <Icon className={cn("size-4 shrink-0", p.featured ? "text-zap" : "text-brand")} />
-                      {f.text}
-                    </li>
-                  );
-                })}
+                {p.features.map((f) => (
+                  <li key={f.text} className="font-body text-sm">
+                    {f.text}
+                  </li>
+                ))}
               </ul>
             </button>
           );
