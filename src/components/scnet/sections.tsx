@@ -139,7 +139,7 @@ function Stat({
 
 export function SocialBar() {
   return (
-    <section className="bg-background py-12">
+    <section className="bg-[#f3f7fc] py-12">
       <Reveal className="mx-auto grid max-w-7xl gap-8 px-4 sm:grid-cols-2 lg:grid-cols-4">
         <Stat
           icon={<MapPin className="size-5" />}
