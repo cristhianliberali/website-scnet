@@ -432,14 +432,14 @@ export function ComoContratar() {
           </SectionTitle>
         </Reveal>
         <div className="relative mt-14 grid gap-8 lg:grid-cols-4">
-          <div className="absolute left-0 right-0 top-7 hidden h-1 rounded-full bg-linear-to-r from-brand-deep to-zap lg:block" />
+          <div className="absolute left-1/2 top-7 hidden h-1 w-3/4 -translate-x-1/2 rounded-full bg-linear-to-r from-brand-deep to-zap lg:block" />
           {steps.map((s, i) => (
             <Reveal key={s} delay={i * 120} className="relative">
               <div className="group flex flex-col items-center text-center">
                 <div className="grid size-14 place-items-center rounded-full gradient-brand font-display text-xl font-extrabold text-primary-foreground ring-4 ring-background transition-transform duration-300 group-hover:scale-110">
                   {i + 1}
                 </div>
-                <p className="mt-4 max-w-xs font-body text-sm text-muted-foreground">{s}</p>
+                <p className="mt-4 max-w-xs font-body text-base text-muted-foreground">{s}</p>
               </div>
             </Reveal>
           ))}
