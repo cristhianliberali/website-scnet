@@ -16,7 +16,7 @@ import {
   ArrowRight,
   Clock,
 } from "lucide-react";
-import heroImg from "@/assets/casa-wifi-hero.png";
+import heroImg from "@/assets/planta-baixa-wifi.webp";
 import logoBranca from "@/assets/logo-scnet-branca.webp";
 import { Button } from "@/components/ui/button";
 import {
@@ -64,9 +64,9 @@ export function Hero() {
           <div className="absolute left-1/2 top-1/2 -z-0 h-[70%] w-[70%] -translate-x-1/2 -translate-y-1/2 rounded-full bg-zap/30 blur-3xl" />
           <img
             src={heroImg}
-            alt="Casa conectada com Wi-Fi de fibra óptica da SCNET"
-            width={1024}
-            height={1024}
+            alt="Planta baixa de uma casa com sinal de Wi-Fi forte em todos os cômodos"
+            width={1080}
+            height={1080}
             className="animate-float-slow relative mx-auto w-full max-w-lg drop-shadow-2xl"
           />
           {[
