@@ -42,18 +42,18 @@ export function Hero() {
   return (
   <section
     id="top"
-    className="gradient-brand relative overflow-hidden pb-12 pt-20 sm:pb-16 sm:pt-24 lg:pb-28 lg:pt-36"
+    className="gradient-brand relative overflow-hidden pb-12 pt-20 lg:pb-28 lg:pt-36"
   >
     <Blobs />
-    <div className="relative mx-auto grid max-w-7xl items-center gap-8 px-4 sm:gap-10 lg:grid-cols-2 lg:gap-12">
+    <div className="relative mx-auto grid max-w-7xl items-center gap-8 px-4 lg:grid-cols-2 lg:gap-12">
       <div>
         <Reveal>
-          <span className="font-ui inline-flex items-center gap-2 rounded-full bg-zap px-3 py-1 text-[10px] font-bold uppercase tracking-wide text-zap-ink sm:px-4 sm:py-1.5 sm:text-xs">
+          <span className="font-ui inline-flex items-center gap-2 rounded-full bg-zap px-3 py-1 text-[10px] font-bold uppercase tracking-wide text-zap-ink sm:text-xs sm:px-4 sm:py-1.5">
             <Zap className="size-3 sm:size-4" /> INTERNET FIBRA ÓPTICA NO OESTE E LITORAL DE SC
           </span>
         </Reveal>
         <Reveal delay={80}>
-          <h1 className="mt-4 font-display text-3xl font-extrabold leading-[1.05] tracking-tight text-primary-foreground sm:text-4xl md:text-5xl lg:text-6xl">
+          <h1 className="mt-4 font-display text-3xl font-extrabold leading-[1.05] tracking-tight text-primary-foreground sm:text-4xl lg:text-6xl">
             Wi-Fi rápido e estável&nbsp;na casa toda!
           </h1>
         </Reveal>
@@ -79,7 +79,7 @@ export function Hero() {
           alt="Planta baixa de uma casa com sinal de Wi-Fi forte em todos os cômodos"
           width={1080}
           height={1080}
-          className="animate-float-slow relative mx-auto w-full max-w-xs drop-shadow-2xl sm:max-w-sm md:max-w-md lg:max-w-xl"
+          className="animate-float-slow relative mx-auto w-full max-w-xs drop-shadow-2xl sm:max-w-sm lg:max-w-xl"
         />
         {[
           { Icon: Wifi, cls: "left-2 top-6", delay: "0s" },
@@ -90,7 +90,7 @@ export function Hero() {
           <div
             key={i}
             style={{ animationDelay: delay }}
-            className={`animate-float absolute ${cls} grid size-10 place-items-center rounded-2xl border border-primary-foreground/25 bg-primary-foreground/15 text-zap backdrop-blur-md sm:size-12 lg:size-14`}
+            className={`animate-float absolute ${cls} grid size-10 place-items-center rounded-2xl border border-primary-foreground/25 bg-primary-foreground/15 text-zap backdrop-blur-md sm:size-11 lg:size-14`}
           >
             <Icon className="size-5 sm:size-6 lg:size-7" />
           </div>
