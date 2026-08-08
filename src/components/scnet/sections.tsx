@@ -487,7 +487,7 @@ const testimonials = [
   },
   {
     name: "Diego A.",
-    city: "Balneário Piçarras",
+    city: "Camboriú",
     text: "Jogo online sem lag e as aulas da minha filha sem cair. É isso que eu queria.",
   },
 ];
