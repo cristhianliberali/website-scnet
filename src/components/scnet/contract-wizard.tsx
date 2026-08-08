@@ -478,12 +478,15 @@ export function ContractWizard({ handoff }: { handoff: ContractHandoff }) {
               />
             </Field>
 
-            <Field label="Complemento (opcional)">
+            <Field label="Complemento" error={errors["complemento"]}>
               <input
-                className={inputCls(false)}
+                className={inputCls(!!errors["complemento"])}
                 value={address.complemento}
                 placeholder="Bloco B, apto 302"
-                onChange={(e) => setAddress((p) => ({ ...p, complemento: e.target.value }))}
+                onChange={(e) => {
+                  setAddress((p) => ({ ...p, complemento: e.target.value }));
+                  clearError("complemento");
+                }}
               />
             </Field>
 
