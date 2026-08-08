@@ -54,8 +54,13 @@ export function Hero() {
               Internet estável e atendimento humano com gente da sua cidade.
             </p>
           </Reveal>
-          <Reveal delay={240} className="mt-8 max-w-md">
-            <LeadForm />
+          <Reveal delay={240} className="mt-8">
+            <Button asChild variant="zap" size="hero" className="shadow-lg">
+              <a href="#planos">
+                Quero ver os planos
+                <ArrowRight className="size-5" />
+              </a>
+            </Button>
           </Reveal>
         </div>
 
