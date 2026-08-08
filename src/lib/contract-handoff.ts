@@ -6,11 +6,11 @@
  */
 
 export type ContractHandoff = {
-  nome?: string;
-  whatsapp?: string;
-  plano?: string;
-  preco?: string;
-  intencao?: string;
+  nome?: string | undefined;
+  whatsapp?: string | undefined;
+  plano?: string | undefined;
+  preco?: string | undefined;
+  intencao?: string | undefined;
 };
 
 const COOKIE_NAME = "scnet_contratacao";
