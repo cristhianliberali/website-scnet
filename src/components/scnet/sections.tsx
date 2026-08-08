@@ -18,6 +18,14 @@ import {
 } from "lucide-react";
 import heroImg from "@/assets/planta-baixa-wifi.webp";
 import logoBranca from "@/assets/logo-scnet-branca.webp";
+import skyLogo from "@/assets/sky.webp";
+import paramountLogo from "@/assets/paramount.webp";
+import telecineLogo from "@/assets/telecine.webp";
+import disneyLogo from "@/assets/disney.webp";
+import nossoFutebolLogo from "@/assets/nosso-futebol.webp";
+import skeeloLogo from "@/assets/skeelo.webp";
+import wifi7Logo from "@/assets/wifi7.webp";
+import scMovelLogo from "@/assets/scmovel.webp";
 import { Button } from "@/components/ui/button";
 import {
   Accordion,
@@ -349,16 +357,24 @@ export function Planos({ onSelectPlan }: { onSelectPlan: (plan: SelectedPlan) =>
 
 /* ---------------- Benefícios ---------------- */
 const perks = [
-  { name: "Sky+", desc: "Streaming com canais ao vivo e sob demanda." },
-  { name: "Paramount+", desc: "Séries, filmes e originais pra maratonar." },
-  { name: "Telecine", desc: "Cinema em casa, lançamento atrás de lançamento." },
-  { name: "Disney+", desc: "Do infantil ao blockbuster, tudo num lugar só." },
+  { name: "Sky+", desc: "Streaming com canais ao vivo e sob demanda.", logo: skyLogo },
+  { name: "Paramount+", desc: "Séries, filmes e originais pra maratonar.", logo: paramountLogo },
+  { name: "Telecine", desc: "Cinema em casa, lançamento atrás de lançamento.", logo: telecineLogo },
+  { name: "Disney+", desc: "Do infantil ao blockbuster, tudo num lugar só.", logo: disneyLogo },
   { name: "Premiere", desc: "Seu time ao vivo, rodada após rodada." },
-  { name: "Nosso Futebol", desc: "Mais jogos do Brasileirão pra não perder nada." },
-  { name: "App Skeelo", desc: "Livros e audiolivros liberados na assinatura." },
-  { name: "Wi-Fi 7", desc: "Mais dispositivos conectados, mais alcance, mais velocidade." },
+  {
+    name: "Nosso Futebol",
+    desc: "Mais jogos do Brasileirão pra não perder nada.",
+    logo: nossoFutebolLogo,
+  },
+  { name: "App Skeelo", desc: "Livros e audiolivros liberados na assinatura.", logo: skeeloLogo },
+  {
+    name: "Wi-Fi 7",
+    desc: "Mais dispositivos conectados, mais alcance, mais velocidade.",
+    logo: wifi7Logo,
+  },
   { name: "Rede Mesh", desc: "Sinal forte e rápido em qualquer cômodo da casa!" },
-  { name: "SC Móvel", desc: "Internet móvel com 5G nacional." },
+  { name: "SC Móvel", desc: "Internet móvel com 5G nacional.", logo: scMovelLogo },
 ];
 
 export function Beneficios() {
@@ -370,12 +386,22 @@ export function Beneficios() {
             Sua assinatura pode ter mais do que só internet
           </SectionTitle>
         </Reveal>
-        <div className="mt-12 grid gap-5 sm:grid-cols-2 lg:grid-cols-5">
+        <div className="mt-12 grid grid-cols-2 gap-5 lg:grid-cols-5">
           {perks.map((p, i) => (
             <Reveal key={p.name} delay={(i % 5) * 70}>
               <div className="group h-full rounded-2xl border border-border bg-card p-5 transition-all duration-300 hover:-translate-y-2 hover:border-brand hover:shadow-[0_18px_40px_-18px_color-mix(in_oklab,var(--color-brand)_70%,transparent)]">
-                <div className="grid h-14 place-items-center rounded-xl bg-brand/8 font-display text-lg font-extrabold text-brand transition-colors group-hover:bg-brand group-hover:text-primary-foreground">
-                  {p.name}
+                <div className="flex h-16 items-center justify-center overflow-hidden rounded-xl border border-border bg-white p-2.5 transition-colors group-hover:border-brand/40">
+                  {p.logo ? (
+                    <img
+                      src={p.logo}
+                      alt={p.name}
+                      className="max-h-11 w-auto max-w-full object-contain"
+                    />
+                  ) : (
+                    <span className="text-center font-display text-base font-extrabold text-brand">
+                      {p.name}
+                    </span>
+                  )}
                 </div>
                 <p className="mt-3 font-body text-sm text-muted-foreground">{p.desc}</p>
               </div>
