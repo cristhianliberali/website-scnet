@@ -1,6 +1,6 @@
 import { useMemo, useState, type ReactNode } from "react";
 import { toast } from "sonner";
-import { Check, ChevronLeft, ChevronRight, Loader2, Paperclip, Sun, Sunset } from "lucide-react";
+import { Check, CheckCircle2, ChevronLeft, ChevronRight, Circle, Loader2, Paperclip, Sun, Sunset } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { plans, type Plan } from "@/lib/plans";
 import { capitalizeName, isValidPhone, maskPhone } from "@/lib/form-utils";
@@ -288,9 +288,13 @@ export function ContractWizard({ handoff }: { handoff: ContractHandoff }) {
       if (!isValidCpf(person.cpf)) e["cpf"] = "CPF inválido";
       if (!isAdultBirthDate(person.nascimento)) e["nascimento"] = "Data inválida (18+)";
       if (!EMAIL_RE.test(person.email.trim())) e["email"] = "E-mail inválido";
-      if (!isValidPhone(person.telefone)) e["telefone"] = "DDD + 8 ou 9 dígitos";
-      if (person.telefone2 && !isValidPhone(person.telefone2))
+      if (!person.telefone2.trim()) {
+        e["telefone2"] = "Informe um segundo telefone";
+      } else if (!isValidPhone(person.telefone2)) {
         e["telefone2"] = "DDD + 8 ou 9 dígitos";
+      } else if (onlyDigits(person.telefone2) === onlyDigits(person.telefone)) {
+        e["telefone2"] = "Deve ser diferente do telefone principal";
+      }
       if (personFilled) {
         const pe = fileError(proofFile);
         const ie = fileError(idFile);
