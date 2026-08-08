@@ -32,6 +32,7 @@ import wifi7Logo from "@/assets/wifi7.webp";
 import meshLogo from "@/assets/mesh.webp";
 import scMovelLogo from "@/assets/scmovel.webp";
 import { Button } from "@/components/ui/button";
+import { plans } from "@/lib/plans";
 import {
   Accordion,
   AccordionContent,
