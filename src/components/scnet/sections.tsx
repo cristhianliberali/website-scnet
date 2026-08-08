@@ -40,64 +40,87 @@ import { Blobs, Reveal, SectionTitle, waLink } from "./shared";
 /* ---------------- Hero ---------------- */
 export function Hero() {
   return (
-  <section
-    id="top"
-    className="gradient-brand relative overflow-hidden pb-12 pt-20 lg:pb-28 lg:pt-36"
-  >
-    <Blobs />
-    <div className="relative mx-auto grid max-w-7xl items-center gap-8 px-4 lg:grid-cols-2 lg:gap-12">
-      <div>
-        <Reveal>
-          <span className="font-ui inline-flex items-center gap-2 rounded-full bg-zap px-3 py-1 text-[10px] font-bold uppercase tracking-wide text-zap-ink sm:text-xs sm:px-4 sm:py-1.5">
-            <Zap className="size-3 sm:size-4" /> INTERNET FIBRA ÓPTICA NO OESTE E LITORAL DE SC
-          </span>
-        </Reveal>
-        <Reveal delay={80}>
-          <h1 className="mt-4 font-display text-3xl font-extrabold leading-[1.05] tracking-tight text-primary-foreground sm:text-4xl lg:text-6xl">
-            Wi-Fi rápido e estável&nbsp;na casa toda!
-          </h1>
-        </Reveal>
-        <Reveal delay={160}>
-          <p className="mt-4 max-w-xl font-body text-base text-primary-foreground/90 sm:text-lg">
-            Internet estável e atendimento humano com gente da sua cidade.
-          </p>
-        </Reveal>
-        <Reveal delay={240} className="mt-6 sm:mt-8">
-          <Button asChild variant="zap" size="hero" className="shadow-lg">
-            <a href="#planos">
-              Quero ver os planos
-              <ArrowRight className="size-5" />
-            </a>
-          </Button>
+    // pt-* must clear the fixed header (~60px mobile / ~68px sm / ~104px lg).
+    <section
+      id="top"
+      className="gradient-brand relative overflow-hidden pb-14 pt-24 sm:pt-28 lg:pb-28 lg:pt-40"
+    >
+      <Blobs />
+      <div className="relative mx-auto grid max-w-7xl items-center gap-10 px-4 sm:gap-12 lg:grid-cols-2 lg:gap-12">
+        {/* Stacked below lg: centre the copy and cap the measure so it doesn't
+            stretch edge-to-edge on tablets. Left-aligned once side by side. */}
+        <div className="mx-auto max-w-xl text-center lg:mx-0 lg:max-w-none lg:text-left">
+          <Reveal>
+            <span className="font-ui inline-flex items-center gap-2 rounded-full bg-zap px-3 py-1 text-[10px] font-bold uppercase leading-tight tracking-wide text-zap-ink sm:px-4 sm:py-1.5 sm:text-xs">
+              <Zap className="size-3 shrink-0 sm:size-4" />
+              {/* balance keeps the two wrapped lines even instead of stranding "de SC" */}
+              <span className="text-balance">Internet fibra óptica no Oeste e Litoral de SC</span>
+            </span>
+          </Reveal>
+          <Reveal delay={80}>
+            <h1 className="mt-4 font-display text-[2rem] font-extrabold leading-[1.08] tracking-tight text-primary-foreground sm:mt-5 sm:text-5xl lg:text-6xl">
+              Wi-Fi rápido e estável&nbsp;na casa toda!
+            </h1>
+          </Reveal>
+          <Reveal delay={160}>
+            <p className="mx-auto mt-4 max-w-lg font-body text-base text-primary-foreground/90 sm:text-lg lg:mx-0 lg:max-w-xl">
+              Internet estável e atendimento humano com gente da sua cidade.
+            </p>
+          </Reveal>
+          <Reveal delay={240} className="mt-7 sm:mt-8">
+            <Button asChild variant="zap" size="hero" className="w-full shadow-lg sm:w-auto">
+              <a href="#planos">
+                Quero ver os planos
+                <ArrowRight className="size-5" />
+              </a>
+            </Button>
+          </Reveal>
+        </div>
+
+        {/* w-fit shrinks this wrapper to the image so the floating icons anchor
+            to the artwork instead of drifting to the viewport edges. */}
+        <Reveal delay={200} className="flex justify-center lg:block">
+          {/* lg:w-full — at lg the image fills its grid column, so a fixed
+              max-width would overflow the narrower column at 1024px. */}
+          <div className="relative w-fit lg:w-full">
+            <div className="absolute left-1/2 top-1/2 -z-0 h-[70%] w-[70%] -translate-x-1/2 -translate-y-1/2 rounded-full bg-zap/30 blur-3xl" />
+            <img
+              src={heroImg}
+              alt="Planta baixa de uma casa com sinal de Wi-Fi forte em todos os cômodos"
+              width={1080}
+              height={1080}
+              className="animate-float-slow relative w-[78vw] max-w-sm drop-shadow-2xl sm:w-auto sm:max-w-md lg:w-full lg:max-w-none"
+            />
+            {[
+              { Icon: Wifi, cls: "-left-3 top-6 sm:-left-5 lg:left-2", delay: "0s" },
+              {
+                Icon: Router,
+                cls: "-right-3 top-20 sm:-right-5 lg:right-4 lg:top-24",
+                delay: "-2s",
+              },
+              {
+                Icon: Gauge,
+                cls: "-left-3 bottom-14 sm:-left-5 lg:left-6 lg:bottom-16",
+                delay: "-4s",
+              },
+              {
+                Icon: ShieldCheck,
+                cls: "-right-2 bottom-4 sm:-right-4 lg:right-10 lg:bottom-6",
+                delay: "-3s",
+              },
+            ].map(({ Icon, cls, delay }, i) => (
+              <div
+                key={i}
+                style={{ animationDelay: delay }}
+                className={`animate-float absolute ${cls} grid size-10 place-items-center rounded-2xl border border-primary-foreground/25 bg-primary-foreground/15 text-zap backdrop-blur-md sm:size-12 lg:size-14`}
+              >
+                <Icon className="size-5 sm:size-6 lg:size-7" />
+              </div>
+            ))}
+          </div>
         </Reveal>
       </div>
-
-      <Reveal delay={200} className="relative">
-        <div className="absolute left-1/2 top-1/2 -z-0 h-[60%] w-[60%] -translate-x-1/2 -translate-y-1/2 rounded-full bg-zap/30 blur-3xl lg:h-[70%] lg:w-[70%]" />
-        <img
-          src={heroImg}
-          alt="Planta baixa de uma casa com sinal de Wi-Fi forte em todos os cômodos"
-          width={1080}
-          height={1080}
-          className="animate-float-slow relative mx-auto w-full max-w-xs drop-shadow-2xl sm:max-w-sm md:max-w-xs lg:max-w-xl"
-        />
-        {[
-          { Icon: Wifi, cls: "left-2 top-6", delay: "0s" },
-          { Icon: Router, cls: "right-4 top-24", delay: "-2s" },
-          { Icon: Gauge, cls: "left-6 bottom-16", delay: "-4s" },
-          { Icon: ShieldCheck, cls: "right-10 bottom-6", delay: "-3s" },
-        ].map(({ Icon, cls, delay }, i) => (
-          <div
-            key={i}
-            style={{ animationDelay: delay }}
-            className={`animate-float absolute ${cls} grid size-10 place-items-center rounded-2xl border border-primary-foreground/25 bg-primary-foreground/15 text-zap backdrop-blur-md sm:size-11 lg:size-14`}
-          >
-            <Icon className="size-5 sm:size-6 lg:size-7" />
-          </div>
-        ))}
-      </Reveal>
-    </div>
-  </section>
+    </section>
   );
 }
 
@@ -172,7 +195,6 @@ export function SocialBar() {
     </section>
   );
 }
-
 
 /* ---------------- Diferenciais ---------------- */
 const diffs = [
@@ -306,14 +328,15 @@ export function Planos({ onSelectPlan }: { onSelectPlan: (plan: SelectedPlan) =>
         </div>
 
         <p className="mx-auto mt-8 max-w-3xl text-center font-body text-xs text-muted-foreground">
-          *Instalação gratuita para os planos 450, 710 e Infinity. Plano Infinity Duo: instalação
-          R$ 100,00 (taxa única). Fidelidade de 12 meses (CPF) e 24 meses (PJ). Condições podem
-          variar — confirme com um consultor.
+          *Instalação gratuita para os planos 450, 710 e Infinity. Plano Infinity Duo: instalação R$
+          100,00 (taxa única). Fidelidade de 12 meses (CPF) e 24 meses (PJ). Condições podem variar
+          — confirme com um consultor.
         </p>
 
         <Reveal className="mt-10 rounded-3xl bg-muted p-8 text-center">
           <p className="font-ui text-lg font-semibold text-brand-deep">
-            Não sabe qual é o plano ideal? Nossa equipe irá entender sua necessidade e indicar o plano perfeito para sua rotina!
+            Não sabe qual é o plano ideal? Nossa equipe irá entender sua necessidade e indicar o
+            plano perfeito para sua rotina!
           </p>
           <Button variant="whats" size="xl" className="mt-5" asChild>
             <a
@@ -558,9 +581,7 @@ export function Faq() {
     <section id="duvidas" className="bg-background py-20">
       <div className="mx-auto max-w-3xl px-4">
         <Reveal className="text-center">
-          <SectionTitle className="text-brand-deep">
-            Dúvidas frequentes
-          </SectionTitle>
+          <SectionTitle className="text-brand-deep">Dúvidas frequentes</SectionTitle>
         </Reveal>
         <Reveal delay={100}>
           <Accordion type="single" collapsible className="mt-10 w-full">
@@ -590,7 +611,8 @@ export function CtaFinal({ selectedPlan }: { selectedPlan: SelectedPlan | null }
             Cuidamos do Wi-Fi, você aproveita o momento!&nbsp;
           </SectionTitle>
           <p className="mt-5 max-w-xl font-body text-lg text-primary-foreground/90">
-            + 20 anos conectando o Oeste e Litoral Catarinense. Chegou a sua vez de viver a melhor experiência conectado!
+            + 20 anos conectando o Oeste e Litoral Catarinense. Chegou a sua vez de viver a melhor
+            experiência conectado!
           </p>
           <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:flex-wrap">
             <div className="flex items-center gap-2 rounded-full bg-primary-foreground/15 px-4 py-2 text-primary-foreground backdrop-blur-sm">
@@ -599,11 +621,15 @@ export function CtaFinal({ selectedPlan }: { selectedPlan: SelectedPlan | null }
             </div>
             <div className="flex items-center gap-2 rounded-full bg-primary-foreground/15 px-4 py-2 text-primary-foreground backdrop-blur-sm">
               <Clock className="size-5 text-zap" />
-              <span className="font-ui text-sm font-semibold">Tempo de espera no telefone: 1 minuto</span>
+              <span className="font-ui text-sm font-semibold">
+                Tempo de espera no telefone: 1 minuto
+              </span>
             </div>
             <div className="flex items-center gap-2 rounded-full bg-primary-foreground/15 px-4 py-2 text-primary-foreground backdrop-blur-sm">
               <MessageCircle className="size-5 text-zap" />
-              <span className="font-ui text-sm font-semibold">Tempo de resposta no WhatsApp: 5 minutos</span>
+              <span className="font-ui text-sm font-semibold">
+                Tempo de resposta no WhatsApp: 5 minutos
+              </span>
             </div>
           </div>
         </Reveal>
