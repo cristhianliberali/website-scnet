@@ -22,9 +22,11 @@ import skyLogo from "@/assets/sky.webp";
 import paramountLogo from "@/assets/paramount.webp";
 import telecineLogo from "@/assets/telecine.webp";
 import disneyLogo from "@/assets/disney.webp";
+import premiereLogo from "@/assets/premiere.webp";
 import nossoFutebolLogo from "@/assets/nosso-futebol.webp";
 import skeeloLogo from "@/assets/skeelo.webp";
 import wifi7Logo from "@/assets/wifi7.webp";
+import meshLogo from "@/assets/mesh.webp";
 import scMovelLogo from "@/assets/scmovel.webp";
 import { Button } from "@/components/ui/button";
 import {
@@ -361,7 +363,7 @@ const perks = [
   { name: "Paramount+", desc: "Séries, filmes e originais pra maratonar.", logo: paramountLogo },
   { name: "Telecine", desc: "Cinema em casa, lançamento atrás de lançamento.", logo: telecineLogo },
   { name: "Disney+", desc: "Do infantil ao blockbuster, tudo num lugar só.", logo: disneyLogo },
-  { name: "Premiere", desc: "Seu time ao vivo, rodada após rodada." },
+  { name: "Premiere", desc: "Seu time ao vivo, rodada após rodada.", logo: premiereLogo },
   {
     name: "Nosso Futebol",
     desc: "Mais jogos do Brasileirão pra não perder nada.",
@@ -373,7 +375,7 @@ const perks = [
     desc: "Mais dispositivos conectados, mais alcance, mais velocidade.",
     logo: wifi7Logo,
   },
-  { name: "Rede Mesh", desc: "Sinal forte e rápido em qualquer cômodo da casa!" },
+  { name: "Rede Mesh", desc: "Sinal forte e rápido em qualquer cômodo da casa!", logo: meshLogo },
   { name: "SC Móvel", desc: "Internet móvel com 5G nacional.", logo: scMovelLogo },
 ];
 
@@ -390,12 +392,12 @@ export function Beneficios() {
           {perks.map((p, i) => (
             <Reveal key={p.name} delay={(i % 5) * 70}>
               <div className="group h-full rounded-2xl border border-border bg-card p-5 transition-all duration-300 hover:-translate-y-2 hover:border-brand hover:shadow-[0_18px_40px_-18px_color-mix(in_oklab,var(--color-brand)_70%,transparent)]">
-                <div className="flex h-16 items-center justify-center overflow-hidden rounded-xl border border-border bg-white p-2.5 transition-colors group-hover:border-brand/40">
+                <div className="flex h-24 items-center justify-center overflow-hidden">
                   {p.logo ? (
                     <img
                       src={p.logo}
                       alt={p.name}
-                      className="max-h-11 w-auto max-w-full object-contain"
+                      className="max-h-20 w-auto max-w-full object-contain"
                     />
                   ) : (
                     <span className="text-center font-display text-base font-extrabold text-brand">
