@@ -14,6 +14,7 @@ import {
   MessageCircle,
   Building2,
   ArrowRight,
+  Clock,
 } from "lucide-react";
 import heroImg from "@/assets/casa-wifi-hero.png";
 import logoBranca from "@/assets/logo-scnet-branca.webp";
