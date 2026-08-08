@@ -355,9 +355,9 @@ export function Beneficios() {
             Sua assinatura pode ter mais do que só internet
           </SectionTitle>
         </Reveal>
-        <div className="mt-12 grid grid-cols-2 gap-5 lg:grid-cols-5">
+        <div className="mt-12 grid grid-cols-2 gap-5 lg:grid-cols-4">
           {perks.map((p, i) => (
-            <Reveal key={p.name} delay={(i % 5) * 70}>
+            <Reveal key={p.name} delay={(i % 4) * 70}>
               <div className="group h-full rounded-2xl border border-border bg-card p-5 transition-all duration-300 hover:-translate-y-2 hover:border-brand hover:shadow-[0_18px_40px_-18px_color-mix(in_oklab,var(--color-brand)_70%,transparent)]">
                 <div className="flex h-24 items-center justify-center overflow-hidden">
                   {p.logo ? (
