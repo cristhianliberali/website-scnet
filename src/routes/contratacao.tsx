@@ -48,13 +48,14 @@ function Contratacao() {
 
   useEffect(() => {
     const cookie = readContractHandoffCookie();
-    setHandoff((prev) => ({
-      nome: prev.nome || cookie.nome,
-      whatsapp: prev.whatsapp || cookie.whatsapp,
-      plano: prev.plano || cookie.plano,
-      preco: prev.preco || cookie.preco,
-      intencao: prev.intencao || cookie.intencao,
-    }));
+    setHandoff((prev) => {
+      const merged: ContractHandoff = {};
+      for (const key of ["nome", "whatsapp", "plano", "preco", "intencao"] as const) {
+        const value = prev[key] || cookie[key];
+        if (value) merged[key] = value;
+      }
+      return merged;
+    });
     setReady(true);
   }, []);
 
