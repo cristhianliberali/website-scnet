@@ -532,20 +532,20 @@ export function Depoimentos() {
 /* ---------------- FAQ ---------------- */
 const faqs: Array<[string, string]> = [
   [
-    "Como verificar se atendem em meu endereço?",
-    "Só digitar seu endereço lá em cima que a gente te fala na hora.",
+    "Como funcionam os planos sem controle de velocidade?",
+    "Nos planos Infinity, sem controle de velocidade, você aproveita o máximo que seus aparelhos suportam, chegando a até 1 giga.",
   ],
   [
-    "Tenho contrato com outro provedor, dá pra trocar?",
-    "Dá sim, e a gente ajuda a organizar isso sem dor de cabeça — garantindo seu upgrade de conexão.",
+    "Como sei se vocês atendem no meu endereço?",
+    "É rápido: faça a verificação de cobertura aqui mesmo nesta página, na seção de viabilidade.",
   ],
   [
     "Tem custo de instalação?",
-    "Geralmente é grátis, sujeito a análise de crédito. No Infinity Duo tem uma taxa — um consultor te fala certinho.",
+    "Depende do plano, alguns têm instalação gratuita — é só conferir na descrição de cada plano. Essa condição está sujeita a análise de crédito.",
   ],
   [
-    "Qual a diferença entre os planos?",
-    "Velocidade e cobertura de Wi-Fi pela casa. Na dúvida, chama no WhatsApp que a gente indica o ideal pra tua rotina.",
+    "Posso adicionar mais pontos de Wi-Fi ao meu plano?",
+    "Pode sim! Você pode contratar um plano que já vem com mais de um roteador, ou adicionar roteadores extras a qualquer plano, com um valor a mais na mensalidade.",
   ],
   [
     "Se der problema, quem resolve?",
