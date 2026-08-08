@@ -26,7 +26,6 @@ import {
   AccordionTrigger,
 } from "@/components/ui/accordion";
 import { useCountUp } from "@/hooks/use-reveal";
-import { LeadForm } from "./lead-form";
 import { ContractForm, type SelectedPlan } from "./contract-form";
 import { Blobs, Reveal, SectionTitle, waLink } from "./shared";
 
