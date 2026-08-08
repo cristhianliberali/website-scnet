@@ -315,7 +315,7 @@ export function Planos({ onSelectPlan }: { onSelectPlan: (plan: SelectedPlan) =>
 
         <Reveal className="mt-10 rounded-3xl bg-muted p-8 text-center">
           <p className="font-ui text-lg font-semibold text-brand-deep">
-            Não sabe qual plano é o seu? Manda um oi no WhatsApp que a gente resolve rapidinho.
+            Não sabe qual é o plano ideal? Nossa equipe irá entender sua necessidade e indicar o plano perfeito para sua rotina!
           </p>
           <Button variant="whats" size="xl" className="mt-5" asChild>
             <a
