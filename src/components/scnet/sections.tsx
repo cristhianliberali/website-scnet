@@ -10,14 +10,10 @@ import {
   Users,
   MapPin,
   Headset,
-  Check,
   MessageCircle,
   Building2,
   ArrowRight,
   Clock,
-  Rocket,
-  BookOpen,
-  Globe,
 } from "lucide-react";
 import heroImg from "@/assets/planta-baixa-wifi.webp";
 import logoBranca from "@/assets/logo-scnet-branca.webp";
@@ -32,6 +28,7 @@ import wifi7Logo from "@/assets/wifi7.webp";
 import meshLogo from "@/assets/mesh.webp";
 import scMovelLogo from "@/assets/scmovel.webp";
 import { Button } from "@/components/ui/button";
+import { plans } from "@/lib/plans";
 import {
   Accordion,
   AccordionContent,
@@ -230,71 +227,6 @@ export function Diferenciais() {
 }
 
 /* ---------------- Planos ---------------- */
-const planFeatures = {
-  base: [
-    { icon: Globe, text: "Internet fibra óptica" },
-    { icon: Wifi, text: "450 Mega de velocidade" },
-    { icon: Router, text: "1x Roteador Wi-Fi 6 Incluso" },
-    { icon: BookOpen, text: "App Skeelo" },
-    { icon: Wrench, text: "Instalação gratuita*" },
-  ],
-};
-
-const plans = [
-  {
-    name: "Plano 450",
-    price: "109,90",
-    desc: "Pra quem quer resolver o dia a dia sem drama: redes sociais, séries e trabalho leve, tudo rodando liso.",
-    cta: "Quero este plano",
-    features: [
-      { icon: Globe, text: "Internet fibra óptica" },
-      { icon: Wifi, text: "450 Mega de velocidade" },
-      { icon: Router, text: "1x Roteador Wi-Fi 6 Incluso" },
-      { icon: BookOpen, text: "App Skeelo" },
-      { icon: Wrench, text: "Instalação gratuita*" },
-    ],
-  },
-  {
-    name: "Plano 710",
-    price: "119,90",
-    desc: "Casa com mais gente conectada ao mesmo tempo? Esse aguenta o tranco — aula online, chamada de vídeo e streaming juntos, sem travar.",
-    cta: "Quero este plano",
-    features: [
-      { icon: Globe, text: "Internet fibra óptica" },
-      { icon: Wifi, text: "710 Mega de velocidade" },
-      { icon: Router, text: "1x Roteador Wi-Fi 6 Incluso" },
-      { icon: BookOpen, text: "App Skeelo" },
-      { icon: Wrench, text: "Instalação gratuita*" },
-    ],
-  },
-  {
-    name: "Plano Infinity",
-    price: "139,90",
-    desc: "Várias telas, jogo online, home office e streaming em 4K rodando ao mesmo tempo, sem susto.",
-    cta: "Quero este plano",
-    featured: true,
-    features: [
-      { icon: Globe, text: "Internet fibra óptica" },
-      { icon: Rocket, text: "Sem controle de velocidade" },
-      { icon: Router, text: "1x Roteador Wi-Fi 6 Incluso" },
-      { icon: BookOpen, text: "App Skeelo" },
-      { icon: Wrench, text: "Instalação gratuita*" },
-    ],
-  },
-  {
-    name: "Plano Infinity Duo",
-    price: "159,90",
-    desc: "Ideal para ambientes amplos e vários dispositivos conectados — 2 roteadores garantindo Wi-Fi em todo canto.",
-    cta: "Quero este plano",
-    features: [
-      { icon: Globe, text: "Internet fibra óptica" },
-      { icon: Rocket, text: "Sem controle de velocidade" },
-      { icon: Router, text: "2x Roteadores Wi-Fi 6 Inclusos" },
-      { icon: BookOpen, text: "App Skeelo" },
-      { icon: Wrench, text: "Instalação R$ 100,00 (taxa única)*" },
-    ],
-  },
-];
 
 export function Planos({ onSelectPlan }: { onSelectPlan: (plan: SelectedPlan) => void }) {
   return (
