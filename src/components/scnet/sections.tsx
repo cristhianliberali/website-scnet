@@ -161,32 +161,6 @@ export function SocialBar() {
   );
 }
 
-/* ---------------- Promessa ---------------- */
-export function Promise_() {
-  return (
-    <section className="relative overflow-hidden bg-muted py-20">
-      <div className="relative mx-auto max-w-4xl px-4 text-center">
-        <Reveal>
-          <SectionTitle className="text-brand-deep">
-            Chega de esperar a página carregar...
-          </SectionTitle>
-        </Reveal>
-        <Reveal delay={100}>
-          <p className="mx-auto mt-5 max-w-2xl font-body text-lg text-muted-foreground">
-            Streaming travando, reunião caindo, jogo com lag — a SCNET existe pra resolver isso.
-            Infraestrutura própria, tecnologia fibra óptica de ponta e uma equipe que te atende na
-            hora!
-          </p>
-        </Reveal>
-        <Reveal delay={180}>
-          <Button variant="zap" size="hero" className="mt-8" asChild>
-            <a href="#planos">Quero dar um up na minha conexão</a>
-          </Button>
-        </Reveal>
-      </div>
-    </section>
-  );
-}
 
 /* ---------------- Diferenciais ---------------- */
 const diffs = [
