@@ -124,7 +124,7 @@ export function ContractForm({ selectedPlan }: { selectedPlan: SelectedPlan | nu
           {selectedPlan.price}/mês
         </div>
       )}
-      <p className="font-display text-2xl font-extrabold text-brand-deep">Leva menos de 2 minutos...</p>
+      <p className="font-display text-2xl font-extrabold text-brand-deep">Contrate agora (Leva menos de 2 minutos...)</p>
       <div className="mt-4 space-y-3">
         <div className="space-y-1.5">
           <label className={label(!!errors.name)} htmlFor="nome-contrate">

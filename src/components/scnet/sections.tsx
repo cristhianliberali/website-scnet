@@ -51,12 +51,12 @@ export function Hero() {
         <div>
           <Reveal>
             <span className="font-ui inline-flex items-center gap-2 rounded-full bg-zap px-4 py-1.5 text-xs font-bold uppercase tracking-wide text-zap-ink">
-              <Zap className="size-4" /> Fibra óptica no Oeste e Litoral de SC
+              <Zap className="size-4" /> INTERNET FIBRA ÓPTICA NO OESTE E LITORAL DE SC
             </span>
           </Reveal>
           <Reveal delay={80}>
             <h1 className="mt-5 font-display text-4xl font-extrabold leading-[1.05] tracking-tight text-primary-foreground sm:text-5xl lg:text-6xl">
-              Wi-Fi rápido e estável que <span className="text-zap">pega na casa toda!</span>
+              Wi-Fi rápido e estável&nbsp;na casa toda!
             </h1>
           </Reveal>
           <Reveal delay={160}>
@@ -148,14 +148,14 @@ export function SocialBar() {
           target={20}
           prefix="+"
           suffix=" anos"
-          text="Conectando o Oeste e Litoral catarinense"
+          text="Conectando pessoas e histórias"
         />
         <Stat
           icon={<Users className="size-5" />}
           target={30}
           prefix="+"
           suffix=" mil"
-          text="Clientes online todos os dias"
+          text="Clientes satisfeitos"
         />
         <Stat
           icon={<Star className="size-5" />}
@@ -350,7 +350,7 @@ const perks = [
     desc: "Mais dispositivos conectados, mais alcance, mais velocidade.",
     logo: wifi7Logo,
   },
-  { name: "Rede Mesh", desc: "Sinal forte e rápido em qualquer cômodo da casa!", logo: meshLogo },
+  { name: "Rede Mesh", desc: "Rede Mesh para sinal rápido em qualquer cômodo da casa!", logo: meshLogo },
   { name: "SC Móvel", desc: "Internet móvel com 5G nacional.", logo: scMovelLogo },
 ];
 
@@ -387,7 +387,7 @@ export function Beneficios() {
         </div>
         <Reveal className="mt-8 flex justify-center">
           <span className="font-ui inline-flex items-center gap-2 rounded-full bg-zap px-5 py-2 text-sm font-bold text-zap-ink">
-            <Wifi className="size-4" /> Quer mais um ponto de Wi-Fi? Só +R$ 29,90/mês
+            <Wifi className="size-4" /> Quer mais pontos de Wi-Fi? Adquira por apenas R$ 29,90/mês
           </span>
         </Reveal>
       </div>
@@ -409,7 +409,7 @@ export function ComoContratar() {
       <div className="mx-auto max-w-7xl px-4">
         <Reveal className="text-center">
           <SectionTitle className="text-brand-deep">
-            Contratar é rápido e simples. Sério.
+            Contratar é simples e rápido. Sério.
           </SectionTitle>
         </Reveal>
         <div className="relative mt-14 grid gap-8 lg:grid-cols-4">
@@ -567,7 +567,7 @@ export function Faq() {
       <div className="mx-auto max-w-3xl px-4">
         <Reveal className="text-center">
           <SectionTitle className="text-brand-deep">
-            Perguntas rápidas, respostas diretas
+            Dúvidas frequentes
           </SectionTitle>
         </Reveal>
         <Reveal delay={100}>
@@ -607,11 +607,11 @@ export function CtaFinal({ selectedPlan }: { selectedPlan: SelectedPlan | null }
             </div>
             <div className="flex items-center gap-2 rounded-full bg-primary-foreground/15 px-4 py-2 text-primary-foreground backdrop-blur-sm">
               <Clock className="size-5 text-zap" />
-              <span className="font-ui text-sm font-semibold">Tempo médio de resposta no telefone menos de 1 minuto</span>
+              <span className="font-ui text-sm font-semibold">Tempo de espera no telefone: 1 minuto</span>
             </div>
             <div className="flex items-center gap-2 rounded-full bg-primary-foreground/15 px-4 py-2 text-primary-foreground backdrop-blur-sm">
               <MessageCircle className="size-5 text-zap" />
-              <span className="font-ui text-sm font-semibold">Tempo médio de resposta no WhatsApp menos de 5 minutos</span>
+              <span className="font-ui text-sm font-semibold">Tempo de resposta no WhatsApp: 5 minutos</span>
             </div>
           </div>
         </Reveal>
