@@ -67,7 +67,7 @@ export function Hero() {
             alt="Planta baixa de uma casa com sinal de Wi-Fi forte em todos os cômodos"
             width={1080}
             height={1080}
-            className="animate-float-slow relative mx-auto w-full max-w-lg drop-shadow-2xl"
+            className="animate-float-slow relative mx-auto w-full max-w-lg md:max-w-xl drop-shadow-2xl"
           />
           {[
             { Icon: Wifi, cls: "left-2 top-6", delay: "0s" },
