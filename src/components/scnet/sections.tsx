@@ -10,14 +10,10 @@ import {
   Users,
   MapPin,
   Headset,
-  Check,
   MessageCircle,
   Building2,
   ArrowRight,
   Clock,
-  Rocket,
-  BookOpen,
-  Globe,
 } from "lucide-react";
 import heroImg from "@/assets/planta-baixa-wifi.webp";
 import logoBranca from "@/assets/logo-scnet-branca.webp";
