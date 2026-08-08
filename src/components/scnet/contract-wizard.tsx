@@ -280,6 +280,7 @@ export function ContractWizard({ handoff }: { handoff: ContractHandoff }) {
       if (!address.bairro.trim()) e["bairro"] = "Informe o bairro";
       if (!address.logradouro.trim()) e["logradouro"] = "Informe o logradouro";
       if (!address.numero.trim()) e["numero"] = "Informe o número";
+      if (!address.complemento.trim()) e["complemento"] = "Informe o complemento";
       if (address.tipo === "apartamento" && !address.condominio.trim())
         e["condominio"] = "Informe o nome do condomínio";
     }
