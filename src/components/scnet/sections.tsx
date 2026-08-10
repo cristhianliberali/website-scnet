@@ -43,7 +43,7 @@ export function Hero() {
     // pt-* must clear the fixed header (~60px mobile / ~68px sm / ~104px lg).
     <section
       id="top"
-      className="gradient-brand relative overflow-hidden pb-14 pt-24 sm:pt-28 lg:pb-28 lg:pt-40"
+      className="gradient-brand relative pb-14 pt-24 sm:pt-28 lg:pb-28 lg:pt-40"
     >
       <Blobs />
       <div className="relative mx-auto grid max-w-7xl items-center gap-10 px-4 sm:gap-12 lg:grid-cols-2 lg:gap-12">
