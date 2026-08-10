@@ -83,7 +83,7 @@ export function Hero() {
           {/* lg:w-full — at lg the image fills its grid column, so a fixed
               max-width would overflow the narrower column at 1024px. */}
           <div className="relative z-10 w-fit lg:w-full">
-            <div className="absolute left-1/2 top-1/2 -z-0 h-[70%] w-[70%] -translate-x-1/2 -translate-y-1/2 rounded-full bg-zap/30 blur-3xl" />
+            <div className="absolute left-1/2 top-1/2 -z-0 h-[100%] w-[100%] -translate-x-1/2 -translate-y-1/2 rounded-full bg-zap/30 blur-3xl" />
             <img
               src={heroImg}
               alt="Planta baixa de uma casa com sinal de Wi-Fi forte em todos os cômodos"
