@@ -49,7 +49,7 @@ export function Hero() {
       <div className="relative mx-auto grid max-w-7xl items-center gap-10 px-4 sm:gap-12 lg:grid-cols-2 lg:gap-12">
         {/* Stacked below lg: centre the copy and cap the measure so it doesn't
             stretch edge-to-edge on tablets. Left-aligned once side by side. */}
-        <div className="mx-auto max-w-xl text-center lg:mx-0 lg:max-w-none lg:text-left">
+        <div className="w-[70%] text-left sm:mx-auto sm:w-auto sm:max-w-xl sm:text-center lg:mx-0 lg:max-w-none lg:text-left">
           <Reveal>
             <span className="font-ui inline-flex items-center gap-2 rounded-full bg-zap px-3 py-1 text-[10px] font-bold uppercase leading-tight tracking-wide text-zap-ink sm:px-4 sm:py-1.5 sm:text-xs">
               <Zap className="size-3 shrink-0 sm:size-4" />
