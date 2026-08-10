@@ -43,7 +43,7 @@ export function Hero() {
     // pt-* must clear the fixed header (~60px mobile / ~68px sm / ~104px lg).
     <section
       id="top"
-      className="gradient-brand relative overflow-hidden pb-14 pt-24 sm:pt-28 lg:pb-28 lg:pt-40"
+      className="gradient-brand relative pb-14 pt-24 sm:pt-28 lg:pb-28 lg:pt-40"
     >
       <Blobs />
       <div className="relative mx-auto grid max-w-7xl items-center gap-10 px-4 sm:gap-12 lg:grid-cols-2 lg:gap-12">
@@ -82,14 +82,14 @@ export function Hero() {
         <Reveal delay={200} className="flex justify-center lg:block">
           {/* lg:w-full — at lg the image fills its grid column, so a fixed
               max-width would overflow the narrower column at 1024px. */}
-          <div className="relative w-fit lg:w-full">
+          <div className="relative z-10 w-fit lg:w-full">
             <div className="absolute left-1/2 top-1/2 -z-0 h-[70%] w-[70%] -translate-x-1/2 -translate-y-1/2 rounded-full bg-zap/30 blur-3xl" />
             <img
               src={heroImg}
               alt="Planta baixa de uma casa com sinal de Wi-Fi forte em todos os cômodos"
               width={1080}
               height={1080}
-              className="animate-float-slow relative w-[78vw] max-w-sm drop-shadow-2xl sm:w-auto sm:max-w-md lg:w-full lg:max-w-none"
+              className="animate-float-slow relative z-10 w-[100vw] max-w-none drop-shadow-2xl sm:w-auto sm:max-w-md lg:w-full lg:max-w-none mb-[-96px] sm:mb-0"
             />
             {[
               { Icon: Wifi, cls: "-left-3 top-6 sm:-left-5 lg:left-2", delay: "0s" },
