@@ -206,6 +206,24 @@ type Person = {
 
 type Errors = Record<string, string | undefined>;
 
+type Intent = "quero_contratar" | "ja_sou_cliente";
+
+type Lead = {
+  nome: string;
+  telefone: string;
+  intencao: Intent | "";
+};
+
+const INTENTS = [
+  ["quero_contratar", "Quero contratar"],
+  ["ja_sou_cliente", "Já sou cliente"],
+] as const;
+
+const intentLabel = (value: Intent | "") => INTENTS.find(([id]) => id === value)?.[1] ?? "";
+
+const isIntent = (value: string | undefined): value is Intent =>
+  value === "quero_contratar" || value === "ja_sou_cliente";
+
 /* ---------------- steps ---------------- */
 
 const STEPS = [
@@ -223,6 +241,25 @@ export function ContractWizard({ handoff }: { handoff: ContractHandoff }) {
   const prefilledPlan = useMemo(
     () => plans.find((p) => p.name === handoff.plano) ?? null,
     [handoff.plano],
+  );
+
+  /** Nome/telefone/intenção que vieram do formulário da home (URL ou cookie). */
+  const prefilledLead = useMemo<Lead>(
+    () => ({
+      nome: handoff.nome ?? "",
+      telefone: handoff.whatsapp ? maskPhone(onlyDigits(handoff.whatsapp).slice(-11)) : "",
+      intencao: isIntent(handoff.intencao) ? handoff.intencao : "",
+    }),
+    [handoff.nome, handoff.whatsapp, handoff.intencao],
+  );
+
+  const [lead, setLead] = useState<Lead>(prefilledLead);
+  /** Veio tudo da home? Então a etapa 1 só exibe os dados, sem pedir de novo. */
+  const [needsLead] = useState(
+    () =>
+      prefilledLead.nome.trim().length < 3 ||
+      !isValidPhone(prefilledLead.telefone) ||
+      prefilledLead.intencao === "",
   );
 
   const [plan, setPlan] = useState<Plan | null>(prefilledPlan);
@@ -297,9 +334,21 @@ export function ContractWizard({ handoff }: { handoff: ContractHandoff }) {
   /* ----- validation ----- */
   function validate(target: number): boolean {
     const e: Errors = {};
-    if (target === 0 && !plan) {
-      toast.error("Escolha um plano para continuar.");
-      return false;
+    if (target === 0) {
+      if (needsLead) {
+        if (lead.nome.trim().length < 3) e["lead_nome"] = "Digite seu nome completo";
+        if (!isValidPhone(lead.telefone)) e["lead_telefone"] = "DDD + 8 ou 9 dígitos";
+        if (!lead.intencao) e["lead_intencao"] = "Escolha uma opção";
+      }
+      if (!plan) {
+        setErrors(e);
+        toast.error(
+          Object.keys(e).length
+            ? "Preencha seus dados e escolha um plano para continuar."
+            : "Escolha um plano para continuar.",
+        );
+        return false;
+      }
     }
     if (target === 1) {
       if (!address.tipo) e["tipo"] = "Selecione casa ou apartamento";
@@ -343,14 +392,22 @@ export function ContractWizard({ handoff }: { handoff: ContractHandoff }) {
 
   /* ----- webhook por etapa ----- */
 
+  /** Mantém o DDI que veio da home quando o número não mudou; senão assume +55. */
+  function leadWhatsapp() {
+    const digits = onlyDigits(lead.telefone);
+    if (!digits) return null;
+    if (handoff.whatsapp && onlyDigits(handoff.whatsapp).endsWith(digits)) return handoff.whatsapp;
+    return `+55${digits}`;
+  }
+
   /** Dados acumulados até a etapa informada — o webhook recebe o retrato completo. */
   function buildDados(index: number, chosenPlan: Plan | null) {
     return {
       plano: chosenPlan ? { nome: chosenPlan.name, preco: chosenPlan.price } : null,
       origem: {
-        nome: handoff.nome ?? null,
-        whatsapp: handoff.whatsapp ?? null,
-        intencao: handoff.intencao ?? null,
+        nome: lead.nome.trim() || null,
+        whatsapp: leadWhatsapp(),
+        intencao: lead.intencao || null,
       },
       ...(index >= 1
         ? {
@@ -478,6 +535,8 @@ export function ContractWizard({ handoff }: { handoff: ContractHandoff }) {
   function selectPlan(chosen: Plan) {
     if (sending) return;
     setPlan(chosen);
+    // Com os campos do lead na tela, o avanço é explícito pelo botão "Continuar".
+    if (needsLead) return;
     void advance(0, chosen);
   }
 
@@ -543,7 +602,91 @@ export function ContractWizard({ handoff }: { handoff: ContractHandoff }) {
       />
 
       <div className="mt-7">
-        {step === 0 && <StepPlanos selected={plan} sending={sending} onSelect={selectPlan} />}
+        {step === 0 && (
+          <div className="space-y-7">
+            {needsLead ? (
+              <div className="grid gap-4 rounded-2xl border border-border bg-muted/30 p-4 sm:grid-cols-2 sm:p-5">
+                <p className="font-ui text-sm font-semibold text-brand-deep sm:col-span-2">
+                  Antes de escolher o plano, conte pra gente quem é você:
+                </p>
+
+                <Field label="Nome" error={errors["lead_nome"]}>
+                  <input
+                    className={inputCls(!!errors["lead_nome"])}
+                    value={lead.nome}
+                    autoComplete="name"
+                    placeholder="Maria Silva"
+                    onChange={(e) => {
+                      setLead((p) => ({ ...p, nome: capitalizeName(e.target.value) }));
+                      clearError("lead_nome");
+                    }}
+                  />
+                </Field>
+
+                <Field label="Telefone / WhatsApp" error={errors["lead_telefone"]}>
+                  <input
+                    className={inputCls(!!errors["lead_telefone"])}
+                    value={lead.telefone}
+                    inputMode="tel"
+                    autoComplete="tel"
+                    placeholder="(49) 99999-9999"
+                    onChange={(e) => {
+                      setLead((p) => ({ ...p, telefone: maskPhone(e.target.value) }));
+                      clearError("lead_telefone");
+                    }}
+                  />
+                </Field>
+
+                <Field
+                  label="O que você precisa?"
+                  error={errors["lead_intencao"]}
+                  className="sm:col-span-2"
+                >
+                  <div className="grid max-w-md grid-cols-2 gap-2">
+                    {INTENTS.map(([value, text]) => (
+                      <button
+                        key={value}
+                        type="button"
+                        onClick={() => {
+                          setLead((p) => ({ ...p, intencao: value }));
+                          clearError("lead_intencao");
+                        }}
+                        className={cn(
+                          "rounded-lg border px-3 py-2.5 font-ui text-sm font-semibold transition",
+                          lead.intencao === value
+                            ? "border-brand bg-brand/10 text-brand-deep"
+                            : "border-border bg-white text-muted-foreground hover:border-brand/40",
+                        )}
+                      >
+                        {text}
+                      </button>
+                    ))}
+                  </div>
+                </Field>
+              </div>
+            ) : (
+              <div className="rounded-2xl border border-border bg-muted/30 px-4 py-3 sm:px-5">
+                <p className="font-ui text-sm font-semibold text-brand-deep">Seus dados</p>
+                <dl className="mt-2 grid gap-x-8 gap-y-1 font-body text-sm text-muted-foreground sm:grid-cols-3">
+                  <div className="flex gap-1.5">
+                    <dt>Nome:</dt>
+                    <dd className="truncate font-semibold text-foreground">{lead.nome}</dd>
+                  </div>
+                  <div className="flex gap-1.5">
+                    <dt>Telefone:</dt>
+                    <dd className="font-semibold text-foreground">{lead.telefone}</dd>
+                  </div>
+                  <div className="flex gap-1.5">
+                    <dt>Interesse:</dt>
+                    <dd className="font-semibold text-foreground">{intentLabel(lead.intencao)}</dd>
+                  </div>
+                </dl>
+              </div>
+            )}
+
+            <StepPlanos selected={plan} sending={sending} onSelect={selectPlan} />
+          </div>
+        )}
 
         {step === 1 && (
           <div className="grid gap-4 sm:grid-cols-2">
@@ -854,11 +997,15 @@ export function ContractWizard({ handoff }: { handoff: ContractHandoff }) {
         </p>
       )}
 
-      {step > 0 && (
+      {(step > 0 || needsLead) && (
         <div className="mt-8 flex flex-col-reverse gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <Button type="button" variant="outline" size="lg" onClick={back} disabled={sending}>
-            <ChevronLeft /> Voltar
-          </Button>
+          {step > 0 ? (
+            <Button type="button" variant="outline" size="lg" onClick={back} disabled={sending}>
+              <ChevronLeft /> Voltar
+            </Button>
+          ) : (
+            <span className="hidden sm:block" />
+          )}
           {step < LAST_STEP ? (
             <Button type="button" variant="brand" size="xl" onClick={next} disabled={sending}>
               {sending ? <Loader2 className="animate-spin" /> : null} Continuar <ChevronRight />
