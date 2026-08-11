@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { plans, type Plan } from "@/lib/plans";
 import { capitalizeName, isValidPhone, maskPhone } from "@/lib/form-utils";
 import { getAttribution } from "@/lib/utm";
+import { getRecaptchaToken } from "@/lib/recaptcha";
 import { submitContractStep } from "@/lib/submit-contract-step";
 import { cn } from "@/lib/utils";
 import type { ContractHandoff } from "@/lib/contract-handoff";
@@ -254,13 +255,25 @@ export function ContractWizard({ handoff }: { handoff: ContractHandoff }) {
   );
 
   const [lead, setLead] = useState<Lead>(prefilledLead);
-  /** Veio tudo da home? Então a etapa 1 só exibe os dados, sem pedir de novo. */
-  const [needsLead] = useState(
-    () =>
-      prefilledLead.nome.trim().length < 3 ||
-      !isValidPhone(prefilledLead.telefone) ||
-      prefilledLead.intencao === "",
-  );
+  /**
+   * Cada campo é pedido só quando não veio preenchido da home; os que vieram
+   * ficam ocultos e aparecem apenas como informação acima dos planos.
+   */
+  const [needs] = useState(() => ({
+    nome: prefilledLead.nome.trim().length < 3,
+    telefone: !isValidPhone(prefilledLead.telefone),
+    intencao: prefilledLead.intencao === "",
+  }));
+  const needsLead = needs.nome || needs.telefone || needs.intencao;
+
+  /** Só o que veio da home — é isso que vira o bloco informativo. */
+  const filledLead: Array<[string, string]> = [
+    ...(needs.nome ? [] : ([["Nome", prefilledLead.nome]] as Array<[string, string]>)),
+    ...(needs.telefone ? [] : ([["Telefone", prefilledLead.telefone]] as Array<[string, string]>)),
+    ...(needs.intencao
+      ? []
+      : ([["Interesse", intentLabel(prefilledLead.intencao)]] as Array<[string, string]>)),
+  ];
 
   const [plan, setPlan] = useState<Plan | null>(prefilledPlan);
   const [step, setStep] = useState(prefilledPlan ? 1 : 0);
@@ -335,11 +348,10 @@ export function ContractWizard({ handoff }: { handoff: ContractHandoff }) {
   function validate(target: number): boolean {
     const e: Errors = {};
     if (target === 0) {
-      if (needsLead) {
-        if (lead.nome.trim().length < 3) e["lead_nome"] = "Digite seu nome completo";
-        if (!isValidPhone(lead.telefone)) e["lead_telefone"] = "DDD + 8 ou 9 dígitos";
-        if (!lead.intencao) e["lead_intencao"] = "Escolha uma opção";
-      }
+      if (needs.nome && lead.nome.trim().length < 3) e["lead_nome"] = "Digite seu nome completo";
+      if (needs.telefone && !isValidPhone(lead.telefone))
+        e["lead_telefone"] = "DDD + 8 ou 9 dígitos";
+      if (needs.intencao && !lead.intencao) e["lead_intencao"] = "Escolha uma opção";
       if (!plan) {
         setErrors(e);
         toast.error(
@@ -480,7 +492,10 @@ export function ContractWizard({ handoff }: { handoff: ContractHandoff }) {
     };
 
     try {
-      const anexos = await buildAnexos(index);
+      const [anexos, recaptchaToken] = await Promise.all([
+        buildAnexos(index),
+        getRecaptchaToken(`contratacao_${stepInfo.id}`),
+      ]);
       const result = await submitContractStep({
         data: {
           etapa: index + 1,
@@ -493,6 +508,7 @@ export function ContractWizard({ handoff }: { handoff: ContractHandoff }) {
           dados: buildDados(index, chosenPlan),
           ...(anexos && anexos.length ? { anexos } : {}),
           attribution: getAttribution(),
+          ...(recaptchaToken ? { recaptchaToken } : {}),
         },
       });
       if (result.ok) {
@@ -604,83 +620,91 @@ export function ContractWizard({ handoff }: { handoff: ContractHandoff }) {
       <div className="mt-7">
         {step === 0 && (
           <div className="space-y-7">
-            {needsLead ? (
-              <div className="grid gap-4 rounded-2xl border border-border bg-muted/30 p-4 sm:grid-cols-2 sm:p-5">
-                <p className="font-ui text-sm font-semibold text-brand-deep sm:col-span-2">
-                  Antes de escolher o plano, conte pra gente quem é você:
-                </p>
+            {(needsLead || filledLead.length > 0) && (
+              <div className="space-y-4 rounded-2xl border border-border bg-muted/30 p-4 sm:p-5">
+                {filledLead.length > 0 && (
+                  <div>
+                    <p className="font-ui text-sm font-semibold text-brand-deep">Seus dados</p>
+                    <dl className="mt-2 grid gap-x-8 gap-y-1 font-body text-sm text-muted-foreground sm:grid-cols-3">
+                      {filledLead.map(([rotulo, valor]) => (
+                        <div key={rotulo} className="flex gap-1.5">
+                          <dt>{rotulo}:</dt>
+                          <dd className="truncate font-semibold text-foreground">{valor}</dd>
+                        </div>
+                      ))}
+                    </dl>
+                  </div>
+                )}
 
-                <Field label="Nome" error={errors["lead_nome"]}>
-                  <input
-                    className={inputCls(!!errors["lead_nome"])}
-                    value={lead.nome}
-                    autoComplete="name"
-                    placeholder="Maria Silva"
-                    onChange={(e) => {
-                      setLead((p) => ({ ...p, nome: capitalizeName(e.target.value) }));
-                      clearError("lead_nome");
-                    }}
-                  />
-                </Field>
+                {needsLead && (
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    <p className="font-ui text-sm font-semibold text-brand-deep sm:col-span-2">
+                      {filledLead.length > 0
+                        ? "Falta só isso pra continuar:"
+                        : "Antes de escolher o plano, conte pra gente quem é você:"}
+                    </p>
 
-                <Field label="Telefone / WhatsApp" error={errors["lead_telefone"]}>
-                  <input
-                    className={inputCls(!!errors["lead_telefone"])}
-                    value={lead.telefone}
-                    inputMode="tel"
-                    autoComplete="tel"
-                    placeholder="(49) 99999-9999"
-                    onChange={(e) => {
-                      setLead((p) => ({ ...p, telefone: maskPhone(e.target.value) }));
-                      clearError("lead_telefone");
-                    }}
-                  />
-                </Field>
+                    {needs.nome && (
+                      <Field label="Nome" error={errors["lead_nome"]}>
+                        <input
+                          className={inputCls(!!errors["lead_nome"])}
+                          value={lead.nome}
+                          autoComplete="name"
+                          placeholder="Maria Silva"
+                          onChange={(e) => {
+                            setLead((p) => ({ ...p, nome: capitalizeName(e.target.value) }));
+                            clearError("lead_nome");
+                          }}
+                        />
+                      </Field>
+                    )}
 
-                <Field
-                  label="O que você precisa?"
-                  error={errors["lead_intencao"]}
-                  className="sm:col-span-2"
-                >
-                  <div className="grid max-w-md grid-cols-2 gap-2">
-                    {INTENTS.map(([value, text]) => (
-                      <button
-                        key={value}
-                        type="button"
-                        onClick={() => {
-                          setLead((p) => ({ ...p, intencao: value }));
-                          clearError("lead_intencao");
-                        }}
-                        className={cn(
-                          "rounded-lg border px-3 py-2.5 font-ui text-sm font-semibold transition",
-                          lead.intencao === value
-                            ? "border-brand bg-brand/10 text-brand-deep"
-                            : "border-border bg-white text-muted-foreground hover:border-brand/40",
-                        )}
+                    {needs.telefone && (
+                      <Field label="Telefone / WhatsApp" error={errors["lead_telefone"]}>
+                        <input
+                          className={inputCls(!!errors["lead_telefone"])}
+                          value={lead.telefone}
+                          inputMode="tel"
+                          autoComplete="tel"
+                          placeholder="(49) 99999-9999"
+                          onChange={(e) => {
+                            setLead((p) => ({ ...p, telefone: maskPhone(e.target.value) }));
+                            clearError("lead_telefone");
+                          }}
+                        />
+                      </Field>
+                    )}
+
+                    {needs.intencao && (
+                      <Field
+                        label="O que você precisa?"
+                        error={errors["lead_intencao"]}
+                        className="sm:col-span-2"
                       >
-                        {text}
-                      </button>
-                    ))}
+                        <div className="grid max-w-md grid-cols-2 gap-2">
+                          {INTENTS.map(([value, text]) => (
+                            <button
+                              key={value}
+                              type="button"
+                              onClick={() => {
+                                setLead((p) => ({ ...p, intencao: value }));
+                                clearError("lead_intencao");
+                              }}
+                              className={cn(
+                                "rounded-lg border px-3 py-3 font-ui text-sm font-semibold leading-6 transition",
+                                lead.intencao === value
+                                  ? "border-brand bg-brand/10 text-brand-deep"
+                                  : "border-border bg-white text-muted-foreground hover:border-brand/40",
+                              )}
+                            >
+                              {text}
+                            </button>
+                          ))}
+                        </div>
+                      </Field>
+                    )}
                   </div>
-                </Field>
-              </div>
-            ) : (
-              <div className="rounded-2xl border border-border bg-muted/30 px-4 py-3 sm:px-5">
-                <p className="font-ui text-sm font-semibold text-brand-deep">Seus dados</p>
-                <dl className="mt-2 grid gap-x-8 gap-y-1 font-body text-sm text-muted-foreground sm:grid-cols-3">
-                  <div className="flex gap-1.5">
-                    <dt>Nome:</dt>
-                    <dd className="truncate font-semibold text-foreground">{lead.nome}</dd>
-                  </div>
-                  <div className="flex gap-1.5">
-                    <dt>Telefone:</dt>
-                    <dd className="font-semibold text-foreground">{lead.telefone}</dd>
-                  </div>
-                  <div className="flex gap-1.5">
-                    <dt>Interesse:</dt>
-                    <dd className="font-semibold text-foreground">{intentLabel(lead.intencao)}</dd>
-                  </div>
-                </dl>
+                )}
               </div>
             )}
 

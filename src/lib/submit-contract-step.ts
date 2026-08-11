@@ -1,12 +1,14 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
+import { isLikelyBot, verifyRecaptcha } from "./verify-recaptcha";
 
 /**
  * Per-step webhook for the /contratacao wizard.
  *
  * Every step of the form posts to the environment webhook (WEBHOOK_URL) with
  * the Bearer token (WEBHOOK_TOKEN) added server-side, always carrying
- * `formulario: "contratacao"`. The wizard only lets the user move on when the
+ * `formulario: "contratacao"`. Each step is checked against reCAPTCHA v3
+ * first (when configured), and the wizard only lets the user move on when the
  * webhook answers with `status: "ok"` — an HTTP error, a network failure or
  * any other status blocks the step.
  */
@@ -33,13 +35,14 @@ const stepInputSchema = z.object({
   dados: z.record(z.unknown()),
   anexos: z.array(anexoSchema).optional(),
   attribution: z.record(z.string().optional()).optional(),
+  recaptchaToken: z.string().optional(),
 });
 
 export type ContractStepResult = {
   ok: boolean;
   status: string | null;
   message?: string | undefined;
-  reason?: "not_configured" | "http_error" | "bad_status" | "network_error";
+  reason?: "not_configured" | "http_error" | "bad_status" | "network_error" | "recaptcha";
 };
 
 /* ---------------- response parsing ---------------- */
@@ -106,6 +109,18 @@ function readStatus(body: string): StatusHit | null {
 export const submitContractStep = createServerFn({ method: "POST" })
   .validator(stepInputSchema)
   .handler(async ({ data }): Promise<ContractStepResult> => {
+    const recaptcha = await verifyRecaptcha(data.recaptchaToken);
+    if (isLikelyBot(recaptcha)) {
+      console.error(`Contract step ${data.etapa} blocked by reCAPTCHA`);
+      return {
+        ok: false,
+        status: null,
+        reason: "recaptcha",
+        message:
+          "Não conseguimos confirmar que você não é um robô. Recarregue a página e tente de novo.",
+      };
+    }
+
     const url = process.env["WEBHOOK_URL"];
     if (!url) {
       // Sem webhook configurado (dev local) o formulário segue normalmente.
@@ -114,10 +129,13 @@ export const submitContractStep = createServerFn({ method: "POST" })
     }
 
     const token = process.env["WEBHOOK_TOKEN"];
+    // O token do reCAPTCHA fica no servidor — o webhook recebe só o score.
+    const { recaptchaToken: _token, ...stepData } = data;
     const payload = {
       formulario: FORM_ID,
-      ...data,
+      ...stepData,
       submitted_at: new Date().toISOString(),
+      recaptcha_score: recaptcha?.score ?? null,
     };
 
     let res: Response;

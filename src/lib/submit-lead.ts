@@ -1,6 +1,10 @@
 import { createServerFn } from "@tanstack/react-start";
 import { createHash } from "node:crypto";
 import { z } from "zod";
+import { isLikelyBot, verifyRecaptcha } from "./verify-recaptcha";
+
+/** Identifica a origem do envio para quem consome o webhook. */
+const FORM_ID = "lead";
 
 const leadInputSchema = z.object({
   name: z.string().min(1),
@@ -17,24 +21,6 @@ const leadInputSchema = z.object({
 });
 
 type LeadInput = z.infer<typeof leadInputSchema>;
-
-type RecaptchaResult = { success: boolean; score?: number; action?: string } | null;
-
-async function verifyRecaptcha(token: string | undefined): Promise<RecaptchaResult> {
-  const secret = process.env["RECAPTCHA_SECRET_KEY"];
-  if (!secret || !token) return null;
-  try {
-    const res = await fetch("https://www.google.com/recaptcha/api/siteverify", {
-      method: "POST",
-      headers: { "content-type": "application/x-www-form-urlencoded" },
-      body: new URLSearchParams({ secret, response: token }),
-    });
-    return (await res.json()) as RecaptchaResult;
-  } catch (err) {
-    console.error("reCAPTCHA verification failed", err);
-    return null;
-  }
-}
 
 function sha256(value: string) {
   return createHash("sha256").update(value.trim().toLowerCase()).digest("hex");
@@ -115,11 +101,10 @@ export const submitLead = createServerFn({ method: "POST" })
   .validator(leadInputSchema)
   .handler(async ({ data }) => {
     const recaptcha = await verifyRecaptcha(data.recaptchaToken);
-    const isLikelyBot =
-      recaptcha != null && (recaptcha.success === false || (recaptcha.score ?? 1) < 0.3);
-    if (isLikelyBot) return { ok: false, reason: "recaptcha" as const };
+    if (isLikelyBot(recaptcha)) return { ok: false, reason: "recaptcha" as const };
 
     const payload = {
+      formulario: FORM_ID,
       nome: data.name,
       whatsapp: `${data.ddi}${data.phone.replace(/\D/g, "")}`,
       ...(data.plan ? { plano: data.plan } : {}),
