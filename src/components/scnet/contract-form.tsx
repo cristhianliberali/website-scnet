@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from "react";
 import { useNavigate } from "@tanstack/react-router";
 import { toast } from "sonner";
+import { Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { getAttribution } from "@/lib/utm";
 import { getRecaptchaToken } from "@/lib/recaptcha";
@@ -14,18 +15,23 @@ export type SelectedPlan = { name: string; price: string };
 
 type Intent = "quero_contratar" | "ja_sou_cliente";
 
-/** Fires the webhook/CAPI in the background — never blocks navigation to /contratacao. */
-async function submitContractInBackground(input: {
+const ERRO_GENERICO = "Não foi possível enviar seus dados agora. Tente novamente em instantes.";
+
+/**
+ * Envia o lead e devolve o veredito do webhook. O cliente só é levado para
+ * /contratacao quando a resposta traz `status: "ok"`.
+ */
+async function sendLead(input: {
   name: string;
   ddi: string;
   phone: string;
   intent: Intent;
   plan?: SelectedPlan | undefined;
-}) {
+}): Promise<{ ok: boolean; message?: string | undefined }> {
   try {
     const recaptchaToken = await getRecaptchaToken("contract_form_submit");
     const { fbc, fbp } = getFacebookCookies();
-    await submitLead({
+    const result = await submitLead({
       data: {
         name: input.name,
         ddi: input.ddi,
@@ -40,8 +46,10 @@ async function submitContractInBackground(input: {
         attribution: getAttribution(),
       },
     });
+    return { ok: result.ok, message: result.message || (result.ok ? undefined : ERRO_GENERICO) };
   } catch (err) {
     console.error("Contract form submission failed", err);
+    return { ok: false, message: "Falha de conexão ao enviar seus dados. Tente novamente." };
   }
 }
 
@@ -52,6 +60,9 @@ export function ContractForm({ selectedPlan }: { selectedPlan: SelectedPlan | nu
   const [phone, setPhone] = useState("");
   const [intent, setIntent] = useState<Intent | null>(null);
   const [errors, setErrors] = useState<{ name?: boolean; phone?: boolean; intent?: boolean }>({});
+  const [sending, setSending] = useState(false);
+  /** Mensagem devolvida pelo webhook quando ele recusa o envio. */
+  const [serverError, setServerError] = useState<string | null>(null);
 
   const field = (hasError: boolean) =>
     cn(
@@ -66,8 +77,10 @@ export function ContractForm({ selectedPlan }: { selectedPlan: SelectedPlan | nu
       hasError ? "text-red-500" : "text-brand-deep",
     );
 
-  function submit(e: FormEvent) {
+  async function submit(e: FormEvent) {
     e.preventDefault();
+    if (sending) return;
+    setServerError(null);
     const nextErrors = {
       name: name.trim().length < 3,
       phone: !isValidPhone(phone),
@@ -92,30 +105,43 @@ export function ContractForm({ selectedPlan }: { selectedPlan: SelectedPlan | nu
     const whatsapp = `${ddi}${phone.replace(/\D/g, "")}`;
     const chosenIntent = intent;
 
-    trackLeadEvent();
-    void submitContractInBackground({
-      name: trimmedName,
-      ddi,
-      phone,
-      intent: chosenIntent,
-      plan: selectedPlan ?? undefined,
-    });
+    setSending(true);
+    try {
+      const result = await sendLead({
+        name: trimmedName,
+        ddi,
+        phone,
+        intent: chosenIntent,
+        plan: selectedPlan ?? undefined,
+      });
 
-    const handoff = {
-      nome: trimmedName,
-      whatsapp,
-      intencao: chosenIntent,
-      ...(selectedPlan ? { plano: selectedPlan.name, preco: selectedPlan.price } : {}),
-    };
-    writeContractHandoffCookie(handoff);
+      if (!result.ok) {
+        const message = result.message ?? ERRO_GENERICO;
+        setServerError(message);
+        toast.error(message);
+        return;
+      }
 
-    void navigate({ to: "/contratacao", search: handoff });
+      trackLeadEvent();
+
+      const handoff = {
+        nome: trimmedName,
+        whatsapp,
+        intencao: chosenIntent,
+        ...(selectedPlan ? { plano: selectedPlan.name, preco: selectedPlan.price } : {}),
+      };
+      writeContractHandoffCookie(handoff);
+
+      void navigate({ to: "/contratacao", search: handoff });
+    } finally {
+      setSending(false);
+    }
   }
 
   return (
     <form
       id="contrate"
-      onSubmit={submit}
+      onSubmit={(e) => void submit(e)}
       className="w-full scroll-mt-28 rounded-2xl border border-border bg-white p-6 shadow-xl sm:p-8"
     >
       {selectedPlan && (
@@ -198,8 +224,17 @@ export function ContractForm({ selectedPlan }: { selectedPlan: SelectedPlan | nu
           </div>
         </div>
       </div>
-      <Button type="submit" variant="zap" size="xl" className="mt-5 w-full">
-        Quero contratar agora
+      {serverError && (
+        <p
+          role="alert"
+          className="mt-4 rounded-xl border border-red-300 bg-red-50 px-4 py-3 font-body text-sm text-red-600"
+        >
+          {serverError}
+        </p>
+      )}
+      <Button type="submit" variant="zap" size="xl" className="mt-5 w-full" disabled={sending}>
+        {sending ? <Loader2 className="animate-spin" /> : null}
+        {sending ? "Enviando..." : "Quero contratar agora"}
       </Button>
       <p className="mt-3 text-center font-body text-sm text-muted-foreground">
         Mude para a conexão n°1 da região

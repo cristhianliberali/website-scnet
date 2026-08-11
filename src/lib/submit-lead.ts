@@ -2,9 +2,12 @@ import { createServerFn } from "@tanstack/react-start";
 import { createHash } from "node:crypto";
 import { z } from "zod";
 import { isLikelyBot, verifyRecaptcha } from "./verify-recaptcha";
+import { postToWebhook, type WebhookOutcome } from "./webhook";
 
 /** Identifica a origem do envio para quem consome o webhook. */
 const FORM_ID = "lead";
+
+export type LeadResult = WebhookOutcome;
 
 const leadInputSchema = z.object({
   name: z.string().min(1),
@@ -29,25 +32,6 @@ function sha256(value: string) {
 function parsePrice(price: string): number | undefined {
   const n = Number(price.replace(/\./g, "").replace(",", "."));
   return Number.isFinite(n) ? n : undefined;
-}
-
-async function sendWebhook(payload: unknown) {
-  const url = process.env["WEBHOOK_URL"];
-  if (!url) return;
-  const token = process.env["WEBHOOK_TOKEN"];
-  try {
-    const res = await fetch(url, {
-      method: "POST",
-      headers: {
-        "content-type": "application/json",
-        ...(token ? { authorization: `Bearer ${token}` } : {}),
-      },
-      body: JSON.stringify(payload),
-    });
-    if (!res.ok) console.error(`Lead webhook responded ${res.status}`);
-  } catch (err) {
-    console.error("Lead webhook request failed", err);
-  }
 }
 
 async function sendFacebookCapiEvent(input: LeadInput) {
@@ -92,16 +76,25 @@ async function sendFacebookCapiEvent(input: LeadInput) {
 }
 
 /**
- * Verifies reCAPTCHA (when configured), then forwards the lead to the n8n
- * webhook and Facebook Conversions API in parallel. Any step is skipped
- * silently when its env vars aren't set, and failures are logged, never
- * thrown — the client never waits on this to send the user to WhatsApp.
+ * Verifica o reCAPTCHA (quando configurado) e envia o lead ao webhook,
+ * devolvendo o veredito para o formulário: o cliente só segue adiante com
+ * `status: "ok"`, e a mensagem de erro do webhook volta para ser exibida.
+ * O evento da Conversions API só é disparado para leads aceitos.
  */
 export const submitLead = createServerFn({ method: "POST" })
   .validator(leadInputSchema)
-  .handler(async ({ data }) => {
+  .handler(async ({ data }): Promise<LeadResult> => {
     const recaptcha = await verifyRecaptcha(data.recaptchaToken);
-    if (isLikelyBot(recaptcha)) return { ok: false, reason: "recaptcha" as const };
+    if (isLikelyBot(recaptcha)) {
+      console.error("Lead blocked by reCAPTCHA");
+      return {
+        ok: false,
+        status: null,
+        reason: "recaptcha",
+        message:
+          "Não conseguimos confirmar que você não é um robô. Recarregue a página e tente de novo.",
+      };
+    }
 
     const payload = {
       formulario: FORM_ID,
@@ -116,6 +109,7 @@ export const submitLead = createServerFn({ method: "POST" })
       recaptcha_score: recaptcha?.score ?? null,
     };
 
-    await Promise.all([sendWebhook(payload), sendFacebookCapiEvent(data)]);
-    return { ok: true };
+    const outcome = await postToWebhook(payload, "Lead");
+    if (outcome.ok) await sendFacebookCapiEvent(data);
+    return outcome;
   });
