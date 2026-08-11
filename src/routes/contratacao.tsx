@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { z } from "zod";
+import { Toaster } from "@/components/ui/sonner";
 import { Header } from "@/components/scnet/header";
 import { Footer, WhatsFloat } from "@/components/scnet/sections";
 import { Blobs } from "@/components/scnet/shared";
@@ -70,7 +71,8 @@ function Contratacao() {
               Falta pouco para concluir seu pedido!
             </h1>
             <p className="mt-3 font-body text-lg text-primary-foreground/90">
-              Quatro passos rápidos: plano, endereço, cadastro e agendamento da instalação.
+              Quatro passos rápidos: plano, endereço, cadastro e, por fim, anexos e agendamento da
+              instalação.
             </p>
           </div>
         </section>
@@ -83,6 +85,7 @@ function Contratacao() {
       </main>
       <Footer />
       <WhatsFloat />
+      <Toaster />
     </div>
   );
 }
