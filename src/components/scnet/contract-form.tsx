@@ -183,7 +183,8 @@ export function ContractForm({ selectedPlan }: { selectedPlan: SelectedPlan | nu
                   if (errors.intent) setErrors((prev) => ({ ...prev, intent: false }));
                 }}
                 className={cn(
-                  "rounded-md border px-3 py-2 font-ui text-xs font-medium transition",
+                  // px/py/leading iguais aos inputs acima — mesma altura de caixa
+                  "rounded-lg border px-3 py-3 font-ui text-sm font-semibold leading-6 transition",
                   intent === value
                     ? "border-brand bg-brand/10 text-brand-deep"
                     : errors.intent
