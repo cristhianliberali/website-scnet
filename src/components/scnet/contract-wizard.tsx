@@ -4,6 +4,8 @@ import { Check, CheckCircle2, ChevronLeft, ChevronRight, Circle, Loader2, Paperc
 import { Button } from "@/components/ui/button";
 import { plans, type Plan } from "@/lib/plans";
 import { capitalizeName, isValidPhone, maskPhone } from "@/lib/form-utils";
+import { getAttribution } from "@/lib/utm";
+import { submitContractStep } from "@/lib/submit-contract-step";
 import { cn } from "@/lib/utils";
 import type { ContractHandoff } from "@/lib/contract-handoff";
 
@@ -57,6 +59,26 @@ function fileError(file: File | null) {
   if (!ACCEPTED_TYPES.includes(file.type)) return "Use PDF, PNG ou JPEG";
   if (file.size > MAX_FILE_MB * 1024 * 1024) return `Máximo ${MAX_FILE_MB}MB`;
   return null;
+}
+
+function fileToBase64(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = () => reject(reader.error ?? new Error("Falha ao ler o arquivo"));
+    reader.onload = () => {
+      const result = String(reader.result);
+      resolve(result.slice(result.indexOf(",") + 1));
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
+function newSessionId() {
+  try {
+    return crypto.randomUUID();
+  } catch {
+    return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+  }
 }
 
 const MONTHS = [
@@ -184,6 +206,17 @@ type Person = {
 
 type Errors = Record<string, string | undefined>;
 
+/* ---------------- steps ---------------- */
+
+const STEPS = [
+  { id: "planos", label: "Planos" },
+  { id: "endereco", label: "Endereço" },
+  { id: "cadastro", label: "Cadastro" },
+  { id: "anexos_agendamento", label: "Anexos e Agendamento" },
+] as const;
+
+const LAST_STEP = STEPS.length - 1;
+
 /* ---------------- wizard ---------------- */
 
 export function ContractWizard({ handoff }: { handoff: ContractHandoff }) {
@@ -197,6 +230,9 @@ export function ContractWizard({ handoff }: { handoff: ContractHandoff }) {
   const [errors, setErrors] = useState<Errors>({});
   const [sending, setSending] = useState(false);
   const [done, setDone] = useState(false);
+  const [sessionId] = useState(newSessionId);
+  /** Motivo pelo qual o webhook barrou a etapa atual. */
+  const [stepBlock, setStepBlock] = useState<string | null>(null);
 
   const [address, setAddress] = useState<Address>({
     tipo: "",
@@ -225,7 +261,6 @@ export function ContractWizard({ handoff }: { handoff: ContractHandoff }) {
   const [period, setPeriod] = useState<"manha" | "tarde" | "">("");
   const [note, setNote] = useState("");
 
-  const steps = ["Planos", "Endereço", "Cadastro", "Agendamento"];
   const clearError = (k: string) => setErrors((p) => ({ ...p, [k]: undefined }));
 
   /* ----- CEP lookup ----- */
@@ -260,13 +295,6 @@ export function ContractWizard({ handoff }: { handoff: ContractHandoff }) {
   }
 
   /* ----- validation ----- */
-  const personFilled =
-    FULL_NAME_RE.test(person.nome.trim()) &&
-    isValidCpf(person.cpf) &&
-    isAdultBirthDate(person.nascimento) &&
-    EMAIL_RE.test(person.email.trim()) &&
-    isValidPhone(person.telefone);
-
   function validate(target: number): boolean {
     const e: Errors = {};
     if (target === 0 && !plan) {
@@ -296,14 +324,12 @@ export function ContractWizard({ handoff }: { handoff: ContractHandoff }) {
       } else if (onlyDigits(person.telefone2) === onlyDigits(person.telefone)) {
         e["telefone2"] = "Deve ser diferente do telefone principal";
       }
-      if (personFilled) {
-        const pe = fileError(proofFile);
-        const ie = fileError(idFile);
-        if (pe) e["proof"] = pe;
-        if (ie) e["id"] = ie;
-      }
     }
     if (target === 3) {
+      const pe = fileError(proofFile);
+      const ie = fileError(idFile);
+      if (pe) e["proof"] = pe;
+      if (ie) e["id"] = ie;
       if (!date) e["date"] = "Escolha uma data disponível";
       if (!period) e["period"] = "Escolha o período";
     }
@@ -315,29 +341,157 @@ export function ContractWizard({ handoff }: { handoff: ContractHandoff }) {
     return true;
   }
 
-  function next() {
-    if (!validate(step)) return;
-    setErrors({});
-    setStep((s) => Math.min(s + 1, steps.length - 1));
-    window.scrollTo({ top: 0, behavior: "smooth" });
+  /* ----- webhook por etapa ----- */
+
+  /** Dados acumulados até a etapa informada — o webhook recebe o retrato completo. */
+  function buildDados(index: number, chosenPlan: Plan | null) {
+    return {
+      plano: chosenPlan ? { nome: chosenPlan.name, preco: chosenPlan.price } : null,
+      origem: {
+        nome: handoff.nome ?? null,
+        whatsapp: handoff.whatsapp ?? null,
+        intencao: handoff.intencao ?? null,
+      },
+      ...(index >= 1
+        ? {
+            endereco: {
+              tipo: address.tipo,
+              cep: address.cep,
+              cidade: address.cidade,
+              bairro: address.bairro,
+              logradouro: address.logradouro,
+              numero: address.numero,
+              complemento: address.complemento,
+              condominio: address.condominio,
+            },
+          }
+        : {}),
+      ...(index >= 2
+        ? {
+            cliente: {
+              nome: person.nome.trim(),
+              cpf: person.cpf,
+              nascimento: person.nascimento,
+              email: person.email.trim(),
+              telefone: person.telefone,
+              telefone2: person.telefone2,
+            },
+          }
+        : {}),
+      ...(index >= 3
+        ? {
+            agendamento: {
+              data: date,
+              periodo: period,
+              observacao: note.trim(),
+            },
+          }
+        : {}),
+    };
   }
 
-  function back() {
-    setErrors({});
-    setStep((s) => Math.max(s - 1, 0));
-    window.scrollTo({ top: 0, behavior: "smooth" });
+  async function buildAnexos(index: number) {
+    if (index < 3) return undefined;
+    const picked = [
+      { campo: "comprovante_residencia", file: proofFile },
+      { campo: "documento_com_foto", file: idFile },
+    ].filter((a): a is { campo: string; file: File } => a.file != null);
+
+    return Promise.all(
+      picked.map(async ({ campo, file }) => ({
+        campo,
+        nome: file.name,
+        tipo: file.type,
+        tamanho: file.size,
+        conteudo_base64: await fileToBase64(file),
+      })),
+    );
   }
 
-  async function finish() {
-    if (!validate(3)) return;
+  /**
+   * Envia a etapa ao webhook e só libera o avanço quando a resposta traz
+   * `status: "ok"`. Erro, timeout ou qualquer outro status barra o usuário.
+   */
+  async function sendStep(index: number, chosenPlan: Plan | null): Promise<boolean> {
+    const stepInfo = STEPS[index];
+    if (!stepInfo) return false;
+
+    const block = (message: string) => {
+      setStepBlock(message);
+      toast.error(message);
+      return false;
+    };
+
+    try {
+      const anexos = await buildAnexos(index);
+      const result = await submitContractStep({
+        data: {
+          etapa: index + 1,
+          etapa_id: stepInfo.id,
+          etapa_nome: stepInfo.label,
+          total_etapas: STEPS.length,
+          final: index === LAST_STEP,
+          id_sessao: sessionId,
+          page: window.location.pathname + window.location.search,
+          dados: buildDados(index, chosenPlan),
+          ...(anexos && anexos.length ? { anexos } : {}),
+          attribution: getAttribution(),
+        },
+      });
+      if (result.ok) {
+        setStepBlock(null);
+        return true;
+      }
+      return block(
+        result.message ||
+          "Não foi possível validar esta etapa agora. Tente novamente em instantes.",
+      );
+    } catch (err) {
+      console.error("Contract step submission failed", err);
+      return block("Falha de conexão ao enviar esta etapa. Tente novamente.");
+    }
+  }
+
+  async function advance(index: number, chosenPlan: Plan | null) {
+    if (sending) return;
     setSending(true);
     try {
-      await new Promise((r) => setTimeout(r, 600));
-      setDone(true);
+      const ok = await sendStep(index, chosenPlan);
+      if (!ok) return;
+      setErrors({});
+      if (index === LAST_STEP) {
+        setDone(true);
+      } else {
+        setStep(Math.min(index + 1, LAST_STEP));
+      }
       window.scrollTo({ top: 0, behavior: "smooth" });
     } finally {
       setSending(false);
     }
+  }
+
+  function next() {
+    if (!validate(step)) return;
+    void advance(step, plan);
+  }
+
+  function selectPlan(chosen: Plan) {
+    if (sending) return;
+    setPlan(chosen);
+    void advance(0, chosen);
+  }
+
+  function back() {
+    if (sending) return;
+    setErrors({});
+    setStepBlock(null);
+    setStep((s) => Math.max(s - 1, 0));
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+
+  function finish() {
+    if (!validate(LAST_STEP)) return;
+    void advance(LAST_STEP, plan);
   }
 
   if (done) {
@@ -371,7 +525,8 @@ export function ContractWizard({ handoff }: { handoff: ContractHandoff }) {
             <button
               type="button"
               onClick={() => setStep(0)}
-              className="font-ui text-xs font-semibold text-brand underline underline-offset-4"
+              disabled={sending}
+              className="font-ui text-xs font-semibold text-brand underline underline-offset-4 disabled:opacity-50"
             >
               Trocar plano
             </button>
@@ -379,10 +534,16 @@ export function ContractWizard({ handoff }: { handoff: ContractHandoff }) {
         </div>
       )}
 
-      <Stepper steps={steps} current={step} onGo={setStep} />
+      <Stepper
+        steps={STEPS.map((s) => s.label)}
+        current={step}
+        onGo={(i) => {
+          if (!sending) setStep(i);
+        }}
+      />
 
       <div className="mt-7">
-        {step === 0 && <StepPlanos selected={plan} onSelect={(p) => { setPlan(p); setStep(1); }} />}
+        {step === 0 && <StepPlanos selected={plan} sending={sending} onSelect={selectPlan} />}
 
         {step === 1 && (
           <div className="grid gap-4 sm:grid-cols-2">
@@ -585,9 +746,14 @@ export function ContractWizard({ handoff }: { handoff: ContractHandoff }) {
                 }}
               />
             </Field>
+          </div>
+        )}
 
-            {personFilled ? (
-              <div className="grid gap-4 sm:col-span-2 sm:grid-cols-2">
+        {step === 3 && (
+          <div className="space-y-8">
+            <div className="space-y-4">
+              <h3 className="font-ui text-base font-bold text-brand-deep">Anexos</h3>
+              <div className="grid gap-4 sm:grid-cols-2">
                 <FileField
                   label="Comprovante de residência"
                   hint="Conta de água, luz, contrato de aluguel, etc. (PDF, PNG ou JPEG)"
@@ -609,82 +775,96 @@ export function ContractWizard({ handoff }: { handoff: ContractHandoff }) {
                   }}
                 />
               </div>
-            ) : (
-              <p className="rounded-xl border border-dashed border-border bg-muted/30 px-4 py-3 font-body text-sm text-muted-foreground sm:col-span-2">
-                Preencha os dados acima para liberar o envio dos documentos.
-              </p>
-            )}
-          </div>
-        )}
+            </div>
 
-        {step === 3 && (
-          <div className="space-y-6">
-            <Field label="Escolha a data da instalação" error={errors["date"]}>
-              <CalendarPicker
-                value={date}
-                onChange={(v) => {
-                  setDate(v);
-                  clearError("date");
-                }}
-              />
-            </Field>
+            <div className="space-y-6">
+              <h3 className="font-ui text-base font-bold text-brand-deep">Agendamento</h3>
 
-            <Field label="Período" error={errors["period"]}>
-              <div className="grid max-w-md grid-cols-2 gap-3">
-                {(
-                  [
-                    ["manha", "Manhã", "08h às 12h", Sun],
-                    ["tarde", "Tarde", "13h às 18h", Sunset],
-                  ] as const
-                ).map(([value, title, hours, Icon]) => (
-                  <button
-                    key={value}
-                    type="button"
-                    onClick={() => {
-                      setPeriod(value);
-                      clearError("period");
-                    }}
-                    className={cn(
-                      "flex items-center gap-3 rounded-xl border px-4 py-3 text-left transition",
-                      period === value
-                        ? "border-brand bg-brand/10"
-                        : "border-border bg-white hover:border-brand/40",
-                    )}
-                  >
-                    <Icon className={cn("size-5", period === value ? "text-brand" : "text-muted-foreground")} />
-                    <span>
-                      <span className="block font-ui text-sm font-semibold text-brand-deep">{title}</span>
-                      <span className="block font-body text-xs text-muted-foreground">{hours}</span>
-                    </span>
-                  </button>
-                ))}
-              </div>
-            </Field>
+              <Field label="Escolha a data da instalação" error={errors["date"]}>
+                <CalendarPicker
+                  value={date}
+                  onChange={(v) => {
+                    setDate(v);
+                    clearError("date");
+                  }}
+                />
+              </Field>
 
-            <Field label="Observação (opcional)">
-              <textarea
-                rows={3}
-                className={inputCls(false)}
-                value={note}
-                placeholder="Estarei em casa a partir das 10h da manhã"
-                onChange={(e) => setNote(e.target.value)}
-              />
-            </Field>
+              <Field label="Período" error={errors["period"]}>
+                <div className="grid max-w-md grid-cols-2 gap-3">
+                  {(
+                    [
+                      ["manha", "Manhã", "08h às 12h", Sun],
+                      ["tarde", "Tarde", "13h às 18h", Sunset],
+                    ] as const
+                  ).map(([value, title, hours, Icon]) => (
+                    <button
+                      key={value}
+                      type="button"
+                      onClick={() => {
+                        setPeriod(value);
+                        clearError("period");
+                      }}
+                      className={cn(
+                        "flex items-center gap-3 rounded-xl border px-4 py-3 text-left transition",
+                        period === value
+                          ? "border-brand bg-brand/10"
+                          : "border-border bg-white hover:border-brand/40",
+                      )}
+                    >
+                      <Icon
+                        className={cn(
+                          "size-5",
+                          period === value ? "text-brand" : "text-muted-foreground",
+                        )}
+                      />
+                      <span>
+                        <span className="block font-ui text-sm font-semibold text-brand-deep">
+                          {title}
+                        </span>
+                        <span className="block font-body text-xs text-muted-foreground">
+                          {hours}
+                        </span>
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              </Field>
+
+              <Field label="Observação (opcional)">
+                <textarea
+                  rows={3}
+                  className={inputCls(false)}
+                  value={note}
+                  placeholder="Estarei em casa a partir das 10h da manhã"
+                  onChange={(e) => setNote(e.target.value)}
+                />
+              </Field>
+            </div>
           </div>
         )}
       </div>
 
+      {stepBlock && (
+        <p
+          role="alert"
+          className="mt-6 rounded-xl border border-red-300 bg-red-50 px-4 py-3 font-body text-sm text-red-600"
+        >
+          {stepBlock}
+        </p>
+      )}
+
       {step > 0 && (
         <div className="mt-8 flex flex-col-reverse gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <Button type="button" variant="outline" size="lg" onClick={back}>
+          <Button type="button" variant="outline" size="lg" onClick={back} disabled={sending}>
             <ChevronLeft /> Voltar
           </Button>
-          {step < 3 ? (
-            <Button type="button" variant="brand" size="xl" onClick={next}>
-              Continuar <ChevronRight />
+          {step < LAST_STEP ? (
+            <Button type="button" variant="brand" size="xl" onClick={next} disabled={sending}>
+              {sending ? <Loader2 className="animate-spin" /> : null} Continuar <ChevronRight />
             </Button>
           ) : (
-            <Button type="button" variant="zap" size="xl" onClick={() => void finish()} disabled={sending}>
+            <Button type="button" variant="zap" size="xl" onClick={finish} disabled={sending}>
               {sending ? <Loader2 className="animate-spin" /> : <Check />} Finalizar contratação
             </Button>
           )}
@@ -696,7 +876,15 @@ export function ContractWizard({ handoff }: { handoff: ContractHandoff }) {
 
 /* ---------------- step 1: planos ---------------- */
 
-function StepPlanos({ selected, onSelect }: { selected: Plan | null; onSelect: (p: Plan) => void }) {
+function StepPlanos({
+  selected,
+  sending,
+  onSelect,
+}: {
+  selected: Plan | null;
+  sending: boolean;
+  onSelect: (p: Plan) => void;
+}) {
   return (
     <div>
       <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-4">
@@ -707,8 +895,10 @@ function StepPlanos({ selected, onSelect }: { selected: Plan | null; onSelect: (
               key={p.name}
               type="button"
               onClick={() => onSelect(p)}
+              disabled={sending}
               className={cn(
-                "group relative flex h-full flex-col rounded-3xl p-6 text-left transition-all duration-300 hover:-translate-y-2 focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2",
+                "group relative flex h-full flex-col rounded-3xl p-6 text-left transition-all duration-300 hover:-translate-y-2 focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 disabled:pointer-events-none",
+                sending && !isSelected && "opacity-50",
                 p.featured
                   ? "gradient-brand border-2 border-zap text-primary-foreground shadow-[0_20px_60px_-15px_color-mix(in_oklab,var(--color-zap)_55%,transparent)] focus-visible:ring-zap"
                   : "border border-border bg-card text-card-foreground focus-visible:ring-brand",
@@ -729,7 +919,13 @@ function StepPlanos({ selected, onSelect }: { selected: Plan | null; onSelect: (
                 )}
                 aria-hidden="true"
               >
-                {isSelected ? <CheckCircle2 className="size-4" /> : <Circle className="size-4" />}
+                {isSelected && sending ? (
+                  <Loader2 className="size-4 animate-spin" />
+                ) : isSelected ? (
+                  <CheckCircle2 className="size-4" />
+                ) : (
+                  <Circle className="size-4" />
+                )}
               </span>
 
               {p.featured && (
