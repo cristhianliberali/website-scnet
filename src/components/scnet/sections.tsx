@@ -41,9 +41,11 @@ import { Blobs, Reveal, SectionTitle, waLink } from "./shared";
 export function Hero() {
   return (
     // pt-* must clear the fixed header (~60px mobile / ~68px sm / ~104px lg).
+    // overflow-x-clip (not overflow-hidden) contains any horizontal bleed
+    // without clipping the image's negative bottom margin on phones.
     <section
       id="top"
-      className="gradient-brand relative pb-14 pt-24 sm:pt-28 lg:pb-28 lg:pt-40"
+      className="gradient-brand relative overflow-x-clip pb-14 pt-24 sm:pt-28 lg:pb-28 lg:pt-40"
     >
       <Blobs />
       <div className="relative mx-auto grid max-w-7xl items-center gap-10 px-4 sm:gap-12 lg:grid-cols-2 lg:gap-12">
@@ -77,19 +79,23 @@ export function Hero() {
           </Reveal>
         </div>
 
-        {/* w-fit shrinks this wrapper to the image so the floating icons anchor
-            to the artwork instead of drifting to the viewport edges. */}
+        {/* sm:w-fit shrinks this wrapper to the image so the floating icons
+            anchor to the artwork instead of drifting to the viewport edges. */}
         <Reveal delay={200} className="flex justify-center lg:block">
           {/* lg:w-full — at lg the image fills its grid column, so a fixed
               max-width would overflow the narrower column at 1024px. */}
-          <div className="relative z-10 w-fit lg:w-full">
+          <div className="relative z-10 w-full sm:w-fit lg:w-full">
             <div className="absolute left-1/2 top-1/2 -z-0 h-[100%] w-[100%] -translate-x-1/2 -translate-y-1/2 rounded-full bg-zap/30 blur-3xl" />
+            {/* Full-bleed on phones: 100% of the padded cell + the 2rem of
+                container padding, pulled back out by -mx-4, spans exactly the
+                viewport. Using 100vw here instead overflows by the padding and
+                scrolls the whole page sideways. */}
             <img
               src={heroImg}
               alt="Planta baixa de uma casa com sinal de Wi-Fi forte em todos os cômodos"
               width={1080}
               height={1080}
-              className="animate-float-slow relative z-10 w-[100vw] max-w-none drop-shadow-2xl sm:w-auto sm:max-w-md lg:w-full lg:max-w-none mb-[-96px] sm:mb-0"
+              className="animate-float-slow relative z-10 -mx-4 mb-[-96px] w-[calc(100%+2rem)] max-w-none drop-shadow-2xl sm:mx-0 sm:mb-0 sm:w-auto sm:max-w-md lg:w-full lg:max-w-none"
             />
             {[
               { Icon: Wifi, cls: "-left-3 top-6 sm:-left-5 lg:left-2", delay: "0s" },
