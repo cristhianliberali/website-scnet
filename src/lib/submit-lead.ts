@@ -1,5 +1,5 @@
 import { createServerFn } from "@tanstack/react-start";
-import { createHash } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { z } from "zod";
 import { isLikelyBot, verifyRecaptcha } from "./verify-recaptcha";
 import { postToWebhook, type WebhookOutcome } from "./webhook";
@@ -96,16 +96,27 @@ export const submitLead = createServerFn({ method: "POST" })
       };
     }
 
+    // Mesmo envelope das etapas de /contratacao — quem consome o webhook lê
+    // os dois formulários do mesmo jeito.
     const payload = {
       formulario: FORM_ID,
-      nome: data.name,
-      whatsapp: `${data.ddi}${data.phone.replace(/\D/g, "")}`,
-      ...(data.plan ? { plano: data.plan } : {}),
-      ...(data.price ? { preco: data.price } : {}),
-      ...(data.intent ? { intencao: data.intent } : {}),
+      etapa: 1,
+      etapa_id: "lead",
+      etapa_nome: "Lead",
+      total_etapas: 1,
+      final: true,
+      id_sessao: randomUUID(),
       page: data.page,
-      submitted_at: new Date().toISOString(),
+      dados: {
+        plano: data.plan ? { nome: data.plan, preco: data.price ?? null } : null,
+        origem: {
+          nome: data.name,
+          whatsapp: `${data.ddi}${data.phone.replace(/\D/g, "")}`,
+          intencao: data.intent ?? null,
+        },
+      },
       attribution: data.attribution ?? {},
+      submitted_at: new Date().toISOString(),
       recaptcha_score: recaptcha?.score ?? null,
     };
 
