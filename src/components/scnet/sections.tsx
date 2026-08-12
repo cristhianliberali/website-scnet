@@ -35,7 +35,8 @@ import {
 } from "@/components/ui/accordion";
 import { useCountUp } from "@/hooks/use-reveal";
 import { ContractForm, type SelectedPlan } from "./contract-form";
-import { Blobs, Reveal, SectionTitle, waLink } from "./shared";
+import { Blobs, Reveal, SectionTitle } from "./shared";
+import { waLink } from "@/lib/whatsapp";
 
 /* ---------------- Hero ---------------- */
 export function Hero() {
