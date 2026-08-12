@@ -6,6 +6,7 @@ import { getRecaptchaToken } from "@/lib/recaptcha";
 import { getFacebookCookies, trackLeadEvent } from "@/lib/facebook-pixel";
 import { submitLead } from "@/lib/submit-lead";
 import { capitalizeName, isValidPhone, maskPhone } from "@/lib/form-utils";
+import { isRateLimited } from "@/lib/http-errors";
 import { cn } from "@/lib/utils";
 import { waLink } from "@/lib/whatsapp";
 
@@ -31,7 +32,9 @@ async function submitLeadInBackground(name: string, ddi: string, phone: string) 
       },
     });
   } catch (err) {
-    console.error("Lead submission failed", err);
+    // Envio em segundo plano: o cliente já foi levado ao WhatsApp, então aqui
+    // só registramos. O 429 vem do limite por IP do servidor.
+    console.error(isRateLimited(err) ? "Lead rate limited" : "Lead submission failed", err);
   }
 }
 
@@ -74,11 +77,7 @@ export function LeadForm({ variant = "hero" }: { variant?: "hero" | "light" }) {
   const label = (hasError: boolean) =>
     cn(
       "font-ui text-sm font-semibold transition",
-      hasError
-        ? "text-red-500"
-        : onBrand
-          ? "text-primary-foreground/90"
-          : "text-foreground/80",
+      hasError ? "text-red-500" : onBrand ? "text-primary-foreground/90" : "text-foreground/80",
     );
   const field = (hasError: boolean) =>
     cn(

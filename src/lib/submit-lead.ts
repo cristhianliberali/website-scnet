@@ -1,26 +1,37 @@
 import { createServerFn } from "@tanstack/react-start";
+import { getRequest } from "@tanstack/react-start/server";
 import { createHash, randomUUID } from "node:crypto";
 import { z } from "zod";
-import { isLikelyBot, verifyRecaptcha } from "./verify-recaptcha";
+import { isValidPhone } from "./form-utils";
+import { NAME_RE, attributionSchema } from "./form-schemas";
+import { clientIpFromHeaders } from "./rate-limit";
+import { isLikelyBot, recaptchaScore, verifyRecaptcha } from "./verify-recaptcha";
 import { postToWebhook, type WebhookOutcome } from "./webhook";
 
 /** Identifica a origem do envio para quem consome o webhook. */
 const FORM_ID = "lead";
 
+/** Action com que o cliente gera o token do reCAPTCHA (ver lead-form.tsx). */
+const RECAPTCHA_ACTION = "lead_submit";
+
 export type LeadResult = WebhookOutcome;
 
+// A server function é um endpoint HTTP comum: tudo que entra aqui vem de fora
+// e segue para o n8n e para a Conversions API do Meta, então cada campo tem
+// formato e tamanho fechados.
 const leadInputSchema = z.object({
-  name: z.string().min(1),
-  ddi: z.string().min(1),
-  phone: z.string().min(1),
-  page: z.string(),
+  name: z.string().min(1).max(120).regex(NAME_RE),
+  ddi: z.string().regex(/^\+?\d{1,3}$/),
+  // Mesma regra do formulário (DDD + 8 ou 9 dígitos), agora também no servidor.
+  phone: z.string().min(1).max(20).refine(isValidPhone),
+  page: z.string().max(300),
   intent: z.enum(["quero_contratar", "ja_sou_cliente"]).optional(),
-  plan: z.string().optional(),
-  price: z.string().optional(),
-  recaptchaToken: z.string().optional(),
-  fbc: z.string().optional(),
-  fbp: z.string().optional(),
-  attribution: z.record(z.string().optional()).optional(),
+  plan: z.string().max(60).optional(),
+  price: z.string().max(30).optional(),
+  recaptchaToken: z.string().max(4096).optional(),
+  fbc: z.string().max(255).optional(),
+  fbp: z.string().max(255).optional(),
+  attribution: attributionSchema.optional(),
 });
 
 type LeadInput = z.infer<typeof leadInputSchema>;
@@ -84,7 +95,9 @@ async function sendFacebookCapiEvent(input: LeadInput) {
 export const submitLead = createServerFn({ method: "POST" })
   .validator(leadInputSchema)
   .handler(async ({ data }): Promise<LeadResult> => {
-    const recaptcha = await verifyRecaptcha(data.recaptchaToken);
+    const clientIp = clientIpFromHeaders(getRequest().headers);
+
+    const recaptcha = await verifyRecaptcha(data.recaptchaToken, RECAPTCHA_ACTION, clientIp);
     if (isLikelyBot(recaptcha)) {
       console.error("Lead blocked by reCAPTCHA");
       return {
@@ -117,7 +130,7 @@ export const submitLead = createServerFn({ method: "POST" })
       },
       attribution: data.attribution ?? {},
       submitted_at: new Date().toISOString(),
-      recaptcha_score: recaptcha?.score ?? null,
+      recaptcha_score: recaptchaScore(recaptcha),
     };
 
     const outcome = await postToWebhook(payload, "Lead");

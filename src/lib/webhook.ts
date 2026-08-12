@@ -9,15 +9,24 @@
  * ser exibida ao cliente.
  */
 
-const WEBHOOK_TIMEOUT_MS = 30_000;
+const WEBHOOK_TIMEOUT_MS = 15_000;
+
+/** Teto do corpo da resposta lido do webhook. */
+const MAX_RESPONSE_BYTES = 64 * 1024;
+
+/** Teto da mensagem repassada ao cliente — ela é exibida na tela dele. */
+const MAX_CLIENT_MESSAGE_LENGTH = 200;
 
 export type WebhookReason =
   | "not_configured"
   | "http_error"
   | "bad_status"
   | "network_error"
-  // usado pelos handlers antes mesmo de chegar ao webhook
-  | "recaptcha";
+  // sem WEBHOOK_TOKEN em produção o envio não sai
+  | "missing_token"
+  // usados pelos handlers antes mesmo de chegar ao webhook
+  | "recaptcha"
+  | "invalid_file";
 
 export type WebhookOutcome = {
   ok: boolean;
@@ -33,7 +42,15 @@ type StatusHit = { status: string; message: string | undefined };
 /** Chaves em que n8n e afins costumam embrulhar o payload real. */
 const NESTED_KEYS = ["json", "data", "body", "result", "response", "payload"];
 
-const asString = (value: unknown) => (typeof value === "string" ? value : undefined);
+/**
+ * A `mensagem` do webhook é exibida ao cliente, então chega limitada e sem
+ * caracteres de controle — o texto vem de um sistema externo, não daqui.
+ */
+const asString = (value: unknown) =>
+  typeof value === "string"
+    ? // eslint-disable-next-line no-control-regex
+      value.replace(/[\u0000-\u001f\u007f]/g, " ").slice(0, MAX_CLIENT_MESSAGE_LENGTH)
+    : undefined;
 
 function findStatus(value: unknown, depth = 0): StatusHit | null {
   if (depth > 3 || value == null) return null;
@@ -88,6 +105,44 @@ export function readWebhookStatus(body: string): StatusHit | null {
 /* ---------------- envio ---------------- */
 
 /**
+ * Lê no máximo MAX_RESPONSE_BYTES do corpo da resposta. O webhook é um sistema
+ * externo: sem teto, uma resposta gigante (por erro ou de propósito) seria
+ * carregada inteira na memória do processo.
+ */
+async function readBounded(res: Response): Promise<string> {
+  const reader = res.body?.getReader();
+  if (!reader) return res.text().catch(() => "");
+
+  const chunks: Uint8Array[] = [];
+  let total = 0;
+  try {
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      if (!value) continue;
+      chunks.push(value);
+      total += value.length;
+      if (total >= MAX_RESPONSE_BYTES) {
+        await reader.cancel();
+        break;
+      }
+    }
+  } catch {
+    return "";
+  }
+
+  const merged = new Uint8Array(Math.min(total, MAX_RESPONSE_BYTES));
+  let offset = 0;
+  for (const chunk of chunks) {
+    if (offset >= merged.length) break;
+    const slice = chunk.subarray(0, merged.length - offset);
+    merged.set(slice, offset);
+    offset += slice.length;
+  }
+  return new TextDecoder().decode(merged);
+}
+
+/**
  * Envia o payload ao WEBHOOK_URL e devolve o veredito.
  *
  * Sem WEBHOOK_URL configurada (dev local) devolve `ok: true` com
@@ -101,7 +156,22 @@ export async function postToWebhook(payload: unknown, label: string): Promise<We
     return { ok: true, status: null, reason: "not_configured" };
   }
 
+  // Em produção o webhook não sai sem autenticação: um POST sem o Bearer é
+  // indistinguível do que qualquer um pode mandar direto para a URL do n8n.
   const token = process.env["WEBHOOK_TOKEN"];
+  if (!token) {
+    if (process.env["NODE_ENV"] === "production") {
+      console.error(`WEBHOOK_TOKEN não configurado — ${label} não foi enviado.`);
+      return {
+        ok: false,
+        status: null,
+        reason: "missing_token",
+        message: "Serviço temporariamente indisponível. Fale com a gente no WhatsApp.",
+      };
+    }
+    console.warn(`WEBHOOK_TOKEN não configurado — ${label} será enviado sem autenticação.`);
+  }
+
   let res: Response;
   try {
     res = await fetch(url, {
@@ -118,7 +188,7 @@ export async function postToWebhook(payload: unknown, label: string): Promise<We
     return { ok: false, status: null, reason: "network_error" };
   }
 
-  const body = await res.text().catch(() => "");
+  const body = await readBounded(res);
   const hit = readWebhookStatus(body);
   const status = hit?.status ?? null;
 

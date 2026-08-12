@@ -226,6 +226,70 @@ Logo, links institucionais (Planos, Empresas, Trabalhe conosco, FAQ, Contratos e
 
 This project was built with [Lovable](https://lovable.dev).
 
+## Segurança dos formulários e do webhook
+
+Os dois formulários (lead da home e as 4 etapas de `/contratacao`) são server
+functions do TanStack Start, ou seja, endpoints HTTP públicos em `/_serverFn/…`.
+Qualquer um pode postar neles direto, sem passar pelo navegador — então nada que
+chega do cliente é tratado como confiável.
+
+### Limite de envios por IP
+
+`src/lib/rate-limit.ts`, aplicado em `src/start.ts` antes do parse do corpo:
+
+- **15 envios por minuto por IP** (janela deslizante).
+- Ao estourar, **5 minutos de bloqueio** (HTTP 429 + `Retry-After`). O bloqueio
+  não é renovado por novas tentativas — expira 5 minutos após o estouro.
+- Corpo acima de **30MB** é recusado com 413 sem ser lido.
+- Só vale para `serverFn`; navegação e assets não são limitados.
+
+O contador vive na memória do processo. A instância única do `Dockerfile` está
+coberta; **com réplicas, cada uma teria seu próprio contador** e o store
+precisaria ir para um Redis compartilhado. Operadoras móveis usam CGNAT, então
+vários clientes podem compartilhar um IP — 15/min tolera isso com folga para um
+formulário de 4 etapas, e quem for barrado cai no redirecionamento para o
+WhatsApp que já existe.
+
+### Anexos
+
+`src/lib/attachment-validation.ts`, usado pelo servidor e pelo formulário:
+
+- MIME em allowlist (PDF, PNG, JPEG) e **máximo 2 anexos**.
+- Tamanho **recalculado do base64**, teto de 10MB — o `tamanho` informado pelo
+  cliente é descartado.
+- **Magic bytes** conferidos contra o MIME declarado: um `.exe`, HTML ou script
+  renomeado para `.pdf` é recusado.
+- Nome do arquivo saneado e com a **extensão reescrita a partir do MIME**, o que
+  fecha path traversal (`../../shell.php`), dupla extensão (`doc.pdf.exe`),
+  caracteres de controle e marcas bidi do Unicode.
+
+### reCAPTCHA
+
+Sem `RECAPTCHA_SECRET_KEY` a verificação fica desligada (dev local). Com a chave
+configurada ela é **obrigatória**: requisição sem token, com token inválido ou
+com token de outra `action`/hostname é recusada. Só o Google estar fora do ar
+libera o envio — ver o comentário em `.env.example`.
+
+### Webhook (n8n)
+
+Em produção o envio **não sai sem `WEBHOOK_TOKEN`**. O nó do n8n precisa exigir
+o header `Authorization`, e deve revalidar do seu lado o nome, o tipo e o
+tamanho dos anexos antes de gravar qualquer coisa: um webhook alcançável por URL
+não pode depender só do bom comportamento de quem chama.
+
+Campos de texto livre que seguem para o n8n recebem um apóstrofo à frente quando
+começam com `=`, `+`, `-` ou `@`, para não virarem fórmula se o fluxo gravar em
+planilha.
+
+### Testes
+
+```sh
+bun run test
+```
+
+Cobrem a janela do rate limit, o bloqueio de 5 minutos, o isolamento por IP e
+cada vetor de anexo malicioso.
+
 ## Build with Lovable
 
 Continue developing this project in the [Lovable editor](https://lovable.dev/projects/0d3d8a0e-06f9-43a2-9cb8-7d4d572fbb31).

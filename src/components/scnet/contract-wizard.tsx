@@ -1,8 +1,25 @@
 import { useMemo, useState, type ReactNode } from "react";
 import { toast } from "sonner";
-import { Check, CheckCircle2, ChevronLeft, ChevronRight, Circle, Loader2, Paperclip, Sun, Sunset } from "lucide-react";
+import {
+  Check,
+  CheckCircle2,
+  ChevronLeft,
+  ChevronRight,
+  Circle,
+  Loader2,
+  Paperclip,
+  Sun,
+  Sunset,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { plans, type Plan } from "@/lib/plans";
+import {
+  ACCEPTED_TYPES,
+  ACCEPT_ATTRIBUTE,
+  MAX_FILE_MB,
+  MAX_FILE_BYTES,
+} from "@/lib/attachment-validation";
+import { isPayloadTooLarge, isRateLimited } from "@/lib/http-errors";
 import { capitalizeName, isValidPhone, maskPhone, nationalPhoneDigits } from "@/lib/form-utils";
 import { getAttribution } from "@/lib/utm";
 import { getRecaptchaToken } from "@/lib/recaptcha";
@@ -13,9 +30,9 @@ import type { ContractHandoff } from "@/lib/contract-handoff";
 
 /* ---------------- helpers ---------------- */
 
-const ACCEPT = ".pdf,.png,.jpg,.jpeg";
-const ACCEPTED_TYPES = ["application/pdf", "image/png", "image/jpeg"];
-const MAX_FILE_MB = 10;
+// As mesmas regras que o servidor aplica (src/lib/attachment-validation.ts) —
+// aqui só para o cliente ver o erro na hora; a validação que vale é a de lá.
+const ACCEPT = ACCEPT_ATTRIBUTE;
 
 const onlyDigits = (v: string) => v.replace(/\D/g, "");
 
@@ -58,8 +75,8 @@ function isAdultBirthDate(v: string) {
 
 function fileError(file: File | null) {
   if (!file) return "Anexo obrigatório";
-  if (!ACCEPTED_TYPES.includes(file.type)) return "Use PDF, PNG ou JPEG";
-  if (file.size > MAX_FILE_MB * 1024 * 1024) return `Máximo ${MAX_FILE_MB}MB`;
+  if (!(ACCEPTED_TYPES as readonly string[]).includes(file.type)) return "Use PDF, PNG ou JPEG";
+  if (file.size > MAX_FILE_BYTES) return `Máximo ${MAX_FILE_MB}MB`;
   return null;
 }
 
@@ -84,8 +101,18 @@ function newSessionId() {
 }
 
 const MONTHS = [
-  "Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho",
-  "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro",
+  "Janeiro",
+  "Fevereiro",
+  "Março",
+  "Abril",
+  "Maio",
+  "Junho",
+  "Julho",
+  "Agosto",
+  "Setembro",
+  "Outubro",
+  "Novembro",
+  "Dezembro",
 ];
 const WEEKDAYS = ["D", "S", "T", "Q", "Q", "S", "S"];
 const ymd = (d: Date) =>
@@ -338,7 +365,13 @@ export function ContractWizard({ handoff }: { handoff: ContractHandoff }) {
         bairro: json.bairro || prev.bairro,
         logradouro: json.logradouro || prev.logradouro,
       }));
-      setErrors((p) => ({ ...p, cep: undefined, cidade: undefined, bairro: undefined, logradouro: undefined }));
+      setErrors((p) => ({
+        ...p,
+        cep: undefined,
+        cidade: undefined,
+        bairro: undefined,
+        logradouro: undefined,
+      }));
     } catch {
       // silencioso — o cliente pode preencher manualmente
     } finally {
@@ -531,6 +564,14 @@ export function ContractWizard({ handoff }: { handoff: ContractHandoff }) {
       );
     } catch (err) {
       console.error("Contract step submission failed", err);
+      // O servidor limita envios por IP; sem esta checagem o 429 apareceria
+      // para o cliente como um genérico "falha de conexão".
+      if (isRateLimited(err)) {
+        return block("Muitas tentativas seguidas. Aguarde alguns minutos ou fale no WhatsApp.");
+      }
+      if (isPayloadTooLarge(err)) {
+        return block(`Anexos muito grandes. Envie arquivos de até ${MAX_FILE_MB}MB cada.`);
+      }
       return block("Falha de conexão ao enviar esta etapa. Tente novamente.");
     }
   }
@@ -589,7 +630,8 @@ export function ContractWizard({ handoff }: { handoff: ContractHandoff }) {
           Contratação enviada!
         </h2>
         <p className="mx-auto mt-3 max-w-lg font-body text-muted-foreground">
-          Recebemos seus dados{plan ? ` para o ${plan.name}` : ""} e a instalação foi solicitada para{" "}
+          Recebemos seus dados{plan ? ` para o ${plan.name}` : ""} e a instalação foi solicitada
+          para{" "}
           <strong className="text-brand-deep">
             {date.split("-").reverse().join("/")} ({period === "manha" ? "manhã" : "tarde"})
           </strong>
@@ -829,7 +871,11 @@ export function ContractWizard({ handoff }: { handoff: ContractHandoff }) {
             </Field>
 
             {address.tipo === "apartamento" && (
-              <Field label="Nome do condomínio" error={errors["condominio"]} className="sm:col-span-2">
+              <Field
+                label="Nome do condomínio"
+                error={errors["condominio"]}
+                className="sm:col-span-2"
+              >
                 <input
                   className={inputCls(!!errors["condominio"])}
                   value={address.condominio}
@@ -1134,7 +1180,9 @@ function StepPlanos({
                   Recomendado
                 </span>
               )}
-              <h3 className={cn("font-ui text-2xl font-bold", p.featured ? "text-zap" : "text-brand")}>
+              <h3
+                className={cn("font-ui text-2xl font-bold", p.featured ? "text-zap" : "text-brand")}
+              >
                 {p.name}
               </h3>
               <p className="mt-3 font-display text-3xl font-extrabold tracking-tight">
@@ -1160,7 +1208,8 @@ function StepPlanos({
         })}
       </div>
       <p className="mx-auto mt-8 max-w-3xl text-center font-body text-xs text-muted-foreground">
-        *Condições sujeitas a análise de crédito e viabilidade técnica. Todos os planos residenciais (CPF) possuem fidelidade de 12 meses.
+        *Condições sujeitas a análise de crédito e viabilidade técnica. Todos os planos residenciais
+        (CPF) possuem fidelidade de 12 meses.
       </p>
     </div>
   );
@@ -1230,7 +1279,8 @@ function CalendarPicker({ value, onChange }: { value: string; onChange: (v: stri
         const first = new Date(m.getFullYear(), m.getMonth(), 1);
         const daysInMonth = new Date(m.getFullYear(), m.getMonth() + 1, 0).getDate();
         const cells: (Date | null)[] = Array.from({ length: first.getDay() }, () => null);
-        for (let d = 1; d <= daysInMonth; d++) cells.push(new Date(m.getFullYear(), m.getMonth(), d));
+        for (let d = 1; d <= daysInMonth; d++)
+          cells.push(new Date(m.getFullYear(), m.getMonth(), d));
         return (
           <div key={ymd(m)} className="rounded-2xl border border-border bg-muted/20 p-4">
             <p className="text-center font-ui text-sm font-bold text-brand-deep">
@@ -1256,7 +1306,9 @@ function CalendarPicker({ value, onChange }: { value: string; onChange: (v: stri
                     className={cn(
                       "aspect-square rounded-lg font-body text-sm transition",
                       disabled && "cursor-not-allowed text-muted-foreground/35",
-                      !disabled && !isSelected && "text-foreground hover:bg-brand/10 hover:text-brand-deep",
+                      !disabled &&
+                        !isSelected &&
+                        "text-foreground hover:bg-brand/10 hover:text-brand-deep",
                       isSelected && "bg-brand font-bold text-primary-foreground",
                     )}
                   >
