@@ -2,12 +2,6 @@ import { type ReactNode } from "react";
 import { useReveal } from "@/hooks/use-reveal";
 import { cn } from "@/lib/utils";
 
-export const WHATSAPP_NUMBER = "5549999999999";
-
-export function waLink(message: string) {
-  return `https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent(message)}`;
-}
-
 export function Reveal({
   children,
   className,

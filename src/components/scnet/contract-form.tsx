@@ -9,6 +9,7 @@ import { getFacebookCookies, trackLeadEvent } from "@/lib/facebook-pixel";
 import { submitLead } from "@/lib/submit-lead";
 import { capitalizeName, isValidPhone, maskPhone } from "@/lib/form-utils";
 import { writeContractHandoffCookie } from "@/lib/contract-handoff";
+import { redirectToWhatsAppSupport, whatsappSupportLink } from "@/lib/whatsapp";
 import { cn } from "@/lib/utils";
 
 export type SelectedPlan = { name: string; price: string };
@@ -63,6 +64,8 @@ export function ContractForm({ selectedPlan }: { selectedPlan: SelectedPlan | nu
   const [sending, setSending] = useState(false);
   /** Mensagem devolvida pelo webhook quando ele recusa o envio. */
   const [serverError, setServerError] = useState<string | null>(null);
+  /** Erro no envio: o cliente está sendo levado ao WhatsApp. */
+  const [redirecting, setRedirecting] = useState(false);
 
   const field = (hasError: boolean) =>
     cn(
@@ -119,6 +122,9 @@ export function ContractForm({ selectedPlan }: { selectedPlan: SelectedPlan | nu
         const message = result.message ?? ERRO_GENERICO;
         setServerError(message);
         toast.error(message);
+        // falhou o envio: o cliente é levado ao atendimento no WhatsApp
+        setRedirecting(true);
+        redirectToWhatsAppSupport();
         return;
       }
 
@@ -225,16 +231,33 @@ export function ContractForm({ selectedPlan }: { selectedPlan: SelectedPlan | nu
         </div>
       </div>
       {serverError && (
-        <p
+        <div
           role="alert"
           className="mt-4 rounded-xl border border-red-300 bg-red-50 px-4 py-3 font-body text-sm text-red-600"
         >
-          {serverError}
-        </p>
+          <p>{serverError}</p>
+          {redirecting && (
+            <p className="mt-1 text-red-500">
+              Estamos te levando para o atendimento no WhatsApp.{" "}
+              <a
+                href={whatsappSupportLink()}
+                className="font-semibold underline underline-offset-2"
+              >
+                Abrir agora
+              </a>
+            </p>
+          )}
+        </div>
       )}
-      <Button type="submit" variant="zap" size="xl" className="mt-5 w-full" disabled={sending}>
-        {sending ? <Loader2 className="animate-spin" /> : null}
-        {sending ? "Enviando..." : "Quero contratar agora"}
+      <Button
+        type="submit"
+        variant="zap"
+        size="xl"
+        className="mt-5 w-full"
+        disabled={sending || redirecting}
+      >
+        {sending || redirecting ? <Loader2 className="animate-spin" /> : null}
+        {redirecting ? "Abrindo o WhatsApp..." : sending ? "Enviando..." : "Quero contratar agora"}
       </Button>
       <p className="mt-3 text-center font-body text-sm text-muted-foreground">
         Mude para a conexão n°1 da região

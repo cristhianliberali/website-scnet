@@ -7,6 +7,7 @@ import { capitalizeName, isValidPhone, maskPhone, nationalPhoneDigits } from "@/
 import { getAttribution } from "@/lib/utm";
 import { getRecaptchaToken } from "@/lib/recaptcha";
 import { submitContractStep } from "@/lib/submit-contract-step";
+import { redirectToWhatsAppSupport, whatsappSupportLink } from "@/lib/whatsapp";
 import { cn } from "@/lib/utils";
 import type { ContractHandoff } from "@/lib/contract-handoff";
 
@@ -283,6 +284,8 @@ export function ContractWizard({ handoff }: { handoff: ContractHandoff }) {
   const [sessionId] = useState(newSessionId);
   /** Motivo pelo qual o webhook barrou a etapa atual. */
   const [stepBlock, setStepBlock] = useState<string | null>(null);
+  /** Etapa barrada: o cliente está sendo levado ao WhatsApp. */
+  const [redirecting, setRedirecting] = useState(false);
 
   const [address, setAddress] = useState<Address>({
     tipo: "",
@@ -488,6 +491,9 @@ export function ContractWizard({ handoff }: { handoff: ContractHandoff }) {
     const block = (message: string) => {
       setStepBlock(message);
       toast.error(message);
+      // etapa recusada: o cliente é levado ao atendimento no WhatsApp
+      setRedirecting(true);
+      redirectToWhatsAppSupport();
       return false;
     };
 
@@ -526,7 +532,7 @@ export function ContractWizard({ handoff }: { handoff: ContractHandoff }) {
   }
 
   async function advance(index: number, chosenPlan: Plan | null) {
-    if (sending) return;
+    if (sending || redirecting) return;
     setSending(true);
     try {
       const ok = await sendStep(index, chosenPlan);
@@ -549,7 +555,7 @@ export function ContractWizard({ handoff }: { handoff: ContractHandoff }) {
   }
 
   function selectPlan(chosen: Plan) {
-    if (sending) return;
+    if (sending || redirecting) return;
     setPlan(chosen);
     // Com os campos do lead na tela, o avanço é explícito pelo botão "Continuar".
     if (needsLead) return;
@@ -557,7 +563,7 @@ export function ContractWizard({ handoff }: { handoff: ContractHandoff }) {
   }
 
   function back() {
-    if (sending) return;
+    if (sending || redirecting) return;
     setErrors({});
     setStepBlock(null);
     setStep((s) => Math.max(s - 1, 0));
@@ -600,7 +606,7 @@ export function ContractWizard({ handoff }: { handoff: ContractHandoff }) {
             <button
               type="button"
               onClick={() => setStep(0)}
-              disabled={sending}
+              disabled={sending || redirecting}
               className="font-ui text-xs font-semibold text-brand underline underline-offset-4 disabled:opacity-50"
             >
               Trocar plano
@@ -613,7 +619,7 @@ export function ContractWizard({ handoff }: { handoff: ContractHandoff }) {
         steps={STEPS.map((s) => s.label)}
         current={step}
         onGo={(i) => {
-          if (!sending) setStep(i);
+          if (!sending && !redirecting) setStep(i);
         }}
       />
 
@@ -708,7 +714,7 @@ export function ContractWizard({ handoff }: { handoff: ContractHandoff }) {
               </div>
             )}
 
-            <StepPlanos selected={plan} sending={sending} onSelect={selectPlan} />
+            <StepPlanos selected={plan} sending={sending || redirecting} onSelect={selectPlan} />
           </div>
         )}
 
@@ -1004,29 +1010,58 @@ export function ContractWizard({ handoff }: { handoff: ContractHandoff }) {
       </div>
 
       {stepBlock && (
-        <p
+        <div
           role="alert"
           className="mt-6 rounded-xl border border-red-300 bg-red-50 px-4 py-3 font-body text-sm text-red-600"
         >
-          {stepBlock}
-        </p>
+          <p>{stepBlock}</p>
+          {redirecting && (
+            <p className="mt-1 text-red-500">
+              Estamos te levando para o atendimento no WhatsApp.{" "}
+              <a
+                href={whatsappSupportLink()}
+                className="font-semibold underline underline-offset-2"
+              >
+                Abrir agora
+              </a>
+            </p>
+          )}
+        </div>
       )}
 
       {(step > 0 || needsLead) && (
         <div className="mt-8 flex flex-col-reverse gap-3 sm:flex-row sm:items-center sm:justify-between">
           {step > 0 ? (
-            <Button type="button" variant="outline" size="lg" onClick={back} disabled={sending}>
+            <Button
+              type="button"
+              variant="outline"
+              size="lg"
+              onClick={back}
+              disabled={sending || redirecting}
+            >
               <ChevronLeft /> Voltar
             </Button>
           ) : (
             <span className="hidden sm:block" />
           )}
           {step < LAST_STEP ? (
-            <Button type="button" variant="brand" size="xl" onClick={next} disabled={sending}>
+            <Button
+              type="button"
+              variant="brand"
+              size="xl"
+              onClick={next}
+              disabled={sending || redirecting}
+            >
               {sending ? <Loader2 className="animate-spin" /> : null} Continuar <ChevronRight />
             </Button>
           ) : (
-            <Button type="button" variant="zap" size="xl" onClick={finish} disabled={sending}>
+            <Button
+              type="button"
+              variant="zap"
+              size="xl"
+              onClick={finish}
+              disabled={sending || redirecting}
+            >
               {sending ? <Loader2 className="animate-spin" /> : <Check />} Finalizar contratação
             </Button>
           )}

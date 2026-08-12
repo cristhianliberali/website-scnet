@@ -7,7 +7,7 @@ import { getFacebookCookies, trackLeadEvent } from "@/lib/facebook-pixel";
 import { submitLead } from "@/lib/submit-lead";
 import { capitalizeName, isValidPhone, maskPhone } from "@/lib/form-utils";
 import { cn } from "@/lib/utils";
-import { waLink } from "./shared";
+import { waLink } from "@/lib/whatsapp";
 
 /**
  * Sends the lead to the webhook/CRM + Facebook CAPI without blocking the
