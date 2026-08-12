@@ -108,7 +108,7 @@ export const submitLead = createServerFn({ method: "POST" })
       id_sessao: randomUUID(),
       page: data.page,
       dados: {
-        plano: data.plan ? { nome: data.plan, preco: data.price ?? null } : null,
+        planos: data.plan ? { nome: data.plan, preco: data.price ?? null } : null,
         origem: {
           nome: data.name,
           whatsapp: `${data.ddi}${data.phone.replace(/\D/g, "")}`,
