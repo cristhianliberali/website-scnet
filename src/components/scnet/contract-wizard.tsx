@@ -3,7 +3,7 @@ import { toast } from "sonner";
 import { Check, CheckCircle2, ChevronLeft, ChevronRight, Circle, Loader2, Paperclip, Sun, Sunset } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { plans, type Plan } from "@/lib/plans";
-import { capitalizeName, isValidPhone, maskPhone } from "@/lib/form-utils";
+import { capitalizeName, isValidPhone, maskPhone, nationalPhoneDigits } from "@/lib/form-utils";
 import { getAttribution } from "@/lib/utm";
 import { getRecaptchaToken } from "@/lib/recaptcha";
 import { submitContractStep } from "@/lib/submit-contract-step";
@@ -248,7 +248,7 @@ export function ContractWizard({ handoff }: { handoff: ContractHandoff }) {
   const prefilledLead = useMemo<Lead>(
     () => ({
       nome: handoff.nome ?? "",
-      telefone: handoff.whatsapp ? maskPhone(onlyDigits(handoff.whatsapp).slice(-11)) : "",
+      telefone: handoff.whatsapp ? maskPhone(nationalPhoneDigits(handoff.whatsapp)) : "",
       intencao: isIntent(handoff.intencao) ? handoff.intencao : "",
     }),
     [handoff.nome, handoff.whatsapp, handoff.intencao],
