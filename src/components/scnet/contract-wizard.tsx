@@ -414,10 +414,14 @@ export function ContractWizard({ handoff }: { handoff: ContractHandoff }) {
     return `+55${digits}`;
   }
 
-  /** Dados acumulados até a etapa informada — o webhook recebe o retrato completo. */
+  /**
+   * Dados acumulados até a etapa informada — o webhook recebe o retrato
+   * completo. Cada grupo usa o `id` da etapa que o preenche (STEPS); só
+   * `origem` foge disso, por ser o lead que veio antes do formulário.
+   */
   function buildDados(index: number, chosenPlan: Plan | null) {
     return {
-      plano: chosenPlan ? { nome: chosenPlan.name, preco: chosenPlan.price } : null,
+      planos: chosenPlan ? { nome: chosenPlan.name, preco: chosenPlan.price } : null,
       origem: {
         nome: lead.nome.trim() || null,
         whatsapp: leadWhatsapp(),
@@ -452,7 +456,7 @@ export function ContractWizard({ handoff }: { handoff: ContractHandoff }) {
         : {}),
       ...(index >= 3
         ? {
-            agendamento: {
+            anexos_agendamento: {
               data: date,
               periodo: period,
               observacao: note.trim(),
