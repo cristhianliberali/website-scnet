@@ -109,7 +109,7 @@ function Field({
 }: {
   label: string;
   error?: string | undefined;
-  hint?: string;
+  hint?: string | undefined;
   className?: string;
   children: ReactNode;
 }) {
@@ -196,12 +196,12 @@ type Address = {
   condominio: string;
 };
 
+/** O telefone principal vem da etapa 1 (lead) — aqui só o segundo contato. */
 type Person = {
   nome: string;
   cpf: string;
   nascimento: string;
   email: string;
-  telefone: string;
   telefone2: string;
 };
 
@@ -301,7 +301,6 @@ export function ContractWizard({ handoff }: { handoff: ContractHandoff }) {
     cpf: "",
     nascimento: "",
     email: "",
-    telefone: handoff.whatsapp ? maskPhone(onlyDigits(handoff.whatsapp).slice(-11)) : "",
     telefone2: "",
   });
   const [proofFile, setProofFile] = useState<File | null>(null);
@@ -382,7 +381,7 @@ export function ContractWizard({ handoff }: { handoff: ContractHandoff }) {
         e["telefone2"] = "Informe um segundo telefone";
       } else if (!isValidPhone(person.telefone2)) {
         e["telefone2"] = "DDD + 8 ou 9 dígitos";
-      } else if (onlyDigits(person.telefone2) === onlyDigits(person.telefone)) {
+      } else if (onlyDigits(person.telefone2) === onlyDigits(lead.telefone)) {
         e["telefone2"] = "Deve ser diferente do telefone principal";
       }
     }
@@ -442,7 +441,8 @@ export function ContractWizard({ handoff }: { handoff: ContractHandoff }) {
               cpf: person.cpf,
               nascimento: person.nascimento,
               email: person.email.trim(),
-              telefone: person.telefone,
+              // principal informado na etapa 1; aqui só o contato adicional
+              telefone: lead.telefone,
               telefone2: person.telefone2,
             },
           }
@@ -888,20 +888,11 @@ export function ContractWizard({ handoff }: { handoff: ContractHandoff }) {
               />
             </Field>
 
-            <Field label="Telefone / WhatsApp principal" error={errors["telefone"]}>
-              <input
-                className={inputCls(!!errors["telefone"])}
-                value={person.telefone}
-                inputMode="tel"
-                placeholder="(49) 99999-9999"
-                onChange={(e) => {
-                  setPerson((p) => ({ ...p, telefone: maskPhone(e.target.value) }));
-                  clearError("telefone");
-                }}
-              />
-            </Field>
-
-            <Field label="2° telefone para contato" error={errors["telefone2"]} className="sm:col-span-2">
+            <Field
+              label="2° telefone para contato"
+              error={errors["telefone2"]}
+              hint={lead.telefone ? `Diferente do principal: ${lead.telefone}` : undefined}
+            >
               <input
                 className={inputCls(!!errors["telefone2"])}
                 value={person.telefone2}
