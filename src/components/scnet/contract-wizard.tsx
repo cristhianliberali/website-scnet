@@ -439,7 +439,7 @@ export function ContractWizard({ handoff }: { handoff: ContractHandoff }) {
         : {}),
       ...(index >= 2
         ? {
-            cliente: {
+            cadastro: {
               nome: person.nome.trim(),
               cpf: person.cpf,
               nascimento: person.nascimento,
