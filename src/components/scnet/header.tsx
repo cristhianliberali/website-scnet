@@ -77,7 +77,7 @@ export function Header() {
             className="hidden shadow-[0_0_18px_color-mix(in_oklab,var(--color-zap)_45%,transparent)] sm:inline-flex"
             asChild
           >
-            <a href="#top">Área do cliente</a>
+            <a href="/cliente">Área do cliente</a>
           </Button>
           <button
             aria-label="Abrir menu"
@@ -98,7 +98,7 @@ export function Header() {
             ...solutions,
             { label: "Depoimentos", href: "#depoimentos" },
             { label: "Dúvidas", href: "#duvidas" },
-            { label: "Área do cliente", href: "#top" },
+            { label: "Área do cliente", href: "/cliente" },
           ].map((l) => (
             <a
               key={l.label}

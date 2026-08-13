@@ -255,6 +255,61 @@ Como cada coluna aparece no site:
   `composicao` seguem no webhook dos dois formulários, junto de
   `valor_primeiras_faturas` e `quant_meses_desconto`.
 
+### ÁREA DO CLIENTE (`/cliente`)
+
+Página de login com header e rodapé iguais aos das demais, reCAPTCHA v3 em toda
+submissão e dois métodos de acesso, em abas:
+
+1. **Documento do cadastro** — CPF ou CNPJ, depois a escolha de onde receber um
+   código (SMS, WhatsApp ou e-mail, só os canais que o cadastro tiver) e por fim
+   o código.
+2. **Login e senha do SAC** — entra direto, sem código. Abaixo há "Esqueci meu
+   login ou senha", que envia as credenciais pelo WhatsApp ou e-mail do cadastro.
+
+Depois do login o cliente vai para `/cliente/painel`, uma rota protegida que
+nesta versão está propositalmente vazia: ela existe para receber faturas, dados
+cadastrais e chamados sem retrabalho de autenticação.
+
+**Quem decide o quê.** O n8n verifica as credenciais; a sessão é deste servidor.
+Os cookies `scnet_cliente` (2h) e `scnet_cliente_desafio` (10min) usam a sessão
+selada do TanStack Start: conteúdo criptografado e assinado com `SESSION_SECRET`,
+`HttpOnly`, `SameSite=Lax` e `Secure` quando em https. O navegador não lê nem
+forja nenhum dos dois, e nada de sessão fica guardado no servidor — o que
+importa porque o container do EasyPanel é efêmero.
+
+**Segurança do webhook.** O webhook do n8n é uma URL pública, então a defesa é
+dos dois lados. Do lado do site: o `id_cliente` nunca vem do formulário (sai do
+cookie de desafio, selado), o navegador nunca fala com o n8n (tudo passa por
+server functions, protegidas por CSRF), e cada POST vai assinado —
+`X-SCNET-Timestamp` mais `X-SCNET-Assinatura` = `HMAC_SHA256(token,
+"<timestamp>.<corpo>")`. Do lado do n8n, é preciso:
+
+- ligar _Header Auth_ no nó Webhook e recusar requisição sem o Bearer — sem isso
+  o token não protege nada;
+- recalcular a assinatura num nó Code e recusar o que não bater ou tiver
+  timestamp com mais de 5 minutos (é o que impede reenvio de uma requisição
+  capturada);
+- usar um path com UUID, separado do `WEBHOOK_URL` dos formulários públicos;
+- se o n8n roda no mesmo EasyPanel, apontar `WEBHOOK_PAINEL_CLIENTE` para a URL
+  interna da rede Docker — sem superfície pública não há o que descobrir.
+
+**Falha fechado.** Sem `WEBHOOK_PAINEL_CLIENTE` ou sem `SESSION_SECRET` (mínimo
+de 32 caracteres) nenhum login é aceito, e o servidor registra o motivo. É o
+oposto do `WEBHOOK_URL` dos formulários, que sem configuração deixa passar: um
+login que passa por falta de configuração é um login que qualquer um atravessa.
+
+**Tentativas.** Três falhas seguidas no mesmo documento ou login bloqueiam
+aquele acesso por 5 minutos. O IP de origem também é contado, porém com limite
+bem mais folgado (15), porque no Brasil vários clientes saem pelo mesmo IP
+público (CGNAT das operadoras móveis, NAT de empresas e condomínios) — travar o
+IP em 3 deixaria vizinhos de fora por causa de um só. O contador vive na memória
+do processo: reiniciar o container ou rodar duas instâncias zera a contagem.
+
+Os eventos e o formato das respostas esperadas do n8n estão documentados no
+`.env.example`, junto das três variáveis novas (`WEBHOOK_PAINEL_CLIENTE`,
+`WEBHOOK_PAINEL_CLIENTE_TOKEN` e `SESSION_SECRET`). Todas são de runtime — no
+EasyPanel entram como Environment Variables, nunca como Build Args.
+
 This project was built with [Lovable](https://lovable.dev).
 
 ## Build with Lovable
