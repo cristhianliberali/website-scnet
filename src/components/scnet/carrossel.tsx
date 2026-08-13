@@ -49,9 +49,11 @@ export function Carrossel({
 
   return (
     <div role="region" aria-roledescription="carrossel" aria-label={label}>
-      {/* py-* dá espaço para o selo do plano em destaque e para o hover que
-          levanta o card — sem isso o overflow-hidden do Embla corta os dois. */}
-      <div className="overflow-hidden py-5" ref={emblaRef}>
+      {/* O overflow-hidden do Embla corta tudo que passa da borda, então a
+          folga vertical precisa acomodar o selo do plano em destaque (12px
+          acima do card) somados aos 12px que o hover levanta — daí os 40px de
+          py-10, com margem para o brilho da sombra. */}
+      <div className="overflow-hidden py-10" ref={emblaRef}>
         <div className="-ml-5 flex touch-pan-y">
           {slides.map((slide, i) => (
             <div
