@@ -4,9 +4,11 @@
  * itens com ícone de check e os logos dos agregados.
  */
 
-import { Check } from "lucide-react";
+import { Check, MessageCircle } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { precoVigente, textoPosDesconto, type Plan } from "@/lib/plans";
+import { waLink } from "@/lib/whatsapp";
 
 /** Título fixo acima dos logos dos agregados. */
 export const TITULO_AGREGADOS = "O que você leva";
@@ -111,6 +113,36 @@ export function ItensPlano({
         </li>
       ))}
     </ul>
+  );
+}
+
+/**
+ * Mostrado no lugar dos cards quando a consulta ao banco não trouxe plano
+ * nenhum. Sem lista de reserva, a saída do cliente é o atendimento — e o
+ * motivo real fica no log do servidor.
+ */
+export function PlanosIndisponiveis({ className }: { className?: string }) {
+  return (
+    <div
+      className={cn("rounded-3xl border border-border bg-card p-8 text-center sm:p-10", className)}
+    >
+      <p className="font-ui text-lg font-semibold text-brand-deep">
+        Não foi possível carregar os planos agora
+      </p>
+      <p className="mx-auto mt-2 max-w-md font-body text-sm text-muted-foreground">
+        É coisa rápida. Chame a gente no WhatsApp que um consultor passa os planos e as condições na
+        hora.
+      </p>
+      <Button variant="whats" size="xl" className="mt-6" asChild>
+        <a
+          target="_blank"
+          rel="noopener"
+          href={waLink("Oi! O site não está mostrando os planos. Pode me passar as opções?")}
+        >
+          <MessageCircle /> Falar com um consultor
+        </a>
+      </Button>
+    </div>
   );
 }
 

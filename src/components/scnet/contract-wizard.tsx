@@ -3,7 +3,7 @@ import { toast } from "sonner";
 import { Check, CheckCircle2, ChevronLeft, ChevronRight, Circle, Loader2, Paperclip, Sun, Sunset } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { planoWebhook, precoVigente, textoPosDesconto, type Plan } from "@/lib/plans";
-import { ItensPlano, LogosAgregados, PrecoPlano, SeloDestaque } from "./plano";
+import { ItensPlano, LogosAgregados, PlanosIndisponiveis, PrecoPlano, SeloDestaque } from "./plano";
 import { capitalizeName, isValidPhone, maskPhone, nationalPhoneDigits } from "@/lib/form-utils";
 import { getAttribution } from "@/lib/utm";
 import { getRecaptchaToken } from "@/lib/recaptcha";
@@ -1048,7 +1048,9 @@ export function ContractWizard({ plans, handoff }: { plans: Plan[]; handoff: Con
         </div>
       )}
 
-      {(step > 0 || needsLead) && (
+      {/* Na etapa 0 sem plano no banco o "Continuar" nunca passaria da validação:
+          melhor não oferecer o botão do que travar o cliente nele. */}
+      {(step > 0 || (needsLead && plans.length > 0)) && (
         <div className="mt-8 flex flex-col-reverse gap-3 sm:flex-row sm:items-center sm:justify-between">
           {step > 0 ? (
             <Button
@@ -1103,6 +1105,10 @@ function StepPlanos({
   sending: boolean;
   onSelect: (p: Plan) => void;
 }) {
+  // Sem plano não há como avançar: em vez de travar o cliente no "Continuar",
+  // a etapa oferece a saída pelo atendimento.
+  if (!plans.length) return <PlanosIndisponiveis />;
+
   return (
     <div>
       {/* Grade de 4 colunas no desktop, conforme o layout do formulário. */}

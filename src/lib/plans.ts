@@ -1,10 +1,10 @@
 /**
  * Modelo dos planos exibidos no site.
  *
- * Os dados vêm da tabela de planos no Postgres (ver `planos-db.ts`), já
- * normalizados para este formato antes de chegar ao componente. A lista
- * `FALLBACK_PLANOS` é usada só quando o banco não está configurado ou
- * respondeu com erro — assim a página nunca fica sem planos.
+ * O banco é a única fonte: os dados vêm da tabela de planos no Postgres (ver
+ * `planos-db.ts`), já normalizados para este formato antes de chegar ao
+ * componente. Sem banco não há plano — a página mostra o estado vazio em vez
+ * de uma lista embutida, que só esconderia o problema.
  */
 
 export type Plan = {
@@ -99,65 +99,3 @@ export function textoPosDesconto(
 /** Preço em destaque: o das primeiras faturas quando existe, senão o padrão. */
 export const precoVigente = (valor: string, valorPrimeirasFaturas: string | null) =>
   valorPrimeirasFaturas ?? valor;
-
-/* ---------------- fallback ---------------- */
-
-const fallback = (
-  id: number,
-  nome: string,
-  valor: string,
-  descricao: string,
-  composicao: string,
-  destaque = false,
-): Plan => ({
-  id_plano: id,
-  codigo_mk: null,
-  nome,
-  descricao,
-  valor,
-  valor_primeiras_faturas: null,
-  quant_meses_desconto: null,
-  composicao,
-  composicao_resumo: null,
-  itens: splitList(composicao),
-  logos: [],
-  destaque,
-  nome_destaque: destaque ? "Mais escolhido" : null,
-  ordem_grade: id,
-});
-
-/**
- * Planos exibidos enquanto o Postgres não está configurado (dev local sem
- * banco) ou quando a consulta falha.
- */
-export const FALLBACK_PLANOS: Plan[] = [
-  fallback(
-    1,
-    "Plano 450",
-    "109,90",
-    "Pra quem quer resolver o dia a dia sem drama: redes sociais, séries e trabalho leve, tudo rodando leve.",
-    "Internet fibra óptica;450 Mega de velocidade;1x Roteador Wi-Fi 6 Incluso;App Skeelo;Instalação gratuita*",
-  ),
-  fallback(
-    2,
-    "Plano 710",
-    "119,90",
-    "Casa com mais gente conectada ao mesmo tempo? Esse aguenta o tranco, aula online, chamada de vídeo e streaming juntos, sem travar.",
-    "Internet fibra óptica;710 Mega de velocidade;1x Roteador Wi-Fi 6 Incluso;App Skeelo;Instalação gratuita*",
-  ),
-  fallback(
-    3,
-    "Plano Infinity",
-    "139,90",
-    "Várias telas, jogo online, home office e streaming em 4K rodando ao mesmo tempo.",
-    "Internet fibra óptica;Sem controle de velocidade;1x Roteador Wi-Fi 6 Incluso;App Skeelo;Instalação gratuita*",
-    true,
-  ),
-  fallback(
-    4,
-    "Plano Infinity Duo",
-    "159,90",
-    "Ideal para residencias amplas e vários dispositivos conectados, possui 2 roteadores garantindo Wi-Fi em todos os comôdos.",
-    "Internet fibra óptica;Sem controle de velocidade;2x Roteadores Wi-Fi 6 Inclusos;App Skeelo;Instalação R$ 100,00 (taxa única)*",
-  ),
-];
