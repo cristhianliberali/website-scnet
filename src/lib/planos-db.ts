@@ -15,11 +15,13 @@
  *   POSTGRES_PLANOS_TABLE     tabela dos planos (padrão "planos_web")
  *   POSTGRES_PLANOS_CACHE_SECONDS  cache em memória do resultado (padrão 60)
  *
- * Sem host nem URL a conexão nem é aberta: o site cai no `FALLBACK_PLANOS`.
+ * O banco é a única fonte de planos: sem configuração, sem tabela ou sem linhas
+ * ativas o site fica sem plano nenhum (e diz isso no log). Nada de lista
+ * embutida de reserva — ela só mascararia uma falha de configuração.
  */
 
 import postgres from "postgres";
-import { FALLBACK_PLANOS, formatBRL, splitList, type Plan } from "./plans";
+import { formatBRL, splitList, type Plan } from "./plans";
 
 const DEFAULT_SCHEMA = "public";
 const DEFAULT_TABLE = "planos_web";
@@ -61,8 +63,8 @@ function getClient(): Sql | null {
   const url = env("POSTGRES_URL");
   const host = env("POSTGRES_HOST");
   if (!url && !host) {
-    console.warn(
-      "Postgres não configurado (POSTGRES_URL/POSTGRES_HOST) — usando planos de fallback.",
+    console.error(
+      "Postgres não configurado (POSTGRES_URL/POSTGRES_HOST) — nenhum plano será exibido.",
     );
     return null;
   }
@@ -139,19 +141,26 @@ const cacheMs = () => {
 };
 
 /**
- * Planos ativos, na ordem da grade. Erros de banco não derrubam a página:
- * o último resultado em cache é reaproveitado e, na falta dele, entram os
- * planos de fallback.
+ * Planos ativos, na ordem da grade. Cada caminho aparece no log do servidor —
+ * é por ele que se sabe se a página está mostrando dados do banco.
+ *
+ * Uma falha na consulta reaproveita o último resultado bem-sucedido em cache
+ * (dado real, só que velho) para não derrubar a página numa oscilação de rede.
+ * Sem cache, devolve lista vazia e a página mostra o estado vazio.
  */
 export async function loadPlanos(): Promise<Plan[]> {
-  if (cache && cache.expiresAt > Date.now()) return cache.planos;
+  if (cache && cache.expiresAt > Date.now()) {
+    console.info(`Planos servidos do cache (${cache.planos.length}).`);
+    return cache.planos;
+  }
 
   const sql = getClient();
-  if (!sql) return FALLBACK_PLANOS;
+  if (!sql) return [];
 
   const schema = identifier(env("POSTGRES_SCHEMA"), DEFAULT_SCHEMA, "POSTGRES_SCHEMA");
   const table = identifier(env("POSTGRES_PLANOS_TABLE"), DEFAULT_TABLE, "POSTGRES_PLANOS_TABLE");
 
+  console.info(`Carregando planos do Postgres (${schema}.${table})...`);
   try {
     const rows = (await sql<PlanoRow[]>`
       select
@@ -164,13 +173,20 @@ export async function loadPlanos(): Promise<Plan[]> {
     `) as unknown as PlanoRow[];
 
     const planos = rows.map(toPlan);
-    // Tabela vazia é configuração, não falha: melhor mostrar o fallback.
-    if (!planos.length) return FALLBACK_PLANOS;
+    if (!planos.length) {
+      console.warn(`Nenhum plano ativo em ${schema}.${table} — a página ficará sem planos.`);
+      return [];
+    }
 
+    console.info(`Planos carregados do Postgres: ${planos.length}.`);
     cache = { planos, expiresAt: Date.now() + cacheMs() };
     return planos;
   } catch (err) {
     console.error("Falha ao consultar os planos no Postgres", err);
-    return cache?.planos ?? FALLBACK_PLANOS;
+    if (cache) {
+      console.warn(`Reaproveitando o último resultado do banco (${cache.planos.length}).`);
+      return cache.planos;
+    }
+    return [];
   }
 }

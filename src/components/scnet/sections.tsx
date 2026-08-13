@@ -37,7 +37,7 @@ import { useCountUp } from "@/hooks/use-reveal";
 import { ContractForm, type SelectedPlan } from "./contract-form";
 import { Blobs, Reveal, SectionTitle } from "./shared";
 import { Carrossel } from "./carrossel";
-import { ItensPlano, LogosAgregados, PrecoPlano, SeloDestaque } from "./plano";
+import { ItensPlano, LogosAgregados, PlanosIndisponiveis, PrecoPlano, SeloDestaque } from "./plano";
 import { waLink } from "@/lib/whatsapp";
 import { cn } from "@/lib/utils";
 
@@ -326,20 +326,26 @@ export function Planos({
         {/* Um Reveal só, envolvendo o carrossel: cards fora da área visível do
             slide ficariam presos no estado invisível se cada um tivesse o seu. */}
         <Reveal className="mt-10">
-          <Carrossel
-            label="Planos de internet"
-            slideClassName="basis-full sm:basis-1/2 lg:basis-1/3"
-            slides={plans.map((p) => (
-              <PlanoCard key={p.id_plano} plan={p} onSelect={onSelectPlan} />
-            ))}
-          />
+          {plans.length ? (
+            <Carrossel
+              label="Planos de internet"
+              slideClassName="basis-full sm:basis-1/2 lg:basis-1/3"
+              slides={plans.map((p) => (
+                <PlanoCard key={p.id_plano} plan={p} onSelect={onSelectPlan} />
+              ))}
+            />
+          ) : (
+            <PlanosIndisponiveis className="mx-auto max-w-2xl" />
+          )}
         </Reveal>
 
-        <p className="mx-auto mt-8 max-w-3xl text-center font-body text-xs text-muted-foreground">
-          *Instalação gratuita para os planos 450, 710 e Infinity. Plano Infinity Duo: instalação R$
-          100,00 (taxa única). Fidelidade de 12 meses (CPF) e 24 meses (PJ). Condições podem variar
-          — confirme com um consultor.
-        </p>
+        {plans.length > 0 && (
+          <p className="mx-auto mt-8 max-w-3xl text-center font-body text-xs text-muted-foreground">
+            *Instalação gratuita para os planos 450, 710 e Infinity. Plano Infinity Duo: instalação
+            R$ 100,00 (taxa única). Fidelidade de 12 meses (CPF) e 24 meses (PJ). Condições podem
+            variar — confirme com um consultor.
+          </p>
+        )}
 
         <Reveal className="mt-10 rounded-3xl bg-muted p-8 text-center">
           <p className="font-ui text-lg font-semibold text-brand-deep">

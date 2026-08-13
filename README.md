@@ -235,8 +235,10 @@ mais `POSTGRES_SSL`, `POSTGRES_SCHEMA`, `POSTGRES_PLANOS_TABLE` e
 como Environment Variables do serviço, nunca como Build Args.
 
 Só entram na página os registros com `ativo = true`, ordenados por
-`ordem_grade`. Sem banco configurado (ou se a consulta falhar) o site cai na
-lista de fallback de `src/lib/plans.ts`.
+`ordem_grade`. O banco é a única fonte — não existe lista embutida de reserva:
+sem configuração, sem tabela ou sem plano ativo, a home e a etapa de planos
+mostram um aviso com o WhatsApp do atendimento, e o log do servidor diz o
+motivo (`Planos carregados do Postgres: N` quando deu certo).
 
 Como cada coluna aparece no site:
 
