@@ -224,6 +224,35 @@ Logo, links institucionais (Planos, Empresas, Trabalhe conosco, FAQ, Contratos e
 
 - Use os gradientes e o amarelo com moderação estratégica: ele deve guiar o olho até os CTAs, não estar espalhado por todo lado a ponto de perder força.
 
+### PLANOS NO POSTGRES
+
+Os planos da home e do formulário de contratação vêm de uma tabela no Postgres
+(`planos_web` por padrão), consultada só no servidor durante o SSR. As variáveis
+de conexão estão documentadas no `.env.example` (`POSTGRES_URL` ou
+`POSTGRES_HOST`/`POSTGRES_PORT`/`POSTGRES_DB`/`POSTGRES_USER`/`POSTGRES_PASSWORD`,
+mais `POSTGRES_SSL`, `POSTGRES_SCHEMA`, `POSTGRES_PLANOS_TABLE` e
+`POSTGRES_PLANOS_CACHE_SECONDS`). São variáveis de runtime — no EasyPanel entram
+como Environment Variables do serviço, nunca como Build Args.
+
+Só entram na página os registros com `ativo = true`, ordenados por
+`ordem_grade`. Sem banco configurado (ou se a consulta falhar) o site cai na
+lista de fallback de `src/lib/plans.ts`.
+
+Como cada coluna aparece no site:
+
+- `nome`, `descricao` — título e texto do card.
+- `valor` — mensalidade padrão.
+- `valor_primeiras_faturas` + `quant_meses_desconto` — quando preenchidos, o
+  valor promocional ocupa o lugar do preço e o padrão vai logo abaixo: "nos 3
+  primeiros meses, após R$ 139,90".
+- `composicao` — itens separados por `;`, um por linha, todos com ícone de check.
+- `url_logo_agregados` — URLs separadas por `;`, exibidas abaixo do valor com
+  ~30px de altura, sob o título fixo "O que você leva".
+- `destaque` + `nome_destaque` — card em destaque e o texto do selo.
+- `codigo_mk`, `composicao_resumo` — não aparecem no card; `codigo_mk` e
+  `composicao` seguem no webhook dos dois formulários, junto de
+  `valor_primeiras_faturas` e `quant_meses_desconto`.
+
 This project was built with [Lovable](https://lovable.dev).
 
 ## Build with Lovable

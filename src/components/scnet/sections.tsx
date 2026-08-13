@@ -26,7 +26,7 @@ import nossoFutebolLogo from "@/assets/nosso-futebol.webp";
 import skeeloLogo from "@/assets/skeelo.webp";
 import scMovelLogo from "@/assets/scmovel.webp";
 import { Button } from "@/components/ui/button";
-import { plans } from "@/lib/plans";
+import { planoWebhook, type Plan } from "@/lib/plans";
 import {
   Accordion,
   AccordionContent,
@@ -36,7 +36,10 @@ import {
 import { useCountUp } from "@/hooks/use-reveal";
 import { ContractForm, type SelectedPlan } from "./contract-form";
 import { Blobs, Reveal, SectionTitle } from "./shared";
+import { Carrossel } from "./carrossel";
+import { ItensPlano, LogosAgregados, PrecoPlano, SeloDestaque } from "./plano";
 import { waLink } from "@/lib/whatsapp";
+import { cn } from "@/lib/utils";
 
 /* ---------------- Hero ---------------- */
 export function Hero() {
@@ -255,7 +258,58 @@ export function Diferenciais() {
 
 /* ---------------- Planos ---------------- */
 
-export function Planos({ onSelectPlan }: { onSelectPlan: (plan: SelectedPlan) => void }) {
+function PlanoCard({ plan, onSelect }: { plan: Plan; onSelect: (plan: SelectedPlan) => void }) {
+  return (
+    <div
+      className={cn(
+        "relative flex h-full flex-col rounded-3xl p-6 transition-all duration-300 hover:-translate-y-3",
+        plan.destaque
+          ? "gradient-brand border-2 border-zap text-primary-foreground shadow-[0_20px_60px_-15px_color-mix(in_oklab,var(--color-zap)_55%,transparent)]"
+          : "border border-border bg-card text-card-foreground hover:shadow-[0_24px_60px_-20px_color-mix(in_oklab,var(--color-brand)_60%,transparent)]",
+      )}
+    >
+      <SeloDestaque plan={plan} className="animate-pulse-glow" />
+      <h3 className={cn("font-ui text-2xl font-bold", plan.destaque ? "text-zap" : "text-brand")}>
+        {plan.nome}
+      </h3>
+      <div className="mt-3">
+        <PrecoPlano plan={plan} featured={plan.destaque} />
+      </div>
+      <LogosAgregados logos={plan.logos} featured={plan.destaque} />
+      {plan.descricao && (
+        <p
+          className={cn(
+            "mt-4 font-body text-sm",
+            plan.destaque ? "text-primary-foreground/90" : "text-muted-foreground",
+          )}
+        >
+          {plan.descricao}
+        </p>
+      )}
+      <ItensPlano itens={plan.itens} featured={plan.destaque} className="mt-5" />
+      {/* empurra o botão para a base — os cards do slide ficam alinhados */}
+      <div className="grow" />
+      <Button
+        variant={plan.destaque ? "zap" : "brand"}
+        size={plan.destaque ? "xl" : "lg"}
+        className="mt-6 w-full"
+        asChild
+      >
+        <a href="#contrate" onClick={() => onSelect(planoWebhook(plan))}>
+          Quero este plano
+        </a>
+      </Button>
+    </div>
+  );
+}
+
+export function Planos({
+  plans,
+  onSelectPlan,
+}: {
+  plans: Plan[];
+  onSelectPlan: (plan: SelectedPlan) => void;
+}) {
   return (
     <section id="planos" className="bg-background py-20">
       <div className="mx-auto max-w-7xl px-4">
@@ -269,70 +323,17 @@ export function Planos({ onSelectPlan }: { onSelectPlan: (plan: SelectedPlan) =>
           </p>
         </Reveal>
 
-        <div className="mt-14 grid gap-6 md:grid-cols-2 lg:grid-cols-4">
-          {plans.map((p, i) => (
-            <Reveal key={p.name} delay={i * 90}>
-              <div
-                className={[
-                  "relative flex h-full flex-col rounded-3xl p-6 transition-all duration-300 hover:-translate-y-3",
-                  p.featured
-                    ? "gradient-brand border-2 border-zap text-primary-foreground shadow-[0_20px_60px_-15px_color-mix(in_oklab,var(--color-zap)_55%,transparent)] lg:scale-[1.04]"
-                    : "border border-border bg-card text-card-foreground hover:shadow-[0_24px_60px_-20px_color-mix(in_oklab,var(--color-brand)_60%,transparent)]",
-                ].join(" ")}
-              >
-                {p.featured && (
-                  <span className="animate-pulse-glow absolute -top-3 left-1/2 -translate-x-1/2 rounded-full bg-zap px-4 py-1 font-ui text-xs font-extrabold tracking-wide text-zap-ink">
-                    MAIS ESCOLHIDO
-                  </span>
-                )}
-                <h3
-                  className={`font-ui text-2xl font-bold ${p.featured ? "text-zap" : "text-brand"}`}
-                >
-                  {p.name}
-                </h3>
-                <p className="mt-3 font-display text-3xl font-extrabold tracking-tight">
-                  <span className="align-super text-lg">R$</span> {p.price}
-                  <span
-                    className={`font-body text-sm font-medium ${p.featured ? "text-primary-foreground/70" : "text-muted-foreground"}`}
-                  >
-                    /mês
-                  </span>
-                </p>
-                <p
-                  className={`mt-4 font-body text-sm ${p.featured ? "text-primary-foreground/90" : "text-muted-foreground"}`}
-                >
-                  {p.desc}
-                </p>
-                <ul className="mt-5 space-y-2">
-                  {p.features.map((f) => {
-                    const Icon = f.icon;
-                    return (
-                      <li key={f.text} className="flex items-center gap-2 font-body text-sm">
-                        <Icon
-                          className={`size-4 shrink-0 ${p.featured ? "text-zap" : "text-brand"}`}
-                        />
-                        {f.text}
-                      </li>
-                    );
-                  })}
-                </ul>
-                <Button
-                  variant={p.featured ? "zap" : "brand"}
-                  size={p.featured ? "xl" : "lg"}
-                  className="mt-6 w-full"
-                  asChild
-                >
-                  <a
-                    href="#contrate"
-                    onClick={() => onSelectPlan({ name: p.name, price: p.price })}
-                  >
-                    {p.cta}
-                  </a>
-                </Button>
-              </div>
-            </Reveal>
-          ))}
-        </div>
+        {/* Um Reveal só, envolvendo o carrossel: cards fora da área visível do
+            slide ficariam presos no estado invisível se cada um tivesse o seu. */}
+        <Reveal className="mt-10">
+          <Carrossel
+            label="Planos de internet"
+            slideClassName="basis-full sm:basis-1/2 lg:basis-1/3"
+            slides={plans.map((p) => (
+              <PlanoCard key={p.id_plano} plan={p} onSelect={onSelectPlan} />
+            ))}
+          />
+        </Reveal>
 
         <p className="mx-auto mt-8 max-w-3xl text-center font-body text-xs text-muted-foreground">
           *Instalação gratuita para os planos 450, 710 e Infinity. Plano Infinity Duo: instalação R$

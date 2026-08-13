@@ -3,6 +3,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { Toaster } from "@/components/ui/sonner";
 import { Header } from "@/components/scnet/header";
 import type { SelectedPlan } from "@/components/scnet/contract-form";
+import { fetchPlanos } from "@/lib/fetch-planos";
 import {
   Hero,
   SocialBar,
@@ -23,6 +24,8 @@ const description =
   "Wi-Fi rápido e estável na casa toda. Planos de fibra a partir de R$ 109,90/mês, roteador incluso e suporte local. Assine em minutos.";
 
 export const Route = createFileRoute("/")({
+  // Planos vêm do Postgres no servidor, então já saem renderizados no HTML.
+  loader: async () => ({ planos: await fetchPlanos() }),
   head: () => ({
     meta: [
       { title },
@@ -37,6 +40,7 @@ export const Route = createFileRoute("/")({
 });
 
 function Index() {
+  const { planos } = Route.useLoaderData();
   const [selectedPlan, setSelectedPlan] = useState<SelectedPlan | null>(null);
 
   return (
@@ -45,7 +49,7 @@ function Index() {
       <main>
         <Hero />
         <SocialBar />
-        <Planos onSelectPlan={setSelectedPlan} />
+        <Planos plans={planos} onSelectPlan={setSelectedPlan} />
         <Diferenciais />
         <Beneficios />
         <ComoContratar />
