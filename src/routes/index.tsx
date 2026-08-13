@@ -10,7 +10,6 @@ import {
   Diferenciais,
   Planos,
   Beneficios,
-  ComoContratar,
   Empresas,
   Depoimentos,
   Faq,
@@ -52,11 +51,11 @@ function Index() {
         <Planos plans={planos} onSelectPlan={setSelectedPlan} />
         <Diferenciais />
         <Beneficios />
-        <ComoContratar />
         <Empresas />
         <Depoimentos />
-        <Faq />
         <CtaFinal selectedPlan={selectedPlan} />
+        {/* Dúvidas fecham a página, depois do formulário de contratação. */}
+        <Faq />
       </main>
       <Footer />
       <WhatsFloat />
