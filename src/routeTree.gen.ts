@@ -11,6 +11,8 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as ContratacaoRouteImport } from './routes/contratacao'
+import { Route as ClienteIndexRouteImport } from './routes/cliente/index'
+import { Route as ClientePainelRouteImport } from './routes/cliente/painel'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -22,31 +24,49 @@ const ContratacaoRoute = ContratacaoRouteImport.update({
   path: '/contratacao',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ClienteIndexRoute = ClienteIndexRouteImport.update({
+  id: '/cliente/',
+  path: '/cliente/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ClientePainelRoute = ClientePainelRouteImport.update({
+  id: '/cliente/painel',
+  path: '/cliente/painel',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/contratacao': typeof ContratacaoRoute
+  '/cliente/painel': typeof ClientePainelRoute
+  '/cliente/': typeof ClienteIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/contratacao': typeof ContratacaoRoute
+  '/cliente/painel': typeof ClientePainelRoute
+  '/cliente': typeof ClienteIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/contratacao': typeof ContratacaoRoute
+  '/cliente/painel': typeof ClientePainelRoute
+  '/cliente/': typeof ClienteIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/contratacao'
+  fullPaths: '/' | '/contratacao' | '/cliente/painel' | '/cliente/'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/contratacao'
-  id: '__root__' | '/' | '/contratacao'
+  to: '/' | '/contratacao' | '/cliente/painel' | '/cliente'
+  id: '__root__' | '/' | '/contratacao' | '/cliente/painel' | '/cliente/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   ContratacaoRoute: typeof ContratacaoRoute
+  ClientePainelRoute: typeof ClientePainelRoute
+  ClienteIndexRoute: typeof ClienteIndexRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -65,13 +85,39 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ContratacaoRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/cliente/': {
+      id: '/cliente/'
+      path: '/cliente'
+      fullPath: '/cliente/'
+      preLoaderRoute: typeof ClienteIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/cliente/painel': {
+      id: '/cliente/painel'
+      path: '/cliente/painel'
+      fullPath: '/cliente/painel'
+      preLoaderRoute: typeof ClientePainelRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   ContratacaoRoute: ContratacaoRoute,
+  ClientePainelRoute: ClientePainelRoute,
+  ClienteIndexRoute: ClienteIndexRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
+
+import type { getRouter } from './router.tsx'
+import type { startInstance } from './start.ts'
+declare module '@tanstack/react-start' {
+  interface Register {
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
+    config: Awaited<ReturnType<typeof startInstance.getOptions>>
+  }
+}

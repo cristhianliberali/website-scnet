@@ -662,7 +662,7 @@ const footerLinks: Array<[string, string]> = [
   ["Trabalhe conosco", "#top"],
   ["FAQ", "#duvidas"],
   ["Contratos e Regulamentos", "#top"],
-  ["Área do cliente", "#top"],
+  ["Área do cliente", "/cliente"],
   ["App SCNET", "#top"],
   ["Segunda via fatura", "#top"],
 ];

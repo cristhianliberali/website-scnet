@@ -4,7 +4,14 @@ import { Check, CheckCircle2, ChevronLeft, ChevronRight, Circle, Loader2, Paperc
 import { Button } from "@/components/ui/button";
 import { planoWebhook, precoVigente, textoPosDesconto, type Plan } from "@/lib/plans";
 import { ItensPlano, LogosAgregados, PlanosIndisponiveis, PrecoPlano, SeloDestaque } from "./plano";
-import { capitalizeName, isValidPhone, maskPhone, nationalPhoneDigits } from "@/lib/form-utils";
+import {
+  capitalizeName,
+  isValidCpf,
+  isValidPhone,
+  maskCpf,
+  maskPhone,
+  nationalPhoneDigits,
+} from "@/lib/form-utils";
 import { getAttribution } from "@/lib/utm";
 import { getRecaptchaToken } from "@/lib/recaptcha";
 import { submitContractStep } from "@/lib/submit-contract-step";
@@ -23,26 +30,6 @@ const onlyDigits = (v: string) => v.replace(/\D/g, "");
 function maskCep(v: string) {
   const d = onlyDigits(v).slice(0, 8);
   return d.length > 5 ? `${d.slice(0, 5)}-${d.slice(5)}` : d;
-}
-
-function maskCpf(v: string) {
-  const d = onlyDigits(v).slice(0, 11);
-  return d
-    .replace(/^(\d{3})(\d)/, "$1.$2")
-    .replace(/^(\d{3})\.(\d{3})(\d)/, "$1.$2.$3")
-    .replace(/\.(\d{3})(\d{1,2})$/, ".$1-$2");
-}
-
-function isValidCpf(v: string) {
-  const d = onlyDigits(v);
-  if (d.length !== 11 || /^(\d)\1{10}$/.test(d)) return false;
-  const calc = (len: number) => {
-    let sum = 0;
-    for (let i = 0; i < len; i++) sum += Number(d[i]) * (len + 1 - i);
-    const r = (sum * 10) % 11;
-    return r === 10 ? 0 : r;
-  };
-  return calc(9) === Number(d[9]) && calc(10) === Number(d[10]);
 }
 
 const FULL_NAME_RE = /^\p{L}{2,}(?:['’\-\p{L}]*)(?:\s+\p{L}{2,}[\p{L}'’\-]*)+$/u;
