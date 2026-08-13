@@ -11,6 +11,8 @@ export type ContractHandoff = {
   plano?: string | undefined;
   preco?: string | undefined;
   intencao?: string | undefined;
+  /** Código de campanha, para os planos de oferta seguirem visíveis. */
+  codigo_oferta?: string | undefined;
 };
 
 const COOKIE_NAME = "scnet_contratacao";

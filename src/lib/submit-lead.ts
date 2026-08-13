@@ -22,6 +22,8 @@ const leadInputSchema = z.object({
   composicao: z.string().optional(),
   valorPrimeirasFaturas: z.string().optional(),
   quantMesesDesconto: z.number().nullable().optional(),
+  codigoOfertaMk: z.union([z.number(), z.string()]).nullable().optional(),
+  codigoOferta: z.string().optional(),
   recaptchaToken: z.string().optional(),
   fbc: z.string().optional(),
   fbp: z.string().optional(),
@@ -121,6 +123,8 @@ export const submitLead = createServerFn({ method: "POST" })
               composicao: data.composicao ?? null,
               valor_primeiras_faturas: data.valorPrimeirasFaturas ?? null,
               quant_meses_desconto: data.quantMesesDesconto ?? null,
+              codigo_oferta_mk: data.codigoOfertaMk ?? null,
+              codigo_oferta: data.codigoOferta ?? null,
             }
           : null,
         origem: {

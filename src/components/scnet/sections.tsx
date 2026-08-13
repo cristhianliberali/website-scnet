@@ -579,7 +579,14 @@ export function Faq() {
 }
 
 /* ---------------- CTA final ---------------- */
-export function CtaFinal({ selectedPlan }: { selectedPlan: SelectedPlan | null }) {
+export function CtaFinal({
+  selectedPlan,
+  codigoOferta,
+}: {
+  selectedPlan: SelectedPlan | null;
+  /** Código de campanha da URL, repassado adiante para /contratacao. */
+  codigoOferta?: string | undefined;
+}) {
   return (
     <section className="gradient-brand relative overflow-hidden py-24">
       <Blobs />
@@ -612,7 +619,7 @@ export function CtaFinal({ selectedPlan }: { selectedPlan: SelectedPlan | null }
           </div>
         </Reveal>
         <Reveal delay={120} className="w-full lg:justify-self-end">
-          <ContractForm selectedPlan={selectedPlan} />
+          <ContractForm selectedPlan={selectedPlan} codigoOferta={codigoOferta} />
         </Reveal>
       </div>
     </section>
