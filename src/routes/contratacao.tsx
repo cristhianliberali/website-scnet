@@ -8,6 +8,7 @@ import { Blobs } from "@/components/scnet/shared";
 import { ContractWizard } from "@/components/scnet/contract-wizard";
 import { readContractHandoffCookie, type ContractHandoff } from "@/lib/contract-handoff";
 import { fetchPlanos } from "@/lib/fetch-planos";
+import { planosVisiveis } from "@/lib/plans";
 
 const searchSchema = z.object({
   nome: z.string().optional(),
@@ -15,14 +16,19 @@ const searchSchema = z.object({
   plano: z.string().optional(),
   preco: z.string().optional(),
   intencao: z.string().optional(),
+  codigo_oferta: z.string().optional(),
 });
 
 const title = "Contratação online — SCNET";
 
 export const Route = createFileRoute("/contratacao")({
   validateSearch: searchSchema,
-  // Mesma fonte da home: os planos ativos do Postgres.
-  loader: async () => ({ planos: await fetchPlanos() }),
+  loaderDeps: ({ search }) => ({ codigoOferta: search.codigo_oferta }),
+  // Mesma fonte e mesma regra da home: os planos ativos do Postgres, com os de
+  // campanha liberados só pelo código que veio na URL.
+  loader: async ({ deps }) => ({
+    planos: planosVisiveis(await fetchPlanos(), deps.codigoOferta),
+  }),
   head: () => ({
     meta: [
       { title },
@@ -55,7 +61,14 @@ function Contratacao() {
     const cookie = readContractHandoffCookie();
     setHandoff((prev) => {
       const merged: ContractHandoff = {};
-      for (const key of ["nome", "whatsapp", "plano", "preco", "intencao"] as const) {
+      for (const key of [
+        "nome",
+        "whatsapp",
+        "plano",
+        "preco",
+        "intencao",
+        "codigo_oferta",
+      ] as const) {
         const value = prev[key] || cookie[key];
         if (value) merged[key] = value;
       }

@@ -28,6 +28,13 @@ export type Plan = {
   destaque: boolean;
   nome_destaque: string | null;
   ordem_grade: number;
+  /** Só trafega até o webhook — não aparece em lugar nenhum da tela. */
+  codigo_oferta_mk: number | string | null;
+  /**
+   * Quando preenchido, o plano é de campanha: só entra na tela se a URL trouxer
+   * `?codigo_oferta=` com este mesmo código (ver `planosVisiveis`).
+   */
+  codigo_oferta: string | null;
 };
 
 /** Recorte do plano enviado ao webhook pelos dois formulários. */
@@ -38,6 +45,8 @@ export type PlanoWebhook = {
   composicao: string | null;
   valor_primeiras_faturas: string | null;
   quant_meses_desconto: number | null;
+  codigo_oferta_mk: number | string | null;
+  codigo_oferta: string | null;
 };
 
 export function planoWebhook(plan: Plan): PlanoWebhook {
@@ -48,7 +57,29 @@ export function planoWebhook(plan: Plan): PlanoWebhook {
     composicao: plan.composicao,
     valor_primeiras_faturas: plan.valor_primeiras_faturas,
     quant_meses_desconto: plan.quant_meses_desconto,
+    codigo_oferta_mk: plan.codigo_oferta_mk,
+    codigo_oferta: plan.codigo_oferta,
   };
+}
+
+/* ---------------- planos de campanha ---------------- */
+
+/** Nome do parâmetro que libera os planos de campanha na URL. */
+export const PARAM_OFERTA = "codigo_oferta";
+
+/**
+ * Planos que podem ser exibidos para o código de oferta da URL.
+ *
+ * Plano sem `codigo_oferta` é plano normal e aparece sempre. Plano com código
+ * é de campanha: só aparece quando a URL traz `?codigo_oferta=` com o mesmo
+ * valor (ignorando espaços e maiúsculas/minúsculas), e nesse caso ele soma-se
+ * aos normais, na ordem de `ordem_grade`.
+ */
+export function planosVisiveis(plans: Plan[], codigoOferta?: string | null | undefined): Plan[] {
+  const oferta = codigoOferta?.trim().toLowerCase();
+  return plans.filter(
+    (p) => !p.codigo_oferta || (!!oferta && p.codigo_oferta.trim().toLowerCase() === oferta),
+  );
 }
 
 /* ---------------- helpers ---------------- */

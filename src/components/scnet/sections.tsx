@@ -58,9 +58,9 @@ export function Hero() {
         <div className="w-[70%] text-left sm:mx-auto sm:w-auto sm:max-w-xl sm:text-center lg:mx-0 lg:max-w-none lg:text-left">
           <Reveal>
             <span className="font-ui inline-flex items-center gap-2 rounded-full bg-zap px-3 py-1 text-[10px] font-bold uppercase leading-tight tracking-wide text-zap-ink sm:px-4 sm:py-1.5 sm:text-xs">
-              <Zap className="size-3 shrink-0 sm:size-4" />
-              {/* balance keeps the two wrapped lines even instead of stranding "de SC" */}
-              <span className="text-balance">Internet fibra óptica no Oeste e Litoral de SC</span>
+              <ShieldCheck className="size-3 shrink-0 sm:size-4" />
+              {/* balance keeps the two wrapped lines even instead of stranding a word */}
+              <span className="text-balance">Internet nota 4.9/5 no Google!</span>
             </span>
           </Reveal>
           <Reveal delay={80}>
@@ -424,48 +424,6 @@ export function Beneficios() {
   );
 }
 
-/* ---------------- Como contratar ---------------- */
-const steps = [
-  "Escolha seu plano no site (ou peça ajuda no WhatsApp)",
-  "Informe seus dados e assine o contrato digitalmente",
-  "Escolha o dia de instalação da sua nova internet — a gente vai até você",
-  "Pronto. Sua casa agora está conectada com a melhor internet da região!",
-];
-
-export function ComoContratar() {
-  return (
-    <section className="bg-background py-20">
-      <div className="mx-auto max-w-7xl px-4">
-        <Reveal className="text-center">
-          <SectionTitle className="text-brand-deep">
-            Contratar é simples e rápido. Sério.
-          </SectionTitle>
-        </Reveal>
-        <div className="relative mt-14 grid gap-8 lg:grid-cols-4">
-          <div className="absolute left-1/2 top-7 hidden h-1 w-3/4 -translate-x-1/2 rounded-full bg-linear-to-r from-brand-deep to-zap lg:block" />
-          {steps.map((s, i) => (
-            <Reveal key={s} delay={i * 120} className="relative">
-              <div className="group flex flex-col items-center text-center">
-                <div className="grid size-14 place-items-center rounded-full gradient-brand font-display text-xl font-extrabold text-primary-foreground ring-4 ring-background transition-transform duration-300 group-hover:scale-110">
-                  {i + 1}
-                </div>
-                <p className="mt-4 max-w-xs font-body text-base text-muted-foreground">{s}</p>
-              </div>
-            </Reveal>
-          ))}
-        </div>
-        <div className="mt-12 text-center">
-          <Button variant="zap" size="hero" asChild>
-            <a target="_blank" rel="noopener" href={waLink("Oi! Quero contratar a SCNET agora.")}>
-              Quero contratar agora <ArrowRight />
-            </a>
-          </Button>
-        </div>
-      </div>
-    </section>
-  );
-}
-
 /* ---------------- Empresas ---------------- */
 export function Empresas() {
   return (
@@ -528,14 +486,20 @@ export function Depoimentos() {
         <Reveal className="text-center">
           <SectionTitle className="text-brand-deep">Quem testou, não troca</SectionTitle>
         </Reveal>
-        <div className="mt-12 flex snap-x snap-mandatory gap-5 overflow-x-auto pb-4 lg:grid lg:grid-cols-4 lg:overflow-visible">
-          {testimonials.map((t, i) => (
-            <Reveal
-              key={t.name}
-              delay={i * 90}
-              className="min-w-[85%] snap-center sm:min-w-[45%] lg:min-w-0"
-            >
-              <div className="h-full rounded-2xl border border-border bg-card p-6 transition-all duration-300 hover:-translate-y-2 hover:shadow-[0_20px_50px_-20px_color-mix(in_oklab,var(--color-brand)_70%,transparent)]">
+        {/* Mesmo carrossel dos planos: no celular vira slide (o scroll manual
+            anterior quebrava o card), e a partir de lg os quatro cabem juntos —
+            aí ele fica sem pontos, como uma grade. Um Reveal só envolvendo
+            tudo, senão os cards fora da área visível ficariam invisíveis. */}
+        <Reveal className="mt-8">
+          <Carrossel
+            label="Depoimentos de clientes"
+            fundo="from-muted"
+            slideClassName="basis-full sm:basis-1/2 lg:basis-1/4"
+            slides={testimonials.map((t) => (
+              <div
+                key={t.name}
+                className="h-full rounded-2xl border border-border bg-card p-6 transition-all duration-300 hover:-translate-y-2 hover:shadow-[0_20px_50px_-20px_color-mix(in_oklab,var(--color-brand)_70%,transparent)]"
+              >
                 <div className="flex items-center gap-3">
                   <div className="grid size-11 shrink-0 place-items-center rounded-full gradient-brand font-display font-extrabold text-primary-foreground">
                     {t.name[0]}
@@ -558,9 +522,9 @@ export function Depoimentos() {
                 </div>
                 <p className="mt-3 font-body text-sm text-muted-foreground">“{t.text}”</p>
               </div>
-            </Reveal>
-          ))}
-        </div>
+            ))}
+          />
+        </Reveal>
       </div>
     </section>
   );
@@ -615,7 +579,14 @@ export function Faq() {
 }
 
 /* ---------------- CTA final ---------------- */
-export function CtaFinal({ selectedPlan }: { selectedPlan: SelectedPlan | null }) {
+export function CtaFinal({
+  selectedPlan,
+  codigoOferta,
+}: {
+  selectedPlan: SelectedPlan | null;
+  /** Código de campanha da URL, repassado adiante para /contratacao. */
+  codigoOferta?: string | undefined;
+}) {
   return (
     <section className="gradient-brand relative overflow-hidden py-24">
       <Blobs />
@@ -648,7 +619,7 @@ export function CtaFinal({ selectedPlan }: { selectedPlan: SelectedPlan | null }
           </div>
         </Reveal>
         <Reveal delay={120} className="w-full lg:justify-self-end">
-          <ContractForm selectedPlan={selectedPlan} />
+          <ContractForm selectedPlan={selectedPlan} codigoOferta={codigoOferta} />
         </Reveal>
       </div>
     </section>

@@ -47,6 +47,8 @@ async function sendLead(input: {
         composicao: input.plan?.composicao ?? undefined,
         valorPrimeirasFaturas: input.plan?.valor_primeiras_faturas ?? undefined,
         quantMesesDesconto: input.plan?.quant_meses_desconto ?? undefined,
+        codigoOfertaMk: input.plan?.codigo_oferta_mk ?? undefined,
+        codigoOferta: input.plan?.codigo_oferta ?? undefined,
         recaptchaToken,
         fbc,
         fbp,
@@ -60,7 +62,17 @@ async function sendLead(input: {
   }
 }
 
-export function ContractForm({ selectedPlan }: { selectedPlan: SelectedPlan | null }) {
+export function ContractForm({
+  selectedPlan,
+  codigoOferta,
+}: {
+  selectedPlan: SelectedPlan | null;
+  /**
+   * Código de campanha que veio na URL. Segue no handoff para /contratacao
+   * continuar exibindo o plano da oferta que o cliente escolheu aqui.
+   */
+  codigoOferta?: string | undefined;
+}) {
   const navigate = useNavigate();
   const [name, setName] = useState("");
   const [ddi, setDdi] = useState("+55");
@@ -150,6 +162,7 @@ export function ContractForm({ selectedPlan }: { selectedPlan: SelectedPlan | nu
         whatsapp,
         intencao: chosenIntent,
         ...(selectedPlan ? { plano: selectedPlan.nome, preco: selectedPlan.preco } : {}),
+        ...(codigoOferta ? { codigo_oferta: codigoOferta } : {}),
       };
       writeContractHandoffCookie(handoff);
 

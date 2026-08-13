@@ -111,7 +111,23 @@ type PlanoRow = {
   destaque: boolean;
   nome_destaque: string | null;
   ordem_grade: number;
+  codigo_oferta_mk: string | number | null;
+  codigo_oferta: string | number | null;
 };
+
+/**
+ * `codigo_oferta_mk` pode ser numérico ou texto na tabela — o postgres.js
+ * entrega bigint como string nos dois casos. Devolve número quando o valor é
+ * só dígitos, senão mantém o texto, para o webhook receber o mesmo que está
+ * gravado no banco.
+ */
+function codigoOfertaMk(value: string | number | null): number | string | null {
+  if (value == null) return null;
+  if (typeof value === "number") return value;
+  const texto = value.trim();
+  if (!texto) return null;
+  return /^\d+$/.test(texto) ? Number(texto) : texto;
+}
 
 function toPlan(row: PlanoRow): Plan {
   const composicao = row.composicao?.trim() || null;
@@ -130,6 +146,8 @@ function toPlan(row: PlanoRow): Plan {
     destaque: Boolean(row.destaque),
     nome_destaque: row.nome_destaque?.trim() || null,
     ordem_grade: row.ordem_grade ?? 0,
+    codigo_oferta_mk: codigoOfertaMk(row.codigo_oferta_mk),
+    codigo_oferta: row.codigo_oferta == null ? null : String(row.codigo_oferta).trim() || null,
   };
 }
 
@@ -166,7 +184,7 @@ export async function loadPlanos(): Promise<Plan[]> {
       select
         id_plano, codigo_mk, nome, descricao, valor, valor_primeiras_faturas,
         quant_meses_desconto, composicao_resumo, composicao, url_logo_agregados,
-        destaque, nome_destaque, ordem_grade
+        destaque, nome_destaque, ordem_grade, codigo_oferta_mk, codigo_oferta
       from ${sql(schema)}.${sql(table)}
       where ativo is true
       order by ordem_grade asc, id_plano asc

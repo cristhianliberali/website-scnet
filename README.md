@@ -251,9 +251,16 @@ Como cada coluna aparece no site:
 - `url_logo_agregados` — URLs separadas por `;`, exibidas abaixo do valor com
   ~30px de altura, sob o título fixo "O que você leva".
 - `destaque` + `nome_destaque` — card em destaque e o texto do selo.
-- `codigo_mk`, `composicao_resumo` — não aparecem no card; `codigo_mk` e
-  `composicao` seguem no webhook dos dois formulários, junto de
-  `valor_primeiras_faturas` e `quant_meses_desconto`.
+- `codigo_oferta` — marca o plano como de campanha: ele **só aparece** quando a
+  URL traz `?codigo_oferta=` com o mesmo valor (sem diferenciar maiúsculas ou
+  espaços em volta). Plano sem esse código é normal e aparece sempre; com o
+  código na URL, o plano da campanha soma-se aos normais, na ordem de
+  `ordem_grade`. O parâmetro é repassado da home para `/contratacao`, então o
+  plano escolhido continua visível no formulário.
+- `codigo_mk`, `codigo_oferta_mk`, `composicao_resumo` — não aparecem no card.
+  `codigo_mk`, `codigo_oferta_mk`, `codigo_oferta` e `composicao` seguem no
+  webhook dos dois formulários, junto de `valor_primeiras_faturas` e
+  `quant_meses_desconto`.
 
 ### ÁREA DO CLIENTE (`/cliente`)
 
