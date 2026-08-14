@@ -30,6 +30,14 @@ const errorMiddleware = createMiddleware().server(async ({ next }) => {
  *    bloqueio (ver src/lib/rate-limit.ts).
  *
  * Só se aplica a `serverFn`: navegação normal e assets não são afetados.
+ *
+ * A contagem cobre apenas as server functions que mudam estado (POST). As de
+ * leitura (`fetchPlanos`, `getSessaoCliente`) rodam a cada navegação do
+ * cliente — a home, a contratação e toda página da área do cliente chamam uma
+ * delas — e contá-las gastaria a cota de 15/min só navegando. Como no Brasil é
+ * comum vários clientes saírem pelo mesmo IP público (CGNAT das operadoras
+ * móveis), isso devolveria 429 a gente legítima. Elas não recebem corpo e não
+ * disparam webhook, então ficam de fora; o que se quer frear é o envio.
  */
 const abuseGuardMiddleware = createMiddleware().server(async (ctx) => {
   if (ctx.handlerType !== "serverFn") return ctx.next();
@@ -39,6 +47,8 @@ const abuseGuardMiddleware = createMiddleware().server(async (ctx) => {
     console.error(`Request rejeitada: corpo de ${declaredLength} bytes acima do limite.`);
     return new Response("Payload Too Large", { status: 413 });
   }
+
+  if (ctx.request.method === "GET" || ctx.request.method === "HEAD") return ctx.next();
 
   const ip = clientIpFromHeaders(ctx.request.headers);
   const verdict = checkRateLimit(ip);

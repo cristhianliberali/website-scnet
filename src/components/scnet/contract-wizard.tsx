@@ -12,7 +12,8 @@ import {
   Sunset,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { plans, type Plan } from "@/lib/plans";
+import { planoWebhook, precoVigente, textoPosDesconto, type Plan } from "@/lib/plans";
+import { ItensPlano, LogosAgregados, PlanosIndisponiveis, PrecoPlano, SeloDestaque } from "./plano";
 import {
   ACCEPTED_TYPES,
   ACCEPT_ATTRIBUTE,
@@ -20,7 +21,14 @@ import {
   MAX_FILE_BYTES,
 } from "@/lib/attachment-validation";
 import { isPayloadTooLarge, isRateLimited } from "@/lib/http-errors";
-import { capitalizeName, isValidPhone, maskPhone, nationalPhoneDigits } from "@/lib/form-utils";
+import {
+  capitalizeName,
+  isValidCpf,
+  isValidPhone,
+  maskCpf,
+  maskPhone,
+  nationalPhoneDigits,
+} from "@/lib/form-utils";
 import { getAttribution } from "@/lib/utm";
 import { getRecaptchaToken } from "@/lib/recaptcha";
 import { submitContractStep } from "@/lib/submit-contract-step";
@@ -39,26 +47,6 @@ const onlyDigits = (v: string) => v.replace(/\D/g, "");
 function maskCep(v: string) {
   const d = onlyDigits(v).slice(0, 8);
   return d.length > 5 ? `${d.slice(0, 5)}-${d.slice(5)}` : d;
-}
-
-function maskCpf(v: string) {
-  const d = onlyDigits(v).slice(0, 11);
-  return d
-    .replace(/^(\d{3})(\d)/, "$1.$2")
-    .replace(/^(\d{3})\.(\d{3})(\d)/, "$1.$2.$3")
-    .replace(/\.(\d{3})(\d{1,2})$/, ".$1-$2");
-}
-
-function isValidCpf(v: string) {
-  const d = onlyDigits(v);
-  if (d.length !== 11 || /^(\d)\1{10}$/.test(d)) return false;
-  const calc = (len: number) => {
-    let sum = 0;
-    for (let i = 0; i < len; i++) sum += Number(d[i]) * (len + 1 - i);
-    const r = (sum * 10) % 11;
-    return r === 10 ? 0 : r;
-  };
-  return calc(9) === Number(d[9]) && calc(10) === Number(d[10]);
 }
 
 const FULL_NAME_RE = /^\p{L}{2,}(?:['’\-\p{L}]*)(?:\s+\p{L}{2,}[\p{L}'’\-]*)+$/u;
@@ -266,10 +254,10 @@ const LAST_STEP = STEPS.length - 1;
 
 /* ---------------- wizard ---------------- */
 
-export function ContractWizard({ handoff }: { handoff: ContractHandoff }) {
+export function ContractWizard({ plans, handoff }: { plans: Plan[]; handoff: ContractHandoff }) {
   const prefilledPlan = useMemo(
-    () => plans.find((p) => p.name === handoff.plano) ?? null,
-    [handoff.plano],
+    () => plans.find((p) => p.nome === handoff.plano) ?? null,
+    [plans, handoff.plano],
   );
 
   /** Nome/telefone/intenção que vieram do formulário da home (URL ou cookie). */
@@ -341,6 +329,11 @@ export function ContractWizard({ handoff }: { handoff: ContractHandoff }) {
   const [note, setNote] = useState("");
 
   const clearError = (k: string) => setErrors((p) => ({ ...p, [k]: undefined }));
+
+  /** "nos 3 primeiros meses, após R$ 139,90" — só quando há promoção. */
+  const planoPosDesconto = plan
+    ? textoPosDesconto(plan.valor, plan.valor_primeiras_faturas, plan.quant_meses_desconto)
+    : null;
 
   /* ----- CEP lookup ----- */
   async function lookupCep(value: string) {
@@ -454,7 +447,7 @@ export function ContractWizard({ handoff }: { handoff: ContractHandoff }) {
    */
   function buildDados(index: number, chosenPlan: Plan | null) {
     return {
-      planos: chosenPlan ? { nome: chosenPlan.name, preco: chosenPlan.price } : null,
+      planos: chosenPlan ? planoWebhook(chosenPlan) : null,
       origem: {
         nome: lead.nome.trim() || null,
         whatsapp: leadWhatsapp(),
@@ -630,7 +623,7 @@ export function ContractWizard({ handoff }: { handoff: ContractHandoff }) {
           Contratação enviada!
         </h2>
         <p className="mx-auto mt-3 max-w-lg font-body text-muted-foreground">
-          Recebemos seus dados{plan ? ` para o ${plan.name}` : ""} e a instalação foi solicitada
+          Recebemos seus dados{plan ? ` para o ${plan.nome}` : ""} e a instalação foi solicitada
           para{" "}
           <strong className="text-brand-deep">
             {date.split("-").reverse().join("/")} ({period === "manha" ? "manhã" : "tarde"})
@@ -646,7 +639,11 @@ export function ContractWizard({ handoff }: { handoff: ContractHandoff }) {
       {plan && (
         <div className="mb-5 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-brand/25 bg-brand/10 px-4 py-3">
           <p className="font-ui text-sm font-semibold text-brand-deep">
-            Plano escolhido: <span className="text-brand">{plan.name}</span> — R$ {plan.price}/mês
+            Plano escolhido: <span className="text-brand">{plan.nome}</span> — R${" "}
+            {precoVigente(plan.valor, plan.valor_primeiras_faturas)}/mês
+            {planoPosDesconto && (
+              <span className="block font-normal text-brand-deep/70">{planoPosDesconto}</span>
+            )}
           </p>
           {step > 0 && (
             <button
@@ -760,7 +757,12 @@ export function ContractWizard({ handoff }: { handoff: ContractHandoff }) {
               </div>
             )}
 
-            <StepPlanos selected={plan} sending={sending || redirecting} onSelect={selectPlan} />
+            <StepPlanos
+              plans={plans}
+              selected={plan}
+              sending={sending || redirecting}
+              onSelect={selectPlan}
+            />
           </div>
         )}
 
@@ -1079,7 +1081,9 @@ export function ContractWizard({ handoff }: { handoff: ContractHandoff }) {
         </div>
       )}
 
-      {(step > 0 || needsLead) && (
+      {/* Na etapa 0 sem plano no banco o "Continuar" nunca passaria da validação:
+          melhor não oferecer o botão do que travar o cliente nele. */}
+      {(step > 0 || (needsLead && plans.length > 0)) && (
         <div className="mt-8 flex flex-col-reverse gap-3 sm:flex-row sm:items-center sm:justify-between">
           {step > 0 ? (
             <Button
@@ -1124,44 +1128,51 @@ export function ContractWizard({ handoff }: { handoff: ContractHandoff }) {
 /* ---------------- step 1: planos ---------------- */
 
 function StepPlanos({
+  plans,
   selected,
   sending,
   onSelect,
 }: {
+  plans: Plan[];
   selected: Plan | null;
   sending: boolean;
   onSelect: (p: Plan) => void;
 }) {
+  // Sem plano não há como avançar: em vez de travar o cliente no "Continuar",
+  // a etapa oferece a saída pelo atendimento.
+  if (!plans.length) return <PlanosIndisponiveis />;
+
   return (
     <div>
-      <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-4">
+      {/* Grade de 4 colunas no desktop, conforme o layout do formulário. */}
+      <div className="grid gap-5 pt-4 sm:grid-cols-2 lg:grid-cols-4">
         {plans.map((p) => {
-          const isSelected = selected?.name === p.name;
+          const isSelected = selected?.id_plano === p.id_plano;
           return (
             <button
-              key={p.name}
+              key={p.id_plano}
               type="button"
               onClick={() => onSelect(p)}
               disabled={sending}
               className={cn(
                 "group relative flex h-full flex-col rounded-3xl p-6 text-left transition-all duration-300 hover:-translate-y-2 focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 disabled:pointer-events-none",
                 sending && !isSelected && "opacity-50",
-                p.featured
+                p.destaque
                   ? "gradient-brand border-2 border-zap text-primary-foreground shadow-[0_20px_60px_-15px_color-mix(in_oklab,var(--color-zap)_55%,transparent)] focus-visible:ring-zap"
                   : "border border-border bg-card text-card-foreground focus-visible:ring-brand",
-                isSelected && !p.featured && "border-brand ring-2 ring-brand/30",
+                isSelected && !p.destaque && "border-brand ring-2 ring-brand/30",
               )}
             >
               <span
                 className={cn(
                   "absolute right-4 top-4 grid size-7 place-items-center rounded-full transition",
                   isSelected
-                    ? p.featured
+                    ? p.destaque
                       ? "bg-zap text-zap-ink opacity-100"
                       : "bg-brand text-primary-foreground opacity-100"
                     : cn(
                         "border-2 opacity-0 group-hover:opacity-100",
-                        p.featured ? "border-zap text-zap" : "border-brand text-brand",
+                        p.destaque ? "border-zap text-zap" : "border-brand text-brand",
                       ),
                 )}
                 aria-hidden="true"
@@ -1175,34 +1186,17 @@ function StepPlanos({
                 )}
               </span>
 
-              {p.featured && (
-                <span className="absolute -top-3 left-1/2 -translate-x-1/2 rounded-full bg-zap px-4 py-1 font-ui text-xs font-extrabold tracking-wide text-zap-ink">
-                  Recomendado
-                </span>
-              )}
+              <SeloDestaque plan={p} />
               <h3
-                className={cn("font-ui text-2xl font-bold", p.featured ? "text-zap" : "text-brand")}
+                className={cn("font-ui text-2xl font-bold", p.destaque ? "text-zap" : "text-brand")}
               >
-                {p.name}
+                {p.nome}
               </h3>
-              <p className="mt-3 font-display text-3xl font-extrabold tracking-tight">
-                <span className="align-super text-lg">R$</span> {p.price}
-                <span
-                  className={cn(
-                    "font-body text-sm font-medium",
-                    p.featured ? "text-primary-foreground/70" : "text-muted-foreground",
-                  )}
-                >
-                  /mês
-                </span>
-              </p>
-              <ul className="mt-5 space-y-2">
-                {p.features.map((f) => (
-                  <li key={f.text} className="font-body text-sm">
-                    {f.text}
-                  </li>
-                ))}
-              </ul>
+              <div className="mt-3">
+                <PrecoPlano plan={p} featured={p.destaque} />
+              </div>
+              <LogosAgregados logos={p.logos} featured={p.destaque} />
+              <ItensPlano itens={p.itens} featured={p.destaque} className="mt-5" />
             </button>
           );
         })}

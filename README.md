@@ -224,6 +224,108 @@ Logo, links institucionais (Planos, Empresas, Trabalhe conosco, FAQ, Contratos e
 
 - Use os gradientes e o amarelo com moderação estratégica: ele deve guiar o olho até os CTAs, não estar espalhado por todo lado a ponto de perder força.
 
+### PLANOS NO POSTGRES
+
+Os planos da home e do formulário de contratação vêm de uma tabela no Postgres
+(`planos_web` por padrão), consultada só no servidor durante o SSR. As variáveis
+de conexão estão documentadas no `.env.example` (`POSTGRES_URL` ou
+`POSTGRES_HOST`/`POSTGRES_PORT`/`POSTGRES_DB`/`POSTGRES_USER`/`POSTGRES_PASSWORD`,
+mais `POSTGRES_SSL`, `POSTGRES_SCHEMA`, `POSTGRES_PLANOS_TABLE` e
+`POSTGRES_PLANOS_CACHE_SECONDS`). São variáveis de runtime — no EasyPanel entram
+como Environment Variables do serviço, nunca como Build Args.
+
+Só entram na página os registros com `ativo = true`, ordenados por
+`ordem_grade`. O banco é a única fonte — não existe lista embutida de reserva:
+sem configuração, sem tabela ou sem plano ativo, a home e a etapa de planos
+mostram um aviso com o WhatsApp do atendimento, e o log do servidor diz o
+motivo (`Planos carregados do Postgres: N` quando deu certo).
+
+Como cada coluna aparece no site:
+
+- `nome`, `descricao` — título e texto do card.
+- `valor` — mensalidade padrão.
+- `valor_primeiras_faturas` + `quant_meses_desconto` — quando preenchidos, o
+  valor promocional ocupa o lugar do preço e o padrão vai logo abaixo: "nos 3
+  primeiros meses, após R$ 139,90".
+- `composicao` — itens separados por `;`, um por linha, todos com ícone de check.
+- `url_logo_agregados` — URLs separadas por `;`, exibidas abaixo do valor com
+  ~30px de altura, sob o título fixo "O que você leva".
+- `destaque` + `nome_destaque` — card em destaque e o texto do selo.
+- `codigo_oferta` — marca o plano como de campanha: ele **só aparece** quando a
+  URL traz `?codigo_oferta=` com o mesmo valor (sem diferenciar maiúsculas ou
+  espaços em volta). Plano sem esse código é normal e aparece sempre; com o
+  código na URL, o plano da campanha soma-se aos normais, na ordem de
+  `ordem_grade`. O parâmetro é repassado da home para `/contratacao`, então o
+  plano escolhido continua visível no formulário.
+- `codigo_mk`, `codigo_oferta_mk`, `composicao_resumo` — não aparecem no card.
+  `codigo_mk`, `codigo_oferta_mk`, `codigo_oferta` e `composicao` seguem no
+  webhook dos dois formulários, junto de `valor_primeiras_faturas` e
+  `quant_meses_desconto`.
+
+### ÁREA DO CLIENTE (`/cliente`)
+
+Página de login com header e rodapé iguais aos das demais, reCAPTCHA v3 em toda
+submissão e dois métodos de acesso, em abas:
+
+1. **Documento do cadastro** — CPF ou CNPJ, depois a escolha de onde receber um
+   código (SMS, WhatsApp ou e-mail, só os canais que o cadastro tiver) e por fim
+   o código.
+2. **Login e senha do SAC** — entra direto, sem código. Abaixo há "Esqueci meu
+   login ou senha", que envia as credenciais pelo WhatsApp ou e-mail do cadastro.
+
+Depois do login o cliente vai para `/cliente/painel`, uma rota protegida que
+nesta versão está propositalmente vazia: ela existe para receber faturas, dados
+cadastrais e chamados sem retrabalho de autenticação.
+
+**Quem decide o quê.** O n8n verifica as credenciais; a sessão é deste servidor.
+Os cookies `scnet_cliente` (2h) e `scnet_cliente_desafio` (10min) usam a sessão
+selada do TanStack Start: conteúdo criptografado e assinado com `SESSION_SECRET`,
+`HttpOnly`, `SameSite=Lax` e `Secure` quando em https. O navegador não lê nem
+forja nenhum dos dois, e nada de sessão fica guardado no servidor — o que
+importa porque o container do EasyPanel é efêmero.
+
+**Segurança do webhook.** O webhook do n8n é uma URL pública, então a defesa é
+dos dois lados. Do lado do site: o `id_cliente` nunca vem do formulário (sai do
+cookie de desafio, selado), o navegador nunca fala com o n8n (tudo passa por
+server functions, protegidas por CSRF), e cada POST vai assinado —
+`X-SCNET-Timestamp` mais `X-SCNET-Assinatura` = `HMAC_SHA256(token,
+"<timestamp>.<corpo>")`. Do lado do n8n, é preciso:
+
+- ligar _Header Auth_ no nó Webhook e recusar requisição sem o Bearer — sem isso
+  o token não protege nada;
+- recalcular a assinatura num nó Code e recusar o que não bater ou tiver
+  timestamp com mais de 5 minutos (é o que impede reenvio de uma requisição
+  capturada);
+- usar um path com UUID, separado do `WEBHOOK_URL` dos formulários públicos;
+- se o n8n roda no mesmo EasyPanel, apontar `WEBHOOK_PAINEL_CLIENTE` para a URL
+  interna da rede Docker — sem superfície pública não há o que descobrir.
+
+**Falha fechado.** Sem `WEBHOOK_PAINEL_CLIENTE` ou sem `SESSION_SECRET` (mínimo
+de 32 caracteres) nenhum login é aceito, e o servidor registra o motivo. É o
+oposto do `WEBHOOK_URL` dos formulários, que sem configuração deixa passar: um
+login que passa por falta de configuração é um login que qualquer um atravessa.
+
+**Tentativas.** Duas travas independentes valem no `/cliente`, e é bom não
+confundi-las:
+
+- `src/lib/tentativas-login.ts` conta só as tentativas que **falharam**, por
+  credencial: três erros no mesmo documento ou login bloqueiam aquele acesso por
+  5 minutos. É a trava contra adivinhar senha. O IP também é contado aqui, com
+  limite bem mais folgado (15 falhas), porque no Brasil vários clientes saem
+  pelo mesmo IP público (CGNAT das operadoras móveis, NAT de empresas e
+  condomínios) — travar o IP em 3 deixaria vizinhos de fora por causa de um só.
+- `src/lib/rate-limit.ts` é o throttle de volume por IP descrito em "Limite de
+  envios por IP", aplicado pelo middleware a toda server function que muda
+  estado, inclusive as de login.
+
+Os dois contadores vivem na memória do processo: reiniciar o container ou rodar
+duas instâncias zera a contagem.
+
+Os eventos e o formato das respostas esperadas do n8n estão documentados no
+`.env.example`, junto das três variáveis novas (`WEBHOOK_PAINEL_CLIENTE`,
+`WEBHOOK_PAINEL_CLIENTE_TOKEN` e `SESSION_SECRET`). Todas são de runtime — no
+EasyPanel entram como Environment Variables, nunca como Build Args.
+
 This project was built with [Lovable](https://lovable.dev).
 
 ## Segurança dos formulários e do webhook
@@ -242,6 +344,10 @@ chega do cliente é tratado como confiável.
   não é renovado por novas tentativas — expira 5 minutos após o estouro.
 - Corpo acima de **30MB** é recusado com 413 sem ser lido.
 - Só vale para `serverFn`; navegação e assets não são limitados.
+- Dentro de `serverFn`, contam só as que **mudam estado** (POST). As de leitura
+  (`fetchPlanos`, `getSessaoCliente`) rodam a cada navegação — home, contratação
+  e toda página da área do cliente chamam uma delas —, então contá-las gastaria
+  a cota só navegando. Não recebem corpo nem disparam webhook.
 
 O contador vive na memória do processo. A instância única do `Dockerfile` está
 coberta; **com réplicas, cada uma teria seu próprio contador** e o store

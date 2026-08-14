@@ -10,9 +10,11 @@ import { submitLead } from "@/lib/submit-lead";
 import { capitalizeName, isValidPhone, maskPhone } from "@/lib/form-utils";
 import { writeContractHandoffCookie } from "@/lib/contract-handoff";
 import { redirectToWhatsAppSupport, whatsappSupportLink } from "@/lib/whatsapp";
+import { precoVigente, textoPosDesconto, type PlanoWebhook } from "@/lib/plans";
 import { cn } from "@/lib/utils";
 
-export type SelectedPlan = { name: string; price: string };
+/** Plano escolhido na home — é o recorte que segue para o webhook. */
+export type SelectedPlan = PlanoWebhook;
 
 type Intent = "quero_contratar" | "ja_sou_cliente";
 
@@ -39,8 +41,14 @@ async function sendLead(input: {
         phone: input.phone,
         page: window.location.pathname + window.location.search,
         intent: input.intent,
-        plan: input.plan?.name,
-        price: input.plan?.price,
+        plan: input.plan?.nome,
+        price: input.plan?.preco,
+        codigoMk: input.plan?.codigo_mk ?? undefined,
+        composicao: input.plan?.composicao ?? undefined,
+        valorPrimeirasFaturas: input.plan?.valor_primeiras_faturas ?? undefined,
+        quantMesesDesconto: input.plan?.quant_meses_desconto ?? undefined,
+        codigoOfertaMk: input.plan?.codigo_oferta_mk ?? undefined,
+        codigoOferta: input.plan?.codigo_oferta ?? undefined,
         recaptchaToken,
         fbc,
         fbp,
@@ -54,7 +62,17 @@ async function sendLead(input: {
   }
 }
 
-export function ContractForm({ selectedPlan }: { selectedPlan: SelectedPlan | null }) {
+export function ContractForm({
+  selectedPlan,
+  codigoOferta,
+}: {
+  selectedPlan: SelectedPlan | null;
+  /**
+   * Código de campanha que veio na URL. Segue no handoff para /contratacao
+   * continuar exibindo o plano da oferta que o cliente escolheu aqui.
+   */
+  codigoOferta?: string | undefined;
+}) {
   const navigate = useNavigate();
   const [name, setName] = useState("");
   const [ddi, setDdi] = useState("+55");
@@ -66,6 +84,15 @@ export function ContractForm({ selectedPlan }: { selectedPlan: SelectedPlan | nu
   const [serverError, setServerError] = useState<string | null>(null);
   /** Erro no envio: o cliente está sendo levado ao WhatsApp. */
   const [redirecting, setRedirecting] = useState(false);
+
+  /** "nos 3 primeiros meses, após R$ 139,90" — só quando há promoção. */
+  const posDesconto = selectedPlan
+    ? textoPosDesconto(
+        selectedPlan.preco,
+        selectedPlan.valor_primeiras_faturas,
+        selectedPlan.quant_meses_desconto,
+      )
+    : null;
 
   const field = (hasError: boolean) =>
     cn(
@@ -134,7 +161,8 @@ export function ContractForm({ selectedPlan }: { selectedPlan: SelectedPlan | nu
         nome: trimmedName,
         whatsapp,
         intencao: chosenIntent,
-        ...(selectedPlan ? { plano: selectedPlan.name, preco: selectedPlan.price } : {}),
+        ...(selectedPlan ? { plano: selectedPlan.nome, preco: selectedPlan.preco } : {}),
+        ...(codigoOferta ? { codigo_oferta: codigoOferta } : {}),
       };
       writeContractHandoffCookie(handoff);
 
@@ -152,8 +180,11 @@ export function ContractForm({ selectedPlan }: { selectedPlan: SelectedPlan | nu
     >
       {selectedPlan && (
         <div className="mb-4 rounded-xl border border-brand/25 bg-brand/10 px-4 py-3 font-ui text-sm font-semibold text-brand-deep">
-          Plano desejado: <span className="text-brand">{selectedPlan.name}</span> — R${" "}
-          {selectedPlan.price}/mês
+          Plano desejado: <span className="text-brand">{selectedPlan.nome}</span> — R${" "}
+          {precoVigente(selectedPlan.preco, selectedPlan.valor_primeiras_faturas)}/mês
+          {posDesconto && (
+            <span className="block font-normal text-brand-deep/70">{posDesconto}</span>
+          )}
         </div>
       )}
       <p className="font-display text-2xl font-extrabold text-brand-deep">Contrate agora (Leva menos de 2 minutos...)</p>

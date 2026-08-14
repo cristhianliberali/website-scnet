@@ -28,6 +28,17 @@ const leadInputSchema = z.object({
   intent: z.enum(["quero_contratar", "ja_sou_cliente"]).optional(),
   plan: z.string().max(60).optional(),
   price: z.string().max(30).optional(),
+  // Demais campos do plano escolhido, repassados ao webhook. Vêm do navegador
+  // como todo o resto, então também chegam com tamanho fechado.
+  codigoMk: z.number().nullable().optional(),
+  composicao: z.string().max(2000).optional(),
+  valorPrimeirasFaturas: z.string().max(30).optional(),
+  quantMesesDesconto: z.number().nullable().optional(),
+  codigoOfertaMk: z
+    .union([z.number(), z.string().max(60)])
+    .nullable()
+    .optional(),
+  codigoOferta: z.string().max(60).optional(),
   recaptchaToken: z.string().max(4096).optional(),
   fbc: z.string().max(255).optional(),
   fbp: z.string().max(255).optional(),
@@ -121,7 +132,18 @@ export const submitLead = createServerFn({ method: "POST" })
       id_sessao: randomUUID(),
       page: data.page,
       dados: {
-        planos: data.plan ? { nome: data.plan, preco: data.price ?? null } : null,
+        planos: data.plan
+          ? {
+              nome: data.plan,
+              preco: data.price ?? null,
+              codigo_mk: data.codigoMk ?? null,
+              composicao: data.composicao ?? null,
+              valor_primeiras_faturas: data.valorPrimeirasFaturas ?? null,
+              quant_meses_desconto: data.quantMesesDesconto ?? null,
+              codigo_oferta_mk: data.codigoOfertaMk ?? null,
+              codigo_oferta: data.codigoOferta ?? null,
+            }
+          : null,
         origem: {
           nome: data.name,
           whatsapp: `${data.ddi}${data.phone.replace(/\D/g, "")}`,

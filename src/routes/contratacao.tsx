@@ -7,6 +7,8 @@ import { Footer, WhatsFloat } from "@/components/scnet/sections";
 import { Blobs } from "@/components/scnet/shared";
 import { ContractWizard } from "@/components/scnet/contract-wizard";
 import { readContractHandoffCookie, type ContractHandoff } from "@/lib/contract-handoff";
+import { fetchPlanos } from "@/lib/fetch-planos";
+import { planosVisiveis } from "@/lib/plans";
 
 const searchSchema = z.object({
   nome: z.string().optional(),
@@ -14,12 +16,19 @@ const searchSchema = z.object({
   plano: z.string().optional(),
   preco: z.string().optional(),
   intencao: z.string().optional(),
+  codigo_oferta: z.string().optional(),
 });
 
 const title = "Contratação online — SCNET";
 
 export const Route = createFileRoute("/contratacao")({
   validateSearch: searchSchema,
+  loaderDeps: ({ search }) => ({ codigoOferta: search.codigo_oferta }),
+  // Mesma fonte e mesma regra da home: os planos ativos do Postgres, com os de
+  // campanha liberados só pelo código que veio na URL.
+  loader: async ({ deps }) => ({
+    planos: planosVisiveis(await fetchPlanos(), deps.codigoOferta),
+  }),
   head: () => ({
     meta: [
       { title },
@@ -43,6 +52,7 @@ export const Route = createFileRoute("/contratacao")({
 
 function Contratacao() {
   const search = Route.useSearch();
+  const { planos } = Route.useLoaderData();
   // A URL é a fonte primária; o cookie só completa o que faltar nela.
   const [handoff, setHandoff] = useState<ContractHandoff>(search);
   const [ready, setReady] = useState(false);
@@ -51,7 +61,14 @@ function Contratacao() {
     const cookie = readContractHandoffCookie();
     setHandoff((prev) => {
       const merged: ContractHandoff = {};
-      for (const key of ["nome", "whatsapp", "plano", "preco", "intencao"] as const) {
+      for (const key of [
+        "nome",
+        "whatsapp",
+        "plano",
+        "preco",
+        "intencao",
+        "codigo_oferta",
+      ] as const) {
         const value = prev[key] || cookie[key];
         if (value) merged[key] = value;
       }
@@ -78,8 +95,9 @@ function Contratacao() {
         </section>
 
         <section className="relative -mt-10 pb-24">
-          <div className="mx-auto max-w-6xl px-4">
-            {ready && <ContractWizard handoff={handoff} />}
+          {/* max-w-7xl: espaço para a grade de 4 colunas da etapa de planos */}
+          <div className="mx-auto max-w-7xl px-4">
+            {ready && <ContractWizard plans={planos} handoff={handoff} />}
           </div>
         </section>
       </main>
