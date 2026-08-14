@@ -1,116 +1,126 @@
 /**
- * Limitador de tentativas da área do cliente: falhas seguidas bloqueiam a chave
- * por 5 minutos.
+ * Rate limit por IP para as server functions dos formulários.
  *
- * Cada tentativa é contada por duas chaves, com limites diferentes de propósito:
+ * Regra: até 15 envios por minuto por IP. Ao estourar, o IP fica 5 minutos
+ * bloqueado — e o bloqueio NÃO é renovado a cada nova tentativa, ele expira
+ * 5 minutos depois do estouro, senão um bot insistente se manteria banido
+ * para sempre e um cliente real preso atrás do mesmo IP (CGNAT de operadora
+ * móvel) nunca conseguiria voltar.
  *
- * - **identificador** (documento ou login): 3 falhas, como pedido. É a trava que
- *   protege a conta de quem está sendo alvo.
- * - **IP de origem**: 15 falhas. Mais frouxa porque no Brasil é comum vários
- *   clientes saírem pelo mesmo IP público (CGNAT das operadoras móveis, NAT de
- *   empresas e condomínios). Se o IP travasse em 3, três senhas erradas de um
- *   vizinho deixariam todos os outros de fora. O limite ainda existe para frear
- *   quem varre muitos documentos a partir de um ponto só.
- *
- * O estado vive na memória do processo, como o cache de planos em
- * `planos-db.ts`. Isso significa que reiniciar o container ou subir uma segunda
- * instância zera a contagem — aceitável para frear tentativa e erro manual,
- * insuficiente contra um atacante distribuído. Um limitador durável (Postgres
- * ou Redis) é o próximo passo se isso virar necessidade.
+ * O estado vive na memória do processo. Com a instância única do Dockerfile
+ * atual isso cobre o caso real; se um dia houver réplicas, cada uma terá seu
+ * próprio contador e o store precisa ir para um Redis compartilhado.
  */
 
-const MAX_POR_IDENTIFICADOR = 3;
-const MAX_POR_IP = 15;
-const BLOCK_MS = 5 * 60 * 1000;
-/** Uma entrada ociosa por mais tempo que isso não interessa mais. */
-const IDLE_TTL_MS = BLOCK_MS * 2;
+export const RATE_LIMIT_MAX_HITS = 15;
+export const RATE_LIMIT_WINDOW_MS = 60_000;
+export const RATE_LIMIT_BLOCK_MS = 5 * 60_000;
 
-/** Chave contada e o número de falhas que a bloqueia. */
-export type LimitKey = { key: string; max: number };
+/** Teto do corpo da requisição: 2 anexos de 10MB em base64 (~13,4MB) + folga. */
+export const MAX_REQUEST_BYTES = 30 * 1024 * 1024;
 
-/** Documento ou login: a trava fechada, de 3 tentativas. */
-export const porIdentificador = (key: string): LimitKey => ({
-  key,
-  max: MAX_POR_IDENTIFICADOR,
-});
-
-/** IP de origem: trava folgada, para não derrubar quem divide o IP. */
-export const porIp = (ip: string | undefined): LimitKey => ({
-  key: `ip:${ip ?? "desconhecido"}`,
-  max: MAX_POR_IP,
-});
-
-type Entry = { attempts: number; blockedUntil: number; touchedAt: number };
+type Entry = {
+  /** Timestamps dos envios dentro da janela deslizante. */
+  hits: number[];
+  /** Enquanto for maior que agora, tudo é recusado. */
+  blockedUntil: number;
+};
 
 const entries = new Map<string, Entry>();
 
-/** Varre as entradas vencidas para o Map não crescer sem limite. */
+/** Entradas paradas há mais de uma janela + um bloqueio não têm mais efeito. */
+const ENTRY_TTL_MS = RATE_LIMIT_WINDOW_MS + RATE_LIMIT_BLOCK_MS;
+
 function sweep(now: number) {
-  for (const [key, entry] of entries) {
-    if (entry.blockedUntil <= now && now - entry.touchedAt > IDLE_TTL_MS) {
-      entries.delete(key);
-    }
+  for (const [ip, entry] of entries) {
+    const lastHit = entry.hits[entry.hits.length - 1] ?? 0;
+    const lastActivity = Math.max(lastHit, entry.blockedUntil);
+    if (now - lastActivity > ENTRY_TTL_MS) entries.delete(ip);
   }
 }
 
-export type RateLimitVerdict = { blocked: false } | { blocked: true; retryAfterSeconds: number };
+// Varredura periódica para o Map não crescer sem limite sob flood distribuído.
+// `unref` para não segurar o event loop e impedir o processo de encerrar.
+const sweepTimer: unknown = setInterval(() => sweep(Date.now()), RATE_LIMIT_WINDOW_MS);
+if (typeof (sweepTimer as { unref?: () => void }).unref === "function") {
+  (sweepTimer as { unref: () => void }).unref();
+}
 
-const veredito = (retryAfterMs: number): RateLimitVerdict =>
-  retryAfterMs > 0
-    ? { blocked: true, retryAfterSeconds: Math.ceil(retryAfterMs / 1000) }
-    : { blocked: false };
+export type RateLimitVerdict = {
+  allowed: boolean;
+  /** Segundos até liberar — vira o header `Retry-After` na resposta 429. */
+  retryAfterSeconds: number;
+};
+
+const ALLOWED: RateLimitVerdict = { allowed: true, retryAfterSeconds: 0 };
 
 /**
- * Verifica as chaves antes de gastar uma tentativa. Devolve o maior tempo
- * restante quando qualquer uma delas está bloqueada.
+ * Contabiliza um envio do IP e devolve o veredito. Chamar uma vez por
+ * requisição: a chamada em si já conta como envio.
  */
-export function checkRateLimit(keys: LimitKey[]): RateLimitVerdict {
-  const now = Date.now();
-  let retryAfterMs = 0;
+export function checkRateLimit(ip: string, now: number = Date.now()): RateLimitVerdict {
+  const entry = entries.get(ip);
 
-  for (const { key } of keys) {
-    const entry = entries.get(key);
-    if (entry && entry.blockedUntil > now) {
-      retryAfterMs = Math.max(retryAfterMs, entry.blockedUntil - now);
-    }
+  if (!entry) {
+    entries.set(ip, { hits: [now], blockedUntil: 0 });
+    return ALLOWED;
   }
 
-  return veredito(retryAfterMs);
-}
-
-/** Conta uma falha nas chaves e bloqueia as que chegarem ao próprio limite. */
-export function registerFailure(keys: LimitKey[]): RateLimitVerdict {
-  const now = Date.now();
-  sweep(now);
-  let retryAfterMs = 0;
-
-  for (const { key, max } of keys) {
-    const current = entries.get(key);
-    // um bloqueio vencido recomeça a contagem do zero
-    const attempts =
-      current && current.blockedUntil <= now && current.attempts >= max
-        ? 1
-        : (current?.attempts ?? 0) + 1;
-    const blockedUntil = attempts >= max ? now + BLOCK_MS : (current?.blockedUntil ?? 0);
-
-    entries.set(key, { attempts, blockedUntil, touchedAt: now });
-    if (blockedUntil > now) retryAfterMs = Math.max(retryAfterMs, blockedUntil - now);
+  if (entry.blockedUntil > now) {
+    return {
+      allowed: false,
+      retryAfterSeconds: Math.ceil((entry.blockedUntil - now) / 1000),
+    };
   }
 
-  return veredito(retryAfterMs);
+  // Saindo de um bloqueio: zera o histórico para o IP recomeçar limpo.
+  if (entry.blockedUntil !== 0) {
+    entry.blockedUntil = 0;
+    entry.hits = [];
+  }
+
+  const windowStart = now - RATE_LIMIT_WINDOW_MS;
+  entry.hits = entry.hits.filter((hit) => hit > windowStart);
+  entry.hits.push(now);
+
+  if (entry.hits.length > RATE_LIMIT_MAX_HITS) {
+    entry.blockedUntil = now + RATE_LIMIT_BLOCK_MS;
+    entry.hits = [];
+    return { allowed: false, retryAfterSeconds: Math.ceil(RATE_LIMIT_BLOCK_MS / 1000) };
+  }
+
+  return ALLOWED;
 }
 
-/** Zera a contagem — chamado quando a tentativa dá certo. */
-export function clearRateLimit(keys: LimitKey[]) {
-  for (const { key } of keys) entries.delete(key);
+/** Usado pelos testes — não chamar em runtime. */
+export function resetRateLimit() {
+  entries.clear();
 }
 
-/** "5 minutos" / "40 segundos", para a mensagem que o cliente lê. */
-export function blockedMessage(retryAfterSeconds: number) {
-  const minutos = Math.ceil(retryAfterSeconds / 60);
-  const tempo =
-    retryAfterSeconds >= 60
-      ? `${minutos} minuto${minutos > 1 ? "s" : ""}`
-      : `${retryAfterSeconds} segundos`;
-  return `Muitas tentativas seguidas. Aguarde ${tempo} e tente de novo.`;
+/**
+ * IP do cliente. O app roda atrás do proxy do EasyPanel, então o primeiro
+ * segmento de `x-forwarded-for` é o endereço real; sem proxy, cai no
+ * `x-real-ip` e por fim numa chave única para não agrupar todo mundo no
+ * mesmo balde por falta de header.
+ */
+export function clientIpFromHeaders(headers: Headers): string {
+  const forwarded = headers.get("x-forwarded-for");
+  const first = forwarded?.split(",")[0]?.trim();
+  if (first) return normalizeIp(first);
+
+  const realIp = headers.get("x-real-ip")?.trim();
+  if (realIp) return normalizeIp(realIp);
+
+  return "unknown";
+}
+
+/** `::ffff:1.2.3.4` e `[::1]:443` são o mesmo cliente que `1.2.3.4` e `::1`. */
+function normalizeIp(value: string): string {
+  let ip = value;
+  if (ip.startsWith("[")) ip = ip.slice(1, ip.indexOf("]") === -1 ? undefined : ip.indexOf("]"));
+  if (ip.startsWith("::ffff:")) ip = ip.slice("::ffff:".length);
+  // Porta em IPv4 (`1.2.3.4:5678`) — IPv6 nu tem vários ":" e fica como está.
+  const colon = ip.indexOf(":");
+  if (colon !== -1 && ip.indexOf(":", colon + 1) === -1) ip = ip.slice(0, colon);
+  return ip.toLowerCase();
 }

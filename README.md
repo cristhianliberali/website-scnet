@@ -305,12 +305,21 @@ de 32 caracteres) nenhum login é aceito, e o servidor registra o motivo. É o
 oposto do `WEBHOOK_URL` dos formulários, que sem configuração deixa passar: um
 login que passa por falta de configuração é um login que qualquer um atravessa.
 
-**Tentativas.** Três falhas seguidas no mesmo documento ou login bloqueiam
-aquele acesso por 5 minutos. O IP de origem também é contado, porém com limite
-bem mais folgado (15), porque no Brasil vários clientes saem pelo mesmo IP
-público (CGNAT das operadoras móveis, NAT de empresas e condomínios) — travar o
-IP em 3 deixaria vizinhos de fora por causa de um só. O contador vive na memória
-do processo: reiniciar o container ou rodar duas instâncias zera a contagem.
+**Tentativas.** Duas travas independentes valem no `/cliente`, e é bom não
+confundi-las:
+
+- `src/lib/tentativas-login.ts` conta só as tentativas que **falharam**, por
+  credencial: três erros no mesmo documento ou login bloqueiam aquele acesso por
+  5 minutos. É a trava contra adivinhar senha. O IP também é contado aqui, com
+  limite bem mais folgado (15 falhas), porque no Brasil vários clientes saem
+  pelo mesmo IP público (CGNAT das operadoras móveis, NAT de empresas e
+  condomínios) — travar o IP em 3 deixaria vizinhos de fora por causa de um só.
+- `src/lib/rate-limit.ts` é o throttle de volume por IP descrito em "Limite de
+  envios por IP", aplicado pelo middleware a toda server function que muda
+  estado, inclusive as de login.
+
+Os dois contadores vivem na memória do processo: reiniciar o container ou rodar
+duas instâncias zera a contagem.
 
 Os eventos e o formato das respostas esperadas do n8n estão documentados no
 `.env.example`, junto das três variáveis novas (`WEBHOOK_PAINEL_CLIENTE`,
@@ -318,6 +327,74 @@ Os eventos e o formato das respostas esperadas do n8n estão documentados no
 EasyPanel entram como Environment Variables, nunca como Build Args.
 
 This project was built with [Lovable](https://lovable.dev).
+
+## Segurança dos formulários e do webhook
+
+Os dois formulários (lead da home e as 4 etapas de `/contratacao`) são server
+functions do TanStack Start, ou seja, endpoints HTTP públicos em `/_serverFn/…`.
+Qualquer um pode postar neles direto, sem passar pelo navegador — então nada que
+chega do cliente é tratado como confiável.
+
+### Limite de envios por IP
+
+`src/lib/rate-limit.ts`, aplicado em `src/start.ts` antes do parse do corpo:
+
+- **15 envios por minuto por IP** (janela deslizante).
+- Ao estourar, **5 minutos de bloqueio** (HTTP 429 + `Retry-After`). O bloqueio
+  não é renovado por novas tentativas — expira 5 minutos após o estouro.
+- Corpo acima de **30MB** é recusado com 413 sem ser lido.
+- Só vale para `serverFn`; navegação e assets não são limitados.
+- Dentro de `serverFn`, contam só as que **mudam estado** (POST). As de leitura
+  (`fetchPlanos`, `getSessaoCliente`) rodam a cada navegação — home, contratação
+  e toda página da área do cliente chamam uma delas —, então contá-las gastaria
+  a cota só navegando. Não recebem corpo nem disparam webhook.
+
+O contador vive na memória do processo. A instância única do `Dockerfile` está
+coberta; **com réplicas, cada uma teria seu próprio contador** e o store
+precisaria ir para um Redis compartilhado. Operadoras móveis usam CGNAT, então
+vários clientes podem compartilhar um IP — 15/min tolera isso com folga para um
+formulário de 4 etapas, e quem for barrado cai no redirecionamento para o
+WhatsApp que já existe.
+
+### Anexos
+
+`src/lib/attachment-validation.ts`, usado pelo servidor e pelo formulário:
+
+- MIME em allowlist (PDF, PNG, JPEG) e **máximo 2 anexos**.
+- Tamanho **recalculado do base64**, teto de 10MB — o `tamanho` informado pelo
+  cliente é descartado.
+- **Magic bytes** conferidos contra o MIME declarado: um `.exe`, HTML ou script
+  renomeado para `.pdf` é recusado.
+- Nome do arquivo saneado e com a **extensão reescrita a partir do MIME**, o que
+  fecha path traversal (`../../shell.php`), dupla extensão (`doc.pdf.exe`),
+  caracteres de controle e marcas bidi do Unicode.
+
+### reCAPTCHA
+
+Sem `RECAPTCHA_SECRET_KEY` a verificação fica desligada (dev local). Com a chave
+configurada ela é **obrigatória**: requisição sem token, com token inválido ou
+com token de outra `action`/hostname é recusada. Só o Google estar fora do ar
+libera o envio — ver o comentário em `.env.example`.
+
+### Webhook (n8n)
+
+Em produção o envio **não sai sem `WEBHOOK_TOKEN`**. O nó do n8n precisa exigir
+o header `Authorization`, e deve revalidar do seu lado o nome, o tipo e o
+tamanho dos anexos antes de gravar qualquer coisa: um webhook alcançável por URL
+não pode depender só do bom comportamento de quem chama.
+
+Campos de texto livre que seguem para o n8n recebem um apóstrofo à frente quando
+começam com `=`, `+`, `-` ou `@`, para não virarem fórmula se o fluxo gravar em
+planilha.
+
+### Testes
+
+```sh
+bun run test
+```
+
+Cobrem a janela do rate limit, o bloqueio de 5 minutos, o isolamento por IP e
+cada vetor de anexo malicioso.
 
 ## Build with Lovable
 

@@ -13,19 +13,25 @@
  *    liberado.
  */
 
-import { getRequestIP } from "@tanstack/react-start/server";
+import { getRequest } from "@tanstack/react-start/server";
 import { randomUUID } from "node:crypto";
 
-import { isLikelyBot, verifyRecaptcha, type RecaptchaResult } from "./verify-recaptcha";
-import { postToPainelWebhook, type WebhookOutcomeWithData } from "./webhook";
 import {
-  blockedMessage,
-  checkRateLimit,
-  clearRateLimit,
+  isLikelyBot,
+  recaptchaScore,
+  verifyRecaptcha,
+  type RecaptchaVerdict,
+} from "./verify-recaptcha";
+import { postToPainelWebhook, type WebhookOutcomeWithData } from "./webhook";
+import { clientIpFromHeaders } from "./rate-limit";
+import {
+  checkTentativas,
+  limparTentativas,
+  mensagemDeBloqueio,
   porIdentificador,
   porIp,
-  registerFailure,
-} from "./rate-limit";
+  registrarFalha,
+} from "./tentativas-login";
 import {
   gravarDesafio,
   gravarSessao,
@@ -147,20 +153,21 @@ function lerNomeCliente(data: Record<string, unknown>): string {
 type Evento =
   "documento_cliente" | "acesso_sac" | "envio_codigo" | "verificacao_codigo" | "solicitacao_login";
 
-function envelope(evento: Evento, dados: Record<string, unknown>, recaptcha: RecaptchaResult) {
+function envelope(evento: Evento, dados: Record<string, unknown>, recaptcha: RecaptchaVerdict) {
   return {
     evento,
     id_sessao: randomUUID(),
     id_requisicao: randomUUID(),
     page: "/cliente",
     submitted_at: new Date().toISOString(),
-    recaptcha_score: recaptcha?.score ?? null,
+    recaptcha_score: recaptchaScore(recaptcha),
     dados,
   };
 }
 
 /** IP de origem, atrás do proxy do EasyPanel. */
-const chaveIp = () => porIp(getRequestIP({ xForwardedFor: true }));
+const ipOrigem = () => clientIpFromHeaders(getRequest().headers);
+const chaveIp = () => porIp(ipOrigem());
 
 const erro = (mensagem: string): LoginErro => ({ ok: false, mensagem });
 
@@ -214,10 +221,10 @@ export async function iniciarAcessoDocumentoServer(
   const documento = onlyDigits(data.documento);
   const chaves = [porIdentificador(`documento:${documento}`), chaveIp()];
 
-  const bloqueio = checkRateLimit(chaves);
-  if (bloqueio.blocked) return erro(blockedMessage(bloqueio.retryAfterSeconds));
+  const bloqueio = checkTentativas(chaves);
+  if (bloqueio.blocked) return erro(mensagemDeBloqueio(bloqueio.retryAfterSeconds));
 
-  const recaptcha = await verifyRecaptcha(data.recaptchaToken);
+  const recaptcha = await verifyRecaptcha(data.recaptchaToken, "cliente_documento", ipOrigem());
   if (isLikelyBot(recaptcha)) {
     console.error("Acesso por documento bloqueado pelo reCAPTCHA");
     return erro(ERRO_ROBO);
@@ -229,8 +236,8 @@ export async function iniciarAcessoDocumentoServer(
   );
 
   if (!resultado.ok) {
-    const falha = registerFailure(chaves);
-    if (falha.blocked) return erro(blockedMessage(falha.retryAfterSeconds));
+    const falha = registrarFalha(chaves);
+    if (falha.blocked) return erro(mensagemDeBloqueio(falha.retryAfterSeconds));
     return erro(mensagemDeFalha(resultado, ERRO_GENERICO));
   }
 
@@ -258,7 +265,7 @@ export async function iniciarAcessoDocumentoServer(
     throw err;
   }
 
-  clearRateLimit(chaves);
+  limparTentativas(chaves);
   return { ok: true, mensagem: resultado.message, canais, contatos };
 }
 
@@ -274,10 +281,10 @@ export async function enviarCodigoServer(data: CanalInput): Promise<MensagemOk |
   }
 
   const chaves = [porIdentificador(`envio:${desafio.idCliente}`), chaveIp()];
-  const bloqueio = checkRateLimit(chaves);
-  if (bloqueio.blocked) return erro(blockedMessage(bloqueio.retryAfterSeconds));
+  const bloqueio = checkTentativas(chaves);
+  if (bloqueio.blocked) return erro(mensagemDeBloqueio(bloqueio.retryAfterSeconds));
 
-  const recaptcha = await verifyRecaptcha(data.recaptchaToken);
+  const recaptcha = await verifyRecaptcha(data.recaptchaToken, "cliente_envio_codigo", ipOrigem());
   if (isLikelyBot(recaptcha)) return erro(ERRO_ROBO);
 
   const resultado = await postToPainelWebhook(
@@ -290,8 +297,8 @@ export async function enviarCodigoServer(data: CanalInput): Promise<MensagemOk |
   );
 
   if (!resultado.ok) {
-    const falha = registerFailure(chaves);
-    if (falha.blocked) return erro(blockedMessage(falha.retryAfterSeconds));
+    const falha = registrarFalha(chaves);
+    if (falha.blocked) return erro(mensagemDeBloqueio(falha.retryAfterSeconds));
     return erro(mensagemDeFalha(resultado, ERRO_GENERICO));
   }
 
@@ -318,10 +325,14 @@ export async function verificarCodigoServer(
   if (!desafio.canalEscolhido) return erro("Escolha antes por onde receber o código.");
 
   const chaves = [porIdentificador(`codigo:${desafio.idCliente}`), chaveIp()];
-  const bloqueio = checkRateLimit(chaves);
-  if (bloqueio.blocked) return erro(blockedMessage(bloqueio.retryAfterSeconds));
+  const bloqueio = checkTentativas(chaves);
+  if (bloqueio.blocked) return erro(mensagemDeBloqueio(bloqueio.retryAfterSeconds));
 
-  const recaptcha = await verifyRecaptcha(data.recaptchaToken);
+  const recaptcha = await verifyRecaptcha(
+    data.recaptchaToken,
+    "cliente_verificacao_codigo",
+    ipOrigem(),
+  );
   if (isLikelyBot(recaptcha)) return erro(ERRO_ROBO);
 
   const resultado = await postToPainelWebhook(
@@ -339,12 +350,12 @@ export async function verificarCodigoServer(
   );
 
   if (!resultado.ok) {
-    const falha = registerFailure(chaves);
+    const falha = registrarFalha(chaves);
     // o desafio pode ter expirado nesse meio-tempo; o bloqueio acima já responde
     await gravarDesafio({ ...desafio, tentativas: desafio.tentativas + 1 }).catch(() => {});
     if (falha.blocked) {
       await limparDesafio();
-      return erro(blockedMessage(falha.retryAfterSeconds));
+      return erro(mensagemDeBloqueio(falha.retryAfterSeconds));
     }
     return erro(mensagemDeFalha(resultado, ERRO_CODIGO));
   }
@@ -363,7 +374,7 @@ export async function verificarCodigoServer(
   }
 
   await limparDesafio();
-  clearRateLimit(chaves);
+  limparTentativas(chaves);
   return { ok: true, mensagem: resultado.message, nome };
 }
 
@@ -374,10 +385,10 @@ export async function acessarSacServer(data: SacInput): Promise<LoginConcluido |
   const login = data.login.trim();
   const chaves = [porIdentificador(`sac:${login.toLowerCase()}`), chaveIp()];
 
-  const bloqueio = checkRateLimit(chaves);
-  if (bloqueio.blocked) return erro(blockedMessage(bloqueio.retryAfterSeconds));
+  const bloqueio = checkTentativas(chaves);
+  if (bloqueio.blocked) return erro(mensagemDeBloqueio(bloqueio.retryAfterSeconds));
 
-  const recaptcha = await verifyRecaptcha(data.recaptchaToken);
+  const recaptcha = await verifyRecaptcha(data.recaptchaToken, "cliente_sac", ipOrigem());
   if (isLikelyBot(recaptcha)) return erro(ERRO_ROBO);
 
   const resultado = await postToPainelWebhook(
@@ -386,8 +397,8 @@ export async function acessarSacServer(data: SacInput): Promise<LoginConcluido |
   );
 
   if (!resultado.ok) {
-    const falha = registerFailure(chaves);
-    if (falha.blocked) return erro(blockedMessage(falha.retryAfterSeconds));
+    const falha = registrarFalha(chaves);
+    if (falha.blocked) return erro(mensagemDeBloqueio(falha.retryAfterSeconds));
     return erro(mensagemDeFalha(resultado, ERRO_CREDENCIAIS));
   }
 
@@ -411,7 +422,7 @@ export async function acessarSacServer(data: SacInput): Promise<LoginConcluido |
     throw err;
   }
 
-  clearRateLimit(chaves);
+  limparTentativas(chaves);
   return { ok: true, mensagem: resultado.message, nome };
 }
 
@@ -424,10 +435,14 @@ export async function solicitarLoginServer(
   const documento = onlyDigits(data.documento);
   const chaves = [porIdentificador(`solicitacao:${documento}`), chaveIp()];
 
-  const bloqueio = checkRateLimit(chaves);
-  if (bloqueio.blocked) return erro(blockedMessage(bloqueio.retryAfterSeconds));
+  const bloqueio = checkTentativas(chaves);
+  if (bloqueio.blocked) return erro(mensagemDeBloqueio(bloqueio.retryAfterSeconds));
 
-  const recaptcha = await verifyRecaptcha(data.recaptchaToken);
+  const recaptcha = await verifyRecaptcha(
+    data.recaptchaToken,
+    "cliente_solicitacao_login",
+    ipOrigem(),
+  );
   if (isLikelyBot(recaptcha)) return erro(ERRO_ROBO);
 
   const resultado = await postToPainelWebhook(
@@ -440,12 +455,12 @@ export async function solicitarLoginServer(
   );
 
   if (!resultado.ok) {
-    const falha = registerFailure(chaves);
-    if (falha.blocked) return erro(blockedMessage(falha.retryAfterSeconds));
+    const falha = registrarFalha(chaves);
+    if (falha.blocked) return erro(mensagemDeBloqueio(falha.retryAfterSeconds));
     return erro(mensagemDeFalha(resultado, ERRO_GENERICO));
   }
 
-  clearRateLimit(chaves);
+  limparTentativas(chaves);
   return {
     ok: true,
     mensagem: mensagemDoWebhook(
