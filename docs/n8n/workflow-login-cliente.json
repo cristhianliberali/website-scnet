@@ -1,0 +1,961 @@
+{
+  "name": "SCNET — Login da área do cliente",
+  "nodes": [
+    {
+      "id": "scnet-001",
+      "name": "Webhook Login",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        -1200,
+        400
+      ],
+      "webhookId": "TROQUE-POR-UM-UUID-SEU",
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "TROQUE-POR-UM-UUID-SEU",
+        "authentication": "headerAuth",
+        "responseMode": "responseNode",
+        "options": {
+          "rawBody": true
+        }
+      }
+    },
+    {
+      "id": "scnet-002",
+      "name": "Validar assinatura",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -980,
+        400
+      ],
+      "parameters": {
+        "jsCode": "/*\n * Porteiro do webhook: confere o Bearer (que o nó Webhook já validou), a\n * assinatura HMAC do corpo e a idade do timestamp.\n *\n * Por que assinar, se já tem o Bearer: o Bearer prova que quem chamou conhece\n * o token; a assinatura prova que o CORPO não foi alterado no caminho e que\n * esta requisição não é a repetição de uma anterior capturada. Sem a janela de\n * 5 minutos, uma requisição gravada valeria para sempre.\n */\nconst crypto = require('crypto');\n\nconst TOKEN = $env.WEBHOOK_LOGIN_TOKEN; // a MESMA string do site\nconst TOLERANCIA_SEGUNDOS = 300;\n\nconst item = $input.first();\nconst headers = item.json.headers ?? {};\n\nconst recusar = (motivo) => [{ json: { assinatura_ok: false, motivo } }];\n\nif (!TOKEN) return recusar('token_nao_configurado_no_n8n');\n\n/*\n * O corpo CRU, byte a byte. O site assinou estes bytes exatos, então\n * reserializar o JSON (JSON.stringify do objeto já parseado) muda espaços e\n * escapes e quebra o HMAC. Por isso o nó Webhook precisa estar com\n * \"Raw Body\" ligado.\n */\nlet bruto;\nconst bin = item.binary?.data;\nif (bin?.data) {\n  bruto = Buffer.from(bin.data, 'base64').toString('utf8');\n} else if (bin) {\n  bruto = (await this.helpers.getBinaryDataBuffer(0, 'data')).toString('utf8');\n} else {\n  // Raw Body desligado: dá para seguir, mas a assinatura fica frágil.\n  bruto = JSON.stringify(item.json.body ?? {});\n}\n\nconst timestamp = String(headers['x-scnet-timestamp'] ?? '');\nconst assinatura = String(headers['x-scnet-assinatura'] ?? '');\nif (!timestamp || !assinatura) return recusar('headers_de_assinatura_ausentes');\n\nif (!/^\\d+$/.test(timestamp)) return recusar('timestamp_invalido');\nconst idade = Math.abs(Math.floor(Date.now() / 1000) - Number(timestamp));\nif (idade > TOLERANCIA_SEGUNDOS) return recusar('timestamp_fora_da_janela');\n\nconst esperada = crypto\n  .createHmac('sha256', TOKEN)\n  .update(timestamp + '.' + bruto)\n  .digest('hex');\n\n// Comparação de tempo constante: um `===` vaza, pelo tempo de resposta, quantos\n// caracteres iniciais bateram, e isso é o bastante para adivinhar a assinatura.\nconst a = Buffer.from(esperada, 'utf8');\nconst b = Buffer.from(assinatura, 'utf8');\nif (a.length !== b.length || !crypto.timingSafeEqual(a, b)) {\n  return recusar('assinatura_invalida');\n}\n\nlet payload;\ntry {\n  payload = JSON.parse(bruto);\n} catch {\n  return recusar('corpo_nao_e_json');\n}\n\nreturn [{ json: { assinatura_ok: true, ...payload } }];"
+      }
+    },
+    {
+      "id": "scnet-004",
+      "name": "Assinatura válida?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -760,
+        400
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "scnet-003",
+              "leftValue": "={{ $json.assinatura_ok }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "scnet-005",
+      "name": "Recusar (401)",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        -540,
+        620
+      ],
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ status: 'erro', mensagem: 'Requisição não autorizada.' }) }}",
+        "options": {
+          "responseCode": 401
+        }
+      }
+    },
+    {
+      "id": "scnet-010",
+      "name": "Rotear evento",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.2,
+      "position": [
+        -540,
+        300
+      ],
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "scnet-006",
+                    "leftValue": "={{ $json.evento }}",
+                    "rightValue": "documento_cliente",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "documento_cliente"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "scnet-007",
+                    "leftValue": "={{ $json.evento }}",
+                    "rightValue": "envio_codigo",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "envio_codigo"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "scnet-008",
+                    "leftValue": "={{ $json.evento }}",
+                    "rightValue": "verificacao_codigo",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "verificacao_codigo"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "scnet-009",
+                    "leftValue": "={{ $json.evento }}",
+                    "rightValue": "solicitacao_login",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "solicitacao_login"
+            }
+          ]
+        },
+        "options": {
+          "fallbackOutput": "extra",
+          "renameFallbackOutput": "desconhecido"
+        }
+      }
+    },
+    {
+      "id": "scnet-011",
+      "name": "Evento desconhecido",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        -100,
+        900
+      ],
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ status: 'erro', mensagem: 'Evento não reconhecido.' }) }}",
+        "options": {
+          "responseCode": 200
+        }
+      }
+    },
+    {
+      "id": "scnet-012",
+      "name": "Buscar cliente por documento",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        -100,
+        -60
+      ],
+      "alwaysOutputData": true,
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT id_cliente, nome, celular, email\n  FROM public.clientes_web\n WHERE documento = $1\n LIMIT 1;",
+        "options": {
+          "queryReplacement": "={{ $json.dados.documento }}"
+        }
+      }
+    },
+    {
+      "id": "scnet-013",
+      "name": "Montar canais",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        180,
+        -60
+      ],
+      "parameters": {
+        "jsCode": "/*\n * Resposta do evento `documento_cliente`.\n *\n * O site exige `id_cliente` aqui: é o único momento em que o n8n diz de quem é\n * o login. Daqui em diante esse id viaja no cookie selado do site, não no\n * formulário, então ninguém troca de cliente no meio do caminho.\n */\nconst cliente = $input.first()?.json ?? {};\n\nif (!cliente.id_cliente) {\n  // Mensagem propositalmente vaga: dizer \"documento não cadastrado\" confirma,\n  // a quem só sabe testar CPFs, quais deles são clientes.\n  return [\n    {\n      json: {\n        status: 'erro',\n        mensagem: 'Não conseguimos localizar esse documento. Confira e tente de novo.',\n      },\n    },\n  ];\n}\n\nconst celular = String(cliente.celular ?? '').replace(/\\D/g, '');\nconst email = String(cliente.email ?? '').trim();\n\n// 10 dígitos = fixo com DDD; 11 = celular. Menos que isso não dá para enviar.\nconst temCelular = celular.length >= 10;\nconst temEmail = /^[^\\s@]+@[^\\s@]+\\.[^\\s@]{2,}$/.test(email);\n\n/*\n * Os contatos vão INTEIROS: o site mascara antes de mandar à tela\n * (\"(49)*******234\", \"ma*****@e****.com\"). Mascarar aqui também não faz mal —\n * ele detecta o \"*\" e não mexe — mas não é necessário.\n *\n * Se nenhum canal for `true`, o site mostra um aviso pedindo que o cliente\n * procure o atendimento, em vez de travar numa tela sem opção.\n */\nreturn [\n  {\n    json: {\n      status: 'ok',\n      id_cliente: String(cliente.id_cliente),\n      canais: { sms: temCelular, whatsapp: temCelular, email: temEmail },\n      contatos: {\n        ...(temCelular ? { celular } : {}),\n        ...(temEmail ? { email } : {}),\n      },\n    },\n  },\n];"
+      }
+    },
+    {
+      "id": "scnet-014",
+      "name": "Responder documento",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        460,
+        -60
+      ],
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify($json) }}",
+        "options": {
+          "responseCode": 200
+        }
+      }
+    },
+    {
+      "id": "scnet-015",
+      "name": "Gerar código",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -100,
+        200
+      ],
+      "parameters": {
+        "jsCode": "/*\n * Evento `envio_codigo`: gera o código de 6 dígitos.\n *\n * O site nunca vê o código — ele só pede o envio e, depois, manda o que o\n * cliente digitou para conferência. Quem gera, envia e guarda é o n8n.\n */\nconst crypto = require('crypto');\n\nconst envelope = $('Validar assinatura').first().json;\nconst dados = envelope.dados ?? {};\n\n// randomInt é do gerador criptográfico. Math.random() é previsível e não serve\n// para nada que autentica alguém.\nconst codigo = String(crypto.randomInt(0, 1000000)).padStart(6, '0');\n\n/*\n * No banco fica só o hash. Um código de 6 dígitos tem 1 milhão de\n * possibilidades — o SHA-256 aqui não impede quebrá-lo por força bruta offline,\n * mas impede que quem abrir a tabela leia os códigos vivos e entre nas contas\n * antes de eles expirarem, que é o risco real com validade de 5 minutos.\n */\nconst codigoHash = crypto.createHash('sha256').update(codigo).digest('hex');\n\nreturn [\n  {\n    json: {\n      id_cliente: String(dados.id_cliente ?? ''),\n      documento: String(dados.documento ?? ''),\n      metodo: String(dados.metodo ?? ''),\n      codigo, // só para o nó de envio; não vai ao banco nem à resposta\n      codigo_hash: codigoHash,\n    },\n  },\n];"
+      }
+    },
+    {
+      "id": "scnet-016",
+      "name": "Guardar código",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        180,
+        200
+      ],
+      "alwaysOutputData": true,
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "-- Um comando só, para não deixar meio caminho gravado se algo falhar:\n-- confere o par cliente/documento, invalida os códigos anteriores e grava\n-- o novo. Sem cliente correspondente, nada é inserido e nenhum código sai.\nWITH cliente AS (\n  SELECT id_cliente FROM public.clientes_web\n   WHERE id_cliente = $1 AND documento = $2\n), invalidados AS (\n  UPDATE public.web_codigos_acesso SET usado_em = now()\n   WHERE id_cliente = $1 AND usado_em IS NULL\n     AND EXISTS (SELECT 1 FROM cliente)\n)\nINSERT INTO public.web_codigos_acesso\n       (id_cliente, documento, metodo, codigo_hash, expira_em)\nSELECT $1, $2, $3, $4, now() + interval '5 minutes' FROM cliente\nRETURNING id;",
+        "options": {
+          "queryReplacement": "={{ $json.id_cliente }}, {{ $json.documento }}, {{ $json.metodo }}, {{ $json.codigo_hash }}"
+        }
+      }
+    },
+    {
+      "id": "scnet-018",
+      "name": "Código gravado?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        460,
+        200
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "scnet-017",
+              "leftValue": "={{ $json.id != null }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "scnet-019",
+      "name": "Enviar código — CONFIGURE AQUI",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        740,
+        120
+      ],
+      "parameters": {}
+    },
+    {
+      "id": "scnet-020",
+      "name": "Responder envio",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        1020,
+        120
+      ],
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ status: 'ok', mensagem: 'Código enviado. Ele vale por 5 minutos.' }) }}",
+        "options": {
+          "responseCode": 200
+        }
+      }
+    },
+    {
+      "id": "scnet-021",
+      "name": "Responder envio recusado",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        740,
+        300
+      ],
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ status: 'erro', mensagem: 'Não foi possível enviar o código agora. Fale com nosso atendimento.' }) }}",
+        "options": {
+          "responseCode": 200
+        }
+      }
+    },
+    {
+      "id": "scnet-022",
+      "name": "Hash do código",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -100,
+        480
+      ],
+      "parameters": {
+        "jsCode": "/*\n * Evento `verificacao_codigo`: transforma o código digitado no mesmo hash que\n * foi gravado no envio, para a query comparar hash com hash.\n *\n * Isso é um nó de código, e não uma expressão no nó Postgres, porque as\n * expressões do n8n rodam num sandbox sem `require` — não há como chamar o\n * módulo crypto de dentro delas.\n */\nconst crypto = require('crypto');\n\nconst dados = $input.first().json.dados ?? {};\nconst codigo = String(dados.codigo ?? '').replace(/\\D/g, '');\n\nreturn [\n  {\n    json: {\n      id_cliente: String(dados.id_cliente ?? ''),\n      documento: String(dados.documento ?? ''),\n      codigo_hash: crypto.createHash('sha256').update(codigo).digest('hex'),\n    },\n  },\n];"
+      }
+    },
+    {
+      "id": "scnet-023",
+      "name": "Conferir código",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        180,
+        480
+      ],
+      "alwaysOutputData": true,
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "-- Tudo em uma instrução, de propósito: escolher o código, contar a\n-- tentativa e marcá-lo como usado em comandos separados abriria a janela\n-- em que dois envios simultâneos gastam o mesmo código.\nWITH alvo AS (\n  SELECT id, codigo_hash FROM public.web_codigos_acesso\n   WHERE id_cliente = $1 AND documento = $2\n     AND usado_em IS NULL AND expira_em > now() AND tentativas < 5\n   ORDER BY criado_em DESC LIMIT 1\n), marcado AS (\n  UPDATE public.web_codigos_acesso c\n     SET tentativas = c.tentativas + 1,\n         usado_em = CASE WHEN a.codigo_hash = $3 THEN now() ELSE c.usado_em END\n    FROM alvo a WHERE c.id = a.id\n  RETURNING (a.codigo_hash = $3) AS confere\n)\nSELECT COALESCE((SELECT confere FROM marcado), false) AS confere,\n       (SELECT nome FROM public.clientes_web WHERE id_cliente = $1) AS nome;",
+        "options": {
+          "queryReplacement": "={{ $json.id_cliente }}, {{ $json.documento }}, {{ $json.codigo_hash }}"
+        }
+      }
+    },
+    {
+      "id": "scnet-024",
+      "name": "Avaliar código",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        460,
+        480
+      ],
+      "parameters": {
+        "jsCode": "/*\n * Resposta do evento `verificacao_codigo` — o momento em que o acesso é ou não\n * concedido.\n *\n * Quem decidiu foi a query do nó anterior, em uma única instrução: ela pega o\n * código mais recente ainda válido do cliente, soma uma tentativa e só o marca\n * como usado se o hash bater. Fazer isso em um comando só evita a corrida em\n * que dois envios simultâneos gastam o mesmo código.\n */\nconst r = $input.first()?.json ?? {};\n\nif (r.confere === true) {\n  return [\n    {\n      json: {\n        status: 'ok',\n        cliente: { nome: r.nome || 'cliente' },\n      },\n    },\n  ];\n}\n\n/*\n * Uma única mensagem para código errado, expirado e tentativas esgotadas. As\n * três diferem para quem está atacando — \"expirado\" confirma que o código\n * existiu — e não mudam nada para o cliente, que precisa da mesma coisa nos\n * três casos: pedir outro.\n */\nreturn [\n  {\n    json: {\n      status: 'erro',\n      mensagem: 'Código inválido ou expirado. Peça um novo código.',\n    },\n  },\n];"
+      }
+    },
+    {
+      "id": "scnet-025",
+      "name": "Responder verificação",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        740,
+        480
+      ],
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify($json) }}",
+        "options": {
+          "responseCode": 200
+        }
+      }
+    },
+    {
+      "id": "scnet-026",
+      "name": "Buscar cliente (solicitação)",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        -100,
+        740
+      ],
+      "alwaysOutputData": true,
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT id_cliente, nome, celular, email, supabase_user_id\n  FROM public.clientes_web\n WHERE documento = $1\n LIMIT 1;",
+        "options": {
+          "queryReplacement": "={{ $json.dados.documento }}"
+        }
+      }
+    },
+    {
+      "id": "scnet-027",
+      "name": "Preparar credencial",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        180,
+        740
+      ],
+      "parameters": {
+        "jsCode": "/*\n * Evento `solicitacao_login` (\"Esqueci minha senha\").\n *\n * É a ponte entre os dois provedores: o cadastro está aqui, mas quem guarda a\n * senha é o Supabase. Então geramos uma senha nova, gravamos no Supabase pela\n * chave de serviço e mandamos ao cliente pelo canal que ele escolheu.\n *\n * `acao` decide o caminho no Switch seguinte:\n *   nada       documento não encontrado — respondemos ok assim mesmo\n *   criar      cliente sem usuário no Supabase ainda\n *   atualizar  já tem usuário, só troca a senha\n */\nconst crypto = require('crypto');\n\nconst envelope = $('Validar assinatura').first().json;\nconst dados = envelope.dados ?? {};\nconst cliente = $input.first()?.json ?? {};\n\nconst encontrado = Boolean(cliente.id_cliente);\n\n// 12 caracteres do gerador criptográfico. base64url não tem \"+\", \"/\" nem \"=\",\n// que quebram ao serem copiados de uma mensagem de WhatsApp.\nconst senha = crypto.randomBytes(9).toString('base64url');\n\nconst celular = String(cliente.celular ?? '').replace(/\\D/g, '');\nconst email = String(cliente.email ?? '').trim().toLowerCase();\n\n// O Supabase guarda telefone em E.164. O DDI 55 é acrescentado quando o\n// cadastro traz só DDD + número.\nconst telefoneE164 = celular\n  ? '+' + (celular.startsWith('55') && celular.length > 11 ? celular : '55' + celular)\n  : null;\n\nreturn [\n  {\n    json: {\n      acao: !encontrado ? 'nada' : cliente.supabase_user_id ? 'atualizar' : 'criar',\n      id_cliente: encontrado ? String(cliente.id_cliente) : null,\n      supabase_user_id: cliente.supabase_user_id ?? null,\n      nome: cliente.nome ?? 'cliente',\n      documento: String(dados.documento ?? ''),\n      metodo: String(dados.metodo ?? 'whatsapp'),\n      email: email || null,\n      celular: celular || null,\n      telefone_e164: telefoneE164,\n      senha,\n    },\n  },\n];"
+      }
+    },
+    {
+      "id": "scnet-031",
+      "name": "Ação no Supabase",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.2,
+      "position": [
+        460,
+        740
+      ],
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "scnet-028",
+                    "leftValue": "={{ $json.acao }}",
+                    "rightValue": "criar",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "criar"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "scnet-029",
+                    "leftValue": "={{ $json.acao }}",
+                    "rightValue": "atualizar",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "atualizar"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "scnet-030",
+                    "leftValue": "={{ $json.acao }}",
+                    "rightValue": "nada",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "nada"
+            }
+          ]
+        },
+        "options": {
+          "fallbackOutput": "extra",
+          "renameFallbackOutput": "outra"
+        }
+      }
+    },
+    {
+      "id": "scnet-032",
+      "name": "Supabase: criar usuário",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        740,
+        640
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.SUPABASE_URL }}/auth/v1/admin/users",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "={{ $env.SUPABASE_SERVICE_ROLE_KEY }}"
+            },
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $env.SUPABASE_SERVICE_ROLE_KEY }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify(Object.assign( { password: $json.senha, email_confirm: true, phone_confirm: true,   app_metadata: { id_cliente: $json.id_cliente, nome: $json.nome, documento: $json.documento } }, $json.email ? { email: $json.email } : {}, $json.telefone_e164 ? { phone: $json.telefone_e164 } : {})) }}",
+        "options": {}
+      }
+    },
+    {
+      "id": "scnet-033",
+      "name": "Guardar supabase_user_id",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        1020,
+        640
+      ],
+      "alwaysOutputData": true,
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE public.clientes_web SET supabase_user_id = $1 WHERE id_cliente = $2;",
+        "options": {
+          "queryReplacement": "={{ $json.id }}, {{ $('Preparar credencial').first().json.id_cliente }}"
+        }
+      }
+    },
+    {
+      "id": "scnet-034",
+      "name": "Supabase: redefinir senha",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        740,
+        820
+      ],
+      "parameters": {
+        "method": "PUT",
+        "url": "={{ $env.SUPABASE_URL }}/auth/v1/admin/users/{{ $json.supabase_user_id }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "={{ $env.SUPABASE_SERVICE_ROLE_KEY }}"
+            },
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $env.SUPABASE_SERVICE_ROLE_KEY }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ password: $json.senha }) }}",
+        "options": {}
+      }
+    },
+    {
+      "id": "scnet-035",
+      "name": "Enviar dados de acesso — CONFIGURE AQUI",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        1300,
+        740
+      ],
+      "parameters": {}
+    },
+    {
+      "id": "scnet-036",
+      "name": "Responder solicitação",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        1580,
+        740
+      ],
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ status: 'ok', mensagem: 'Se o documento estiver no nosso cadastro, seus dados de acesso foram enviados.' }) }}",
+        "options": {
+          "responseCode": 200
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Webhook Login": {
+      "main": [
+        [
+          {
+            "node": "Validar assinatura",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validar assinatura": {
+      "main": [
+        [
+          {
+            "node": "Assinatura válida?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Assinatura válida?": {
+      "main": [
+        [
+          {
+            "node": "Rotear evento",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Recusar (401)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Rotear evento": {
+      "main": [
+        [
+          {
+            "node": "Buscar cliente por documento",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Gerar código",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Hash do código",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Buscar cliente (solicitação)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Evento desconhecido",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Buscar cliente por documento": {
+      "main": [
+        [
+          {
+            "node": "Montar canais",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Montar canais": {
+      "main": [
+        [
+          {
+            "node": "Responder documento",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gerar código": {
+      "main": [
+        [
+          {
+            "node": "Guardar código",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Guardar código": {
+      "main": [
+        [
+          {
+            "node": "Código gravado?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Código gravado?": {
+      "main": [
+        [
+          {
+            "node": "Enviar código — CONFIGURE AQUI",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Responder envio recusado",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Enviar código — CONFIGURE AQUI": {
+      "main": [
+        [
+          {
+            "node": "Responder envio",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Hash do código": {
+      "main": [
+        [
+          {
+            "node": "Conferir código",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Conferir código": {
+      "main": [
+        [
+          {
+            "node": "Avaliar código",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Avaliar código": {
+      "main": [
+        [
+          {
+            "node": "Responder verificação",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Buscar cliente (solicitação)": {
+      "main": [
+        [
+          {
+            "node": "Preparar credencial",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Preparar credencial": {
+      "main": [
+        [
+          {
+            "node": "Ação no Supabase",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ação no Supabase": {
+      "main": [
+        [
+          {
+            "node": "Supabase: criar usuário",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Supabase: redefinir senha",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Responder solicitação",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Responder solicitação",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Supabase: criar usuário": {
+      "main": [
+        [
+          {
+            "node": "Guardar supabase_user_id",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Guardar supabase_user_id": {
+      "main": [
+        [
+          {
+            "node": "Enviar dados de acesso — CONFIGURE AQUI",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Supabase: redefinir senha": {
+      "main": [
+        [
+          {
+            "node": "Enviar dados de acesso — CONFIGURE AQUI",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Enviar dados de acesso — CONFIGURE AQUI": {
+      "main": [
+        [
+          {
+            "node": "Responder solicitação",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "pinData": {}
+}
