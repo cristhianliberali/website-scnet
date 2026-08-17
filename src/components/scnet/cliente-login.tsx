@@ -15,7 +15,7 @@ import { getRecaptchaToken } from "@/lib/recaptcha";
 import { whatsappSupportLink } from "@/lib/whatsapp";
 import { isValidDocumento, maskDocumento, type TipoDocumento } from "@/lib/form-utils";
 import {
-  acessarSac,
+  acessarComSenha,
   enviarCodigo,
   iniciarAcessoDocumento,
   solicitarLogin,
@@ -116,7 +116,7 @@ export function ClienteLogin() {
   const [codigo, setCodigo] = useState("");
 
   // método 2
-  const [login, setLogin] = useState("");
+  const [identificador, setIdentificador] = useState("");
   const [senha, setSenha] = useState("");
   const [senhaVisivel, setSenhaVisivel] = useState(false);
 
@@ -245,21 +245,25 @@ export function ClienteLogin() {
 
   /* -------- método 2 -------- */
 
-  async function submeterSac(e: FormEvent) {
+  async function submeterSenha(e: FormEvent) {
     e.preventDefault();
     if (enviando) return;
     limparMensagens();
 
-    if (!login.trim() || !senha) {
-      toast.error("Preencha login e senha.");
+    if (!identificador.trim() || !senha) {
+      toast.error("Preencha e-mail ou telefone e a senha.");
       return;
     }
 
     setEnviando(true);
     try {
-      const recaptchaToken = await getRecaptchaToken("cliente_sac");
-      const resultado = await acessarSac({
-        data: { login: login.trim(), senha, ...(recaptchaToken ? { recaptchaToken } : {}) },
+      const recaptchaToken = await getRecaptchaToken("cliente_senha");
+      const resultado = await acessarComSenha({
+        data: {
+          identificador: identificador.trim(),
+          senha,
+          ...(recaptchaToken ? { recaptchaToken } : {}),
+        },
       });
 
       if (!resultado.ok) {
@@ -269,7 +273,7 @@ export function ClienteLogin() {
 
       concluir(resultado.nome);
     } catch (err) {
-      console.error("Falha no acesso pelo SAC", err);
+      console.error("Falha no acesso por senha", err);
       tratarFalha(ERRO_CONEXAO);
     } finally {
       setEnviando(false);
@@ -303,8 +307,8 @@ export function ClienteLogin() {
             <TabsTrigger value="documento" className="font-ui text-xs font-semibold sm:text-sm">
               Documento do cadastro
             </TabsTrigger>
-            <TabsTrigger value="sac" className="font-ui text-xs font-semibold sm:text-sm">
-              Login e senha SAC
+            <TabsTrigger value="senha" className="font-ui text-xs font-semibold sm:text-sm">
+              E-mail ou telefone
             </TabsTrigger>
           </TabsList>
 
@@ -494,27 +498,27 @@ export function ClienteLogin() {
           </TabsContent>
 
           {/* ---------------- método 2 ---------------- */}
-          <TabsContent value="sac" className="mt-5">
-            <form onSubmit={(e) => void submeterSac(e)}>
+          <TabsContent value="senha" className="mt-5">
+            <form onSubmit={(e) => void submeterSenha(e)}>
               <p className="font-display text-xl font-extrabold text-brand-deep sm:text-2xl">
-                Acesse com login e senha
+                Acesse com e-mail ou telefone
               </p>
               <p className="mt-1 font-body text-sm text-muted-foreground">
-                As mesmas credenciais que você usa no SAC.
+                Use o e-mail ou o telefone do seu cadastro, com a sua senha.
               </p>
 
               <div className="mt-4 space-y-3">
                 <div className="space-y-1.5">
-                  <label className={labelCls(false)} htmlFor="login-cliente">
-                    Login
+                  <label className={labelCls(false)} htmlFor="identificador-cliente">
+                    E-mail ou telefone
                   </label>
                   <input
-                    id="login-cliente"
+                    id="identificador-cliente"
                     className={inputCls(false)}
-                    value={login}
+                    value={identificador}
                     autoComplete="username"
-                    placeholder="seu login"
-                    onChange={(e) => setLogin(e.target.value)}
+                    placeholder="voce@email.com ou (49) 99999-1234"
+                    onChange={(e) => setIdentificador(e.target.value)}
                   />
                 </div>
 
@@ -565,7 +569,7 @@ export function ClienteLogin() {
                 }}
                 className="mt-3 w-full font-ui text-sm font-semibold text-brand transition hover:text-brand-deep"
               >
-                Esqueci meu login ou senha
+                Esqueci minha senha
               </button>
             </form>
           </TabsContent>
@@ -577,7 +581,7 @@ export function ClienteLogin() {
   );
 }
 
-/* ---------------- diálogo: solicitar login e senha ---------------- */
+/* ---------------- diálogo: recuperar acesso ---------------- */
 
 function SolicitarLoginDialog({ aberto, onFechar }: { aberto: boolean; onFechar: () => void }) {
   const [tipoDocumento, setTipoDocumento] = useState<TipoDocumento>("cpf");
@@ -617,7 +621,7 @@ function SolicitarLoginDialog({ aberto, onFechar }: { aberto: boolean; onFechar:
       setSucesso(mensagem);
       toast.success(mensagem);
     } catch (err) {
-      console.error("Falha ao solicitar login e senha", err);
+      console.error("Falha ao solicitar os dados de acesso", err);
       setErro(ERRO_CONEXAO);
       toast.error(ERRO_CONEXAO);
     } finally {
@@ -638,9 +642,10 @@ function SolicitarLoginDialog({ aberto, onFechar }: { aberto: boolean; onFechar:
     >
       <DialogContent>
         <DialogHeader>
-          <DialogTitle className="font-display text-brand-deep">Receber login e senha</DialogTitle>
+          <DialogTitle className="font-display text-brand-deep">Recuperar acesso</DialogTitle>
           <DialogDescription className="font-body">
-            Enviamos seus dados de acesso para o contato do seu cadastro.
+            Informe o documento do cadastro e enviamos seus dados de acesso para o contato
+            cadastrado.
           </DialogDescription>
         </DialogHeader>
 

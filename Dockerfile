@@ -32,9 +32,11 @@ ENV NODE_ENV=production \
     PORT=3000 \
     HOST=0.0.0.0
 
-# Server-only secrets (recaptcha, Facebook CAPI, webhook) are read from
-# process.env at runtime — set them as regular EasyPanel environment
-# variables on the service, not build args.
+# Server-only secrets (recaptcha, Facebook CAPI, webhooks, Supabase, Postgres)
+# are read from process.env at runtime — set them as regular EasyPanel
+# environment variables on the service, not build args. The Supabase vars have
+# no VITE_ prefix on purpose: the browser never talks to Supabase, so nothing
+# about it belongs in the client bundle.
 
 COPY --from=build /app/.output ./.output
 

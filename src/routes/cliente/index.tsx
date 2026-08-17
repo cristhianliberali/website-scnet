@@ -19,7 +19,8 @@ export const Route = createFileRoute("/cliente/")({
       { title },
       {
         name: "description",
-        content: "Acesse a área do cliente SCNET com seu CPF/CNPJ ou com o login e senha do SAC.",
+        content:
+          "Acesse a área do cliente SCNET com seu CPF/CNPJ ou com seu e-mail ou telefone e senha.",
       },
       { property: "og:title", content: title },
       { property: "og:description", content: "Entre na área do cliente SCNET." },
@@ -43,7 +44,7 @@ function ClienteLoginPage() {
               Área do cliente
             </h1>
             <p className="mt-3 font-body text-lg text-primary-foreground/90">
-              Entre com o documento do seu cadastro ou com o login e senha do SAC.
+              Entre com o documento do seu cadastro ou com seu e-mail ou telefone e senha.
             </p>
           </div>
         </section>

@@ -2,8 +2,10 @@
  * Server functions da área do cliente — a ponte entre o formulário e a lógica
  * de `cliente-auth.server.ts`.
  *
- * O navegador nunca fala com o n8n: tudo passa por aqui, já protegido contra
- * requisições de outros sites pelo middleware CSRF de `src/start.ts`. Este
+ * O navegador nunca fala com o n8n nem com o Supabase: tudo passa por aqui, já
+ * protegido contra requisições de outros sites pelo middleware CSRF de
+ * `src/start.ts` — e o Supabase, na rede interna do EasyPanel, sequer é
+ * alcançável de fora. Este
  * arquivo é importado pelo componente de login, então não pode conter nada de
  * servidor fora dos handlers — daí a lógica morar nos módulos `.server.ts`, que
  * o bundle do cliente recusaria.
@@ -13,7 +15,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 
 import {
-  acessarSacServer,
+  acessarComSenhaServer,
   enviarCodigoServer,
   iniciarAcessoDocumentoServer,
   solicitarLoginServer,
@@ -46,9 +48,11 @@ const codigoSchema = z.object({
   recaptchaToken: z.string().optional(),
 });
 
-const sacSchema = z.object({
-  login: z.string().min(1).max(120),
-  senha: z.string().min(1).max(120),
+// O teto da senha existe para não empurrar 100 KB de texto ao Supabase; o piso
+// é 1 porque quem valida força de senha é o Supabase, no cadastro.
+const senhaSchema = z.object({
+  identificador: z.string().min(1).max(160),
+  senha: z.string().min(1).max(200),
   recaptchaToken: z.string().optional(),
 });
 
@@ -78,12 +82,12 @@ export const verificarCodigo = createServerFn({ method: "POST" })
   .validator(codigoSchema)
   .handler(async ({ data }): Promise<LoginConcluido | LoginErro> => verificarCodigoServer(data));
 
-/** Método 2: login e senha do SAC, sem código. */
-export const acessarSac = createServerFn({ method: "POST" })
-  .validator(sacSchema)
-  .handler(async ({ data }): Promise<LoginConcluido | LoginErro> => acessarSacServer(data));
+/** Método 2: e-mail ou telefone + senha, conferidos no Supabase. */
+export const acessarComSenha = createServerFn({ method: "POST" })
+  .validator(senhaSchema)
+  .handler(async ({ data }): Promise<LoginConcluido | LoginErro> => acessarComSenhaServer(data));
 
-/** Envia as credenciais do SAC pelo WhatsApp ou e-mail do cadastro. */
+/** Envia os dados de acesso pelo WhatsApp ou e-mail do cadastro. */
 export const solicitarLogin = createServerFn({ method: "POST" })
   .validator(solicitacaoSchema)
   .handler(async ({ data }): Promise<MensagemOk | LoginErro> => solicitarLoginServer(data));

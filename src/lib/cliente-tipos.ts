@@ -13,12 +13,22 @@ export type CanaisDisponiveis = { sms: boolean; whatsapp: boolean; email: boolea
 /** Contatos já mascarados — o valor completo nunca chega ao navegador. */
 export type ContatosMascarados = { celular?: string | undefined; email?: string | undefined };
 
+/**
+ * Por onde o cliente entrou: `documento` é o código enviado pelo n8n,
+ * `senha` é o e-mail/telefone + senha conferidos no Supabase.
+ */
+export type MetodoAcesso = "documento" | "senha";
+
 export type SessaoCliente = {
   idCliente: string;
   nome: string;
-  /** Mascarado, só para exibição. */
-  documento: string;
-  metodo: "documento" | "sac";
+  metodo: MetodoAcesso;
+  /** Mascarado, só para exibição — ausente quando o cadastro não traz o documento. */
+  documento?: string | undefined;
+  /** E-mail ou telefone mascarado de quem entrou por senha. */
+  contato?: string | undefined;
+  /** `id` do usuário no Supabase, quando o acesso veio por senha. */
+  idSupabase?: string | undefined;
 };
 
 export type DesafioCliente = {
