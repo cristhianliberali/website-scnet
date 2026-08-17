@@ -365,6 +365,10 @@ Variables, nunca como Build Args. (Os nomes antigos `WEBHOOK_PAINEL_CLIENTE` e
 `WEBHOOK_PAINEL_CLIENTE_TOKEN` continuam sendo aceitos, para que uma implantação
 já no ar não caia ao atualizar.)
 
+O outro lado do webhook está em **`docs/n8n/`**: um workflow pronto para
+importar, com os quatro eventos, a conferência da assinatura e a criação da
+senha no Supabase, mais o SQL das duas estruturas que ele espera no Postgres.
+
 This project was built with [Lovable](https://lovable.dev).
 
 ## Segurança dos formulários e do webhook
