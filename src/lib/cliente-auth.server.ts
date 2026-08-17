@@ -1,6 +1,18 @@
 /**
  * Lógica de autenticação da área do cliente (só servidor).
  *
+ * São dois caminhos de entrada, com provedores diferentes de propósito:
+ *
+ * - **Documento do cadastro + código** (SMS, WhatsApp ou e-mail) — vai ao n8n
+ *   pelo `WEBHOOK_LOGIN_URL`. Quem conhece o cadastro do provedor é o n8n, e o
+ *   documento é a referência inicial do cliente: é ele que diz quais canais
+ *   existem e para onde o código pode ir.
+ * - **E-mail ou telefone + senha** — vai ao Supabase (`supabase.server.ts`),
+ *   que guarda as credenciais e as confere.
+ *
+ * Os dois desembocam no mesmo lugar: o cookie selado deste servidor. Nenhum
+ * token do Supabase e nenhuma resposta do n8n chegam ao navegador.
+ *
  * Os invólucros RPC ficam em `cliente-auth.ts`; aqui está o que de fato decide
  * quem entra. Três regras valem para todos os eventos:
  *
@@ -39,6 +51,12 @@ import {
   limparDesafio,
   SessaoIndisponivelError,
 } from "./cliente-sessao.server";
+import {
+  chaveDoIdentificador,
+  classificarIdentificador,
+  loginComSenha,
+  type Identificador,
+} from "./supabase.server";
 import type {
   CanaisDisponiveis,
   ContatosMascarados,
@@ -56,7 +74,7 @@ const ERRO_DESAFIO_EXPIRADO = "Sua tentativa expirou. Recomece informando seu do
 const ERRO_ROBO =
   "Não conseguimos confirmar que você não é um robô. Recarregue a página e tente de novo.";
 const ERRO_CODIGO = "Código inválido. Confira e digite de novo.";
-const ERRO_CREDENCIAIS = "Login ou senha incorretos.";
+const ERRO_IDENTIFICADOR = "Informe o e-mail cadastrado ou o telefone com DDD.";
 
 /* ---------------- máscaras defensivas ---------------- */
 
@@ -150,8 +168,7 @@ function lerNomeCliente(data: Record<string, unknown>): string {
 
 /* ---------------- envelope e helpers comuns ---------------- */
 
-type Evento =
-  "documento_cliente" | "acesso_sac" | "envio_codigo" | "verificacao_codigo" | "solicitacao_login";
+type Evento = "documento_cliente" | "envio_codigo" | "verificacao_codigo" | "solicitacao_login";
 
 function envelope(evento: Evento, dados: Record<string, unknown>, recaptcha: RecaptchaVerdict) {
   return {
@@ -199,7 +216,12 @@ export type CanalInput = {
 
 export type CodigoInput = { codigo: string; recaptchaToken?: string | undefined };
 
-export type SacInput = { login: string; senha: string; recaptchaToken?: string | undefined };
+export type SenhaInput = {
+  /** E-mail ou telefone, como o cliente digitou. */
+  identificador: string;
+  senha: string;
+  recaptchaToken?: string | undefined;
+};
 
 export type SolicitacaoInput = {
   tipoDocumento: "cpf" | "cnpj";
@@ -378,44 +400,49 @@ export async function verificarCodigoServer(
   return { ok: true, mensagem: resultado.message, nome };
 }
 
-/* ---------------- método 2: login e senha do SAC ---------------- */
+/* ---------------- método 2: e-mail ou telefone + senha (Supabase) ---------------- */
 
-/** Login direto por credenciais do SAC — sem código, por decisão do projeto. */
-export async function acessarSacServer(data: SacInput): Promise<LoginConcluido | LoginErro> {
-  const login = data.login.trim();
-  const chaves = [porIdentificador(`sac:${login.toLowerCase()}`), chaveIp()];
+/** Como o contato aparece no painel — nunca inteiro. */
+const contatoMascarado = (id: Identificador) =>
+  id.tipo === "email" ? mascararEmail(id.email) : mascararTelefone(id.telefone);
 
+/**
+ * Login por senha, conferido no Supabase — sem código, por decisão do projeto.
+ *
+ * O identificador é normalizado antes de contar tentativas para que
+ * `49 99999-1234`, `+5549999991234` e `(49) 99999-1234` sejam a mesma chave:
+ * do contrário bastaria variar a pontuação para reiniciar o contador de três
+ * falhas.
+ */
+export async function acessarComSenhaServer(data: SenhaInput): Promise<LoginConcluido | LoginErro> {
+  const identificador = classificarIdentificador(data.identificador);
+  if (!identificador) return erro(ERRO_IDENTIFICADOR);
+
+  const chaves = [porIdentificador(`senha:${chaveDoIdentificador(identificador)}`), chaveIp()];
   const bloqueio = checkTentativas(chaves);
   if (bloqueio.blocked) return erro(mensagemDeBloqueio(bloqueio.retryAfterSeconds));
 
-  const recaptcha = await verifyRecaptcha(data.recaptchaToken, "cliente_sac", ipOrigem());
+  const recaptcha = await verifyRecaptcha(data.recaptchaToken, "cliente_senha", ipOrigem());
   if (isLikelyBot(recaptcha)) return erro(ERRO_ROBO);
 
-  const resultado = await postToPainelWebhook(
-    envelope("acesso_sac", { login, senha: data.senha }, recaptcha),
-    "Área do cliente (SAC)",
-  );
-
+  const resultado = await loginComSenha(identificador, data.senha);
   if (!resultado.ok) {
+    // Supabase fora do ar não gasta a cota de três tentativas de quem sabe a senha
+    if (!resultado.credencial) return erro(resultado.mensagem);
     const falha = registrarFalha(chaves);
     if (falha.blocked) return erro(mensagemDeBloqueio(falha.retryAfterSeconds));
-    return erro(mensagemDeFalha(resultado, ERRO_CREDENCIAIS));
+    return erro(resultado.mensagem);
   }
 
-  const idCliente = lerIdCliente(resultado.data);
-  if (!idCliente) {
-    console.error("Webhook aceitou o acesso SAC sem devolver id_cliente");
-    return erro(ERRO_INDISPONIVEL);
-  }
-
-  const nome = lerNomeCliente(resultado.data);
-  const documento = asString(asRecord(resultado.data["cliente"])["documento"]);
+  const { id, idCliente, nome, documento } = resultado.usuario;
   try {
     await gravarSessao({
       idCliente,
       nome,
-      documento: documento ? mascararDocumento(documento) : login,
-      metodo: "sac",
+      metodo: "senha",
+      idSupabase: id,
+      contato: contatoMascarado(identificador),
+      ...(documento ? { documento: mascararDocumento(documento) } : {}),
     });
   } catch (err) {
     if (err instanceof SessaoIndisponivelError) return erro(ERRO_INDISPONIVEL);
@@ -423,12 +450,21 @@ export async function acessarSacServer(data: SacInput): Promise<LoginConcluido |
   }
 
   limparTentativas(chaves);
-  return { ok: true, mensagem: resultado.message, nome };
+  return { ok: true, nome };
 }
 
-/* ---------------- solicitação de login e senha ---------------- */
+/* ---------------- solicitação de acesso ---------------- */
 
-/** Pede ao n8n o envio das credenciais do SAC pelo WhatsApp ou e-mail. */
+/**
+ * Pede ao n8n que envie os dados de acesso pelo WhatsApp ou e-mail do cadastro.
+ *
+ * Continua no webhook, e não no `resetPasswordForEmail` do Supabase, por dois
+ * motivos: a entrada aqui é o documento (o cliente que esqueceu a senha
+ * costuma não lembrar com qual e-mail se cadastrou), e o WhatsApp, que é o canal
+ * que o cliente de fato usa, o Supabase não alcança. Do lado do n8n, o fluxo
+ * deve criar ou redefinir a credencial no Supabase pela chave de serviço antes
+ * de mandar a mensagem.
+ */
 export async function solicitarLoginServer(
   data: SolicitacaoInput,
 ): Promise<MensagemOk | LoginErro> {

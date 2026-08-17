@@ -32,6 +32,8 @@ function PainelCliente() {
   }
 
   const primeiroNome = sessao.nome.split(" ")[0] ?? sessao.nome;
+  // quem entrou por senha pode não ter documento no cadastro do Supabase
+  const identificacao = sessao.documento ? `Documento ${sessao.documento}` : sessao.contato;
 
   return (
     <div className="min-h-screen bg-background font-body">
@@ -43,9 +45,9 @@ function PainelCliente() {
             <h1 className="font-display text-3xl font-extrabold tracking-tight text-primary-foreground sm:text-4xl">
               Olá, {primeiroNome}
             </h1>
-            <p className="mt-3 font-body text-lg text-primary-foreground/90">
-              Documento {sessao.documento}
-            </p>
+            {identificacao && (
+              <p className="mt-3 font-body text-lg text-primary-foreground/90">{identificacao}</p>
+            )}
           </div>
         </section>
 

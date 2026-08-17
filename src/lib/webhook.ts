@@ -7,10 +7,11 @@
  * - `postToWebhook` — os dois formulários públicos (lead da home e
  *   contratação). Sem `WEBHOOK_URL` o envio é dado por aceito, para não travar
  *   o cliente em ambiente de desenvolvimento.
- * - `postToPainelWebhook` — a autenticação da área do cliente. Sem
- *   `WEBHOOK_PAINEL_CLIENTE` **nada é liberado**: login não pode falhar aberto.
+ * - `postToPainelWebhook` — o login por documento e código da área do cliente.
+ *   Sem `WEBHOOK_LOGIN_URL` **nada é liberado**: login não pode falhar aberto.
  *   O corpo ainda vai assinado (HMAC + timestamp), para que descobrir a URL do
- *   webhook não baste para chamá-lo.
+ *   webhook não baste para chamá-lo. (O acesso por e-mail/telefone e senha não
+ *   passa por aqui: quem confere a senha é o Supabase.)
  *
  * Nos dois casos o POST leva o Bearer token aplicado no servidor e só é
  * considerado aceito quando a resposta traz `status: "ok"`. Qualquer outro
@@ -254,8 +255,19 @@ export async function postToWebhook(payload: unknown, label: string): Promise<We
   return postJson({ url, token, payload, label });
 }
 
+/*
+ * Nomes anteriores das duas variáveis do webhook de login, aceitos para que uma
+ * implantação já no ar não caia ao atualizar. Os nomes válidos são
+ * `WEBHOOK_LOGIN_URL` e `WEBHOOK_LOGIN_TOKEN`.
+ */
+const loginWebhookUrl = () =>
+  process.env["WEBHOOK_LOGIN_URL"] ?? process.env["WEBHOOK_PAINEL_CLIENTE"];
+
+const loginWebhookToken = () =>
+  process.env["WEBHOOK_LOGIN_TOKEN"] ?? process.env["WEBHOOK_PAINEL_CLIENTE_TOKEN"];
+
 /**
- * Envia o payload ao WEBHOOK_PAINEL_CLIENTE (autenticação da área do cliente).
+ * Envia o payload ao WEBHOOK_LOGIN_URL (login por documento e código).
  *
  * Ao contrário de `postToWebhook`, **falha fechado**: sem a URL configurada
  * nada é aceito, porque um login que passa por falta de configuração é um
@@ -267,16 +279,16 @@ export async function postToPainelWebhook(
   payload: unknown,
   label: string,
 ): Promise<WebhookOutcomeWithData> {
-  const url = process.env["WEBHOOK_PAINEL_CLIENTE"];
+  const url = loginWebhookUrl();
   if (!url) {
-    console.error(`WEBHOOK_PAINEL_CLIENTE não configurada — ${label} recusado.`);
+    console.error(`WEBHOOK_LOGIN_URL não configurada — ${label} recusado.`);
     return { ok: false, status: null, reason: "not_configured", data: {} };
   }
 
-  const token = process.env["WEBHOOK_PAINEL_CLIENTE_TOKEN"];
+  const token = loginWebhookToken();
   if (!token) {
     if (process.env["NODE_ENV"] === "production") {
-      console.error(`WEBHOOK_PAINEL_CLIENTE_TOKEN não configurado — ${label} recusado.`);
+      console.error(`WEBHOOK_LOGIN_TOKEN não configurado — ${label} recusado.`);
       return {
         ok: false,
         status: null,
@@ -285,9 +297,7 @@ export async function postToPainelWebhook(
         data: {},
       };
     }
-    console.warn(
-      `WEBHOOK_PAINEL_CLIENTE_TOKEN não configurado — ${label} segue sem Bearer nem assinatura.`,
-    );
+    console.warn(`WEBHOOK_LOGIN_TOKEN não configurado — ${label} segue sem Bearer nem assinatura.`);
   }
 
   return postJson({ url, token, payload, label, sign: true });

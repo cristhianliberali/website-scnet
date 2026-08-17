@@ -110,9 +110,11 @@ export async function lerSessao(): Promise<SessaoCliente | null> {
   const data = await lerCookieSelado<SessaoCliente>(SESSAO_COOKIE, SESSAO_MAX_AGE);
   if (!data) return null;
 
-  const { idCliente, nome, documento, metodo } = data;
-  if (!idCliente || !nome || !documento || !metodo) return null;
-  return { idCliente, nome, documento, metodo };
+  // `documento` e `contato` são só exibição: um login por senha pode não ter
+  // nenhum documento no cadastro do Supabase, e isso não invalida a sessão.
+  const { idCliente, nome, documento, contato, metodo, idSupabase } = data;
+  if (!idCliente || !nome || !metodo) return null;
+  return { idCliente, nome, metodo, documento, contato, idSupabase };
 }
 
 export async function limparSessao() {
