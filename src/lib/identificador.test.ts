@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test";
-import { chaveDoIdentificador, classificarIdentificador } from "./supabase.server";
+import { valorDoIdentificador, classificarIdentificador } from "./identificador";
 
 test("reconhece e-mail e normaliza para minúsculas", () => {
   expect(classificarIdentificador("  Voce@Email.COM ")).toEqual({
@@ -41,7 +41,7 @@ test("recusa o que não é e-mail nem telefone", () => {
 });
 
 test("a chave de tentativas não muda com a pontuação digitada", () => {
-  const chave = (v: string) => chaveDoIdentificador(classificarIdentificador(v)!);
+  const chave = (v: string) => valorDoIdentificador(classificarIdentificador(v)!);
   expect(chave("(49) 99999-1234")).toBe(chave("+5549999991234"));
   expect(chave("VOCE@email.com")).toBe(chave("voce@email.com "));
 });

@@ -10,8 +10,9 @@
  * - `postToPainelWebhook` — o login por documento e código da área do cliente.
  *   Sem `WEBHOOK_LOGIN_URL` **nada é liberado**: login não pode falhar aberto.
  *   O corpo ainda vai assinado (HMAC + timestamp), para que descobrir a URL do
- *   webhook não baste para chamá-lo. (O acesso por e-mail/telefone e senha não
- *   passa por aqui: quem confere a senha é o Supabase.)
+ *   webhook não baste para chamá-lo. Além do login (pelos dois métodos), é por
+ *   aqui que passam as consultas e os formulários do painel, levando o token de
+ *   acesso que o n8n emitiu.
  *
  * Nos dois casos o POST leva o Bearer token aplicado no servidor e só é
  * considerado aceito quando a resposta traz `status: "ok"`. Qualquer outro
@@ -46,6 +47,8 @@ export type WebhookOutcome = {
   status: string | null;
   message?: string | undefined;
   reason?: WebhookReason;
+  /** Código HTTP da resposta, quando houve uma. É o 401 que denuncia token vencido. */
+  httpStatus?: number | undefined;
 };
 
 /* ---------------- leitura do status ---------------- */
@@ -216,15 +219,29 @@ async function postJson(opts: {
 
   if (!res.ok) {
     console.error(`${opts.label}: webhook responded ${res.status}`);
-    return { ok: false, status, message: hit?.message, reason: "http_error", data };
+    return {
+      ok: false,
+      status,
+      message: hit?.message,
+      reason: "http_error",
+      httpStatus: res.status,
+      data,
+    };
   }
 
   if (status?.trim().toLowerCase() !== "ok") {
     console.error(`${opts.label}: webhook returned status "${status ?? ""}"`);
-    return { ok: false, status, message: hit?.message, reason: "bad_status", data };
+    return {
+      ok: false,
+      status,
+      message: hit?.message,
+      reason: "bad_status",
+      httpStatus: res.status,
+      data,
+    };
   }
 
-  return { ok: true, status, message: hit?.message, data };
+  return { ok: true, status, message: hit?.message, httpStatus: res.status, data };
 }
 
 /**
