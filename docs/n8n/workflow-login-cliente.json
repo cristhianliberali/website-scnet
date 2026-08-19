@@ -680,7 +680,7 @@
       ],
       "parameters": {
         "respondWith": "json",
-        "responseBody": "={{ JSON.stringify({ status: 'erro', mensagem: 'E-mail, telefone ou senha incorretos.' }) }}",
+        "responseBody": "={{ JSON.stringify({ status: 'erro', mensagem: 'Login ou senha incorretos.' }) }}",
         "options": {
           "responseCode": 200
         }
