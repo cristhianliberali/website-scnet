@@ -6,7 +6,7 @@
  * - **Documento do cadastro + código** (SMS, WhatsApp ou e-mail). O documento é
  *   a referência inicial do cliente: é ele que diz quais canais existem e para
  *   onde o código pode ir.
- * - **E-mail ou telefone + senha**, conferidos pelo n8n contra o cadastro.
+ * - **Login e senha do SAC**, conferidos pelo n8n contra o cadastro.
  *
  * Os dois terminam igual: o n8n emite um **token de acesso temporário**, que
  * fica no cookie selado deste servidor e acompanha toda consulta e todo
@@ -46,11 +46,6 @@ import {
 } from "./tentativas-login";
 import { lerToken } from "./token-acesso";
 import {
-  classificarIdentificador,
-  valorDoIdentificador,
-  type Identificador,
-} from "./identificador";
-import {
   gravarDesafio,
   gravarSessao,
   lerDesafio,
@@ -81,8 +76,7 @@ const ERRO_DESAFIO_EXPIRADO = "Sua tentativa expirou. Recomece informando seu do
 const ERRO_ROBO =
   "Não conseguimos confirmar que você não é um robô. Recarregue a página e tente de novo.";
 const ERRO_CODIGO = "Código inválido. Confira e digite de novo.";
-const ERRO_IDENTIFICADOR = "Informe o e-mail cadastrado ou o telefone com DDD.";
-const ERRO_CREDENCIAIS = "E-mail, telefone ou senha incorretos.";
+const ERRO_CREDENCIAIS = "Login ou senha incorretos.";
 const ERRO_SESSAO_EXPIRADA = "Sua sessão expirou. Entre novamente para continuar.";
 
 /* ---------------- máscaras defensivas ---------------- */
@@ -245,8 +239,8 @@ export type CanalInput = {
 export type CodigoInput = { codigo: string; recaptchaToken?: string | undefined };
 
 export type SenhaInput = {
-  /** E-mail ou telefone, como o cliente digitou. */
-  identificador: string;
+  /** Login do SAC, como o cliente digitou. Formato livre. */
+  login: string;
   senha: string;
   recaptchaToken?: string | undefined;
 };
@@ -440,38 +434,42 @@ export async function verificarCodigoServer(
   return { ok: true, mensagem: resultado.message, nome };
 }
 
-/* ---------------- método 2: e-mail ou telefone + senha ---------------- */
-
-/** Como o contato aparece no painel — nunca inteiro. */
-const contatoMascarado = (id: Identificador) =>
-  id.tipo === "email" ? mascararEmail(id.email) : mascararTelefone(id.telefone);
+/* ---------------- método 2: login e senha do SAC ---------------- */
 
 /**
- * Login por senha, conferido pelo n8n — sem código, por decisão do projeto.
+ * Login pelas credenciais do SAC, conferidas pelo n8n — sem código, por decisão
+ * do projeto.
+ *
+ * O login é de **formato livre**: é o mesmo que o cliente usa no SAC, e o SAC
+ * não impõe forma nenhuma. Por isso não há validação de formato aqui — quem
+ * sabe se existe é o cadastro, e a única resposta possível para um login que
+ * não existe é a mesma de uma senha errada.
  *
  * Termina igual ao login por documento: o n8n devolve o cliente e o token de
  * acesso, e a sessão selada guarda os dois.
  */
 export async function acessarComSenhaServer(data: SenhaInput): Promise<LoginConcluido | LoginErro> {
-  const identificador = classificarIdentificador(data.identificador);
-  if (!identificador) return erro(ERRO_IDENTIFICADOR);
+  const login = data.login.trim();
+  if (!login) return erro(ERRO_CREDENCIAIS);
 
-  const valor = valorDoIdentificador(identificador);
-  const chaves = [porIdentificador(`senha:${valor}`), chaveIp()];
+  /*
+   * A chave de tentativas usa o login em minúsculas para que `Maria` e `maria`
+   * contem juntos — do contrário bastaria alternar a caixa para reiniciar o
+   * contador de três falhas.
+   */
+  const chaves = [porIdentificador(`sac:${login.toLowerCase()}`), chaveIp()];
   const bloqueio = checkTentativas(chaves);
   if (bloqueio.blocked) return erro(mensagemDeBloqueio(bloqueio.retryAfterSeconds));
 
   const recaptcha = await verifyRecaptcha(data.recaptchaToken, "cliente_senha", ipOrigem());
-  if (isLikelyBot(recaptcha)) return erro(ERRO_ROBO);
+  if (isLikelyBot(recaptcha)) {
+    console.error("Acesso por login e senha bloqueado pelo reCAPTCHA");
+    return erro(ERRO_ROBO);
+  }
 
   const resultado = await postToPainelWebhook(
-    envelope(
-      "acesso_senha",
-      // `tipo_identificador` poupa o n8n de adivinhar em qual coluna procurar.
-      { tipo_identificador: identificador.tipo, identificador: valor, senha: data.senha },
-      recaptcha,
-    ),
-    "Área do cliente (senha)",
+    envelope("acesso_senha", { login, senha: data.senha }, recaptcha),
+    "Área do cliente (login e senha)",
   );
 
   if (!resultado.ok) {
@@ -489,13 +487,13 @@ export async function acessarComSenhaServer(data: SenhaInput): Promise<LoginConc
 
   const idCliente = lerIdCliente(resultado.data);
   if (!idCliente) {
-    console.error("Webhook aceitou a senha sem devolver id_cliente");
+    console.error("Webhook aceitou o login sem devolver id_cliente");
     return erro(ERRO_INDISPONIVEL);
   }
 
   const token = lerToken(resultado.data);
   if (!token) {
-    console.error("Webhook aceitou a senha sem devolver token de acesso");
+    console.error("Webhook aceitou o login sem devolver token de acesso");
     return erro(ERRO_INDISPONIVEL);
   }
 
@@ -507,8 +505,9 @@ export async function acessarComSenhaServer(data: SenhaInput): Promise<LoginConc
       nome,
       metodo: "senha",
       token,
-      contato: contatoMascarado(identificador),
-      ...(documento ? { documento: mascararDocumento(documento) } : {}),
+      // sem documento no cadastro, o próprio login identifica a sessão na tela
+      documento: documento ? mascararDocumento(documento) : undefined,
+      contato: documento ? undefined : login,
     });
   } catch (err) {
     if (err instanceof SessaoIndisponivelError) return erro(ERRO_INDISPONIVEL);

@@ -55,10 +55,13 @@ const codigoSchema = z.object({
   recaptchaToken: z.string().optional(),
 });
 
-// O teto da senha existe para não empurrar 100 KB de texto ao n8n; o piso é 1
-// porque quem valida força de senha é o cadastro do provedor, não esta tela.
+/*
+ * Login e senha do SAC. Os dois são de formato livre — quem define o que vale é
+ * o SAC, não esta tela. Os tetos existem só para não empurrar 100 KB de texto
+ * ao n8n; quem diz se as credenciais existem é o cadastro.
+ */
 const senhaSchema = z.object({
-  identificador: z.string().min(1).max(160),
+  login: z.string().min(1).max(160),
   senha: z.string().min(1).max(200),
   recaptchaToken: z.string().optional(),
 });
@@ -89,7 +92,7 @@ export const verificarCodigo = createServerFn({ method: "POST" })
   .validator(codigoSchema)
   .handler(async ({ data }): Promise<LoginConcluido | LoginErro> => verificarCodigoServer(data));
 
-/** Método 2: e-mail ou telefone + senha, conferidos pelo n8n. */
+/** Método 2: login e senha do SAC, conferidos pelo n8n. */
 export const acessarComSenha = createServerFn({ method: "POST" })
   .validator(senhaSchema)
   .handler(async ({ data }): Promise<LoginConcluido | LoginErro> => acessarComSenhaServer(data));

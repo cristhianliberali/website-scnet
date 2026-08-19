@@ -116,7 +116,7 @@ export function ClienteLogin() {
   const [codigo, setCodigo] = useState("");
 
   // método 2
-  const [identificador, setIdentificador] = useState("");
+  const [login, setLogin] = useState("");
   const [senha, setSenha] = useState("");
   const [senhaVisivel, setSenhaVisivel] = useState(false);
 
@@ -250,8 +250,8 @@ export function ClienteLogin() {
     if (enviando) return;
     limparMensagens();
 
-    if (!identificador.trim() || !senha) {
-      toast.error("Preencha e-mail ou telefone e a senha.");
+    if (!login.trim() || !senha) {
+      toast.error("Preencha o login e a senha.");
       return;
     }
 
@@ -259,11 +259,7 @@ export function ClienteLogin() {
     try {
       const recaptchaToken = await getRecaptchaToken("cliente_senha");
       const resultado = await acessarComSenha({
-        data: {
-          identificador: identificador.trim(),
-          senha,
-          ...(recaptchaToken ? { recaptchaToken } : {}),
-        },
+        data: { login: login.trim(), senha, ...(recaptchaToken ? { recaptchaToken } : {}) },
       });
 
       if (!resultado.ok) {
@@ -308,7 +304,7 @@ export function ClienteLogin() {
               Documento do cadastro
             </TabsTrigger>
             <TabsTrigger value="senha" className="font-ui text-xs font-semibold sm:text-sm">
-              E-mail ou telefone
+              Login e senha SAC
             </TabsTrigger>
           </TabsList>
 
@@ -501,24 +497,24 @@ export function ClienteLogin() {
           <TabsContent value="senha" className="mt-5">
             <form onSubmit={(e) => void submeterSenha(e)}>
               <p className="font-display text-xl font-extrabold text-brand-deep sm:text-2xl">
-                Acesse com e-mail ou telefone
+                Acesse com login e senha
               </p>
               <p className="mt-1 font-body text-sm text-muted-foreground">
-                Use o e-mail ou o telefone do seu cadastro, com a sua senha.
+                As mesmas credenciais que você usa no SAC.
               </p>
 
               <div className="mt-4 space-y-3">
                 <div className="space-y-1.5">
-                  <label className={labelCls(false)} htmlFor="identificador-cliente">
-                    E-mail ou telefone
+                  <label className={labelCls(false)} htmlFor="login-cliente">
+                    Login
                   </label>
                   <input
-                    id="identificador-cliente"
+                    id="login-cliente"
                     className={inputCls(false)}
-                    value={identificador}
+                    value={login}
                     autoComplete="username"
-                    placeholder="voce@email.com ou (49) 99999-1234"
-                    onChange={(e) => setIdentificador(e.target.value)}
+                    placeholder="seu login do SAC"
+                    onChange={(e) => setLogin(e.target.value)}
                   />
                 </div>
 

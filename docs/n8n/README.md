@@ -65,7 +65,8 @@ workflow importar e rodar de ponta a ponta antes de você plugar o que é seu:
   canal está em `$json.metodo` e o código em claro em `$json.codigo`, vindos do
   nó `Gerar código`. O usual é um Switch por `metodo` com três saídas.
 - `Enviar dados de acesso — CONFIGURE AQUI` — a mensagem do "Esqueci minha
-  senha". A senha nova está em `$('Preparar credencial').first().json.senha`.
+  senha". As credenciais estão em `$('Preparar credencial').first().json`, nos
+  campos `acesso_sac` e `senha_sac`.
 - `Consultar seção — CONFIGURE AQUI` — as consultas do painel. A seção pedida
   está em `$('Validar assinatura').first().json.dados.secao` e o cliente
   autenticado em `$('Validar token').first().json.id_cliente`. Devolva um item
@@ -83,13 +84,13 @@ fica sem resposta, senão o site espera os 15s de timeout à toa.
 
 ### Login
 
-| Evento               | O que o ramo faz                                                          |
-| -------------------- | ------------------------------------------------------------------------- |
-| `documento_cliente`  | Busca o cliente pelo documento; devolve `id_cliente`, canais e contatos   |
-| `envio_codigo`       | Gera um código de 6 dígitos, guarda o hash (5 min) e manda enviar         |
-| `verificacao_codigo` | Confere o código, conta a tentativa e, se bater, **emite o token**        |
-| `acesso_senha`       | Confere e-mail/telefone + senha com scrypt e, se bater, **emite o token** |
-| `solicitacao_login`  | Gera senha nova, grava salt + hash e manda ao cliente                     |
+| Evento               | O que o ramo faz                                                        |
+| -------------------- | ----------------------------------------------------------------------- |
+| `documento_cliente`  | Busca o cliente pelo documento; devolve `id_cliente`, canais e contatos |
+| `envio_codigo`       | Gera um código de 6 dígitos, guarda o hash (5 min) e manda enviar       |
+| `verificacao_codigo` | Confere o código, conta a tentativa e, se bater, **emite o token**      |
+| `acesso_senha`       | Confere o login e a senha do SAC e, se bater, **emite o token**         |
+| `solicitacao_login`  | Busca o acesso_sac/senha_sac do cadastro e manda ao cliente             |
 
 Os dois logins convergem nos mesmos nós `Gerar token` → `Guardar token` →
 `Responder login`. É o mesmo token, com o mesmo formato, venha o cliente do
@@ -134,15 +135,21 @@ frente, e a resposta devolve o prazo novo — o site atualiza o dele. Mas há um
 teto absoluto de 12h desde a criação: deslizar sem teto daria uma sessão eterna,
 que é o oposto de um token temporário.
 
-**Nada sensível em claro no banco.** Códigos e tokens vão como SHA-256; senhas,
-como salt + hash **scrypt**. Uma cópia da tabela não entrega sessão viva nem
-conta de ninguém.
+**Códigos e tokens vão ao banco como SHA-256.** Uma cópia da tabela não entrega
+código vivo nem sessão de ninguém.
 
-**A senha não entra em query nenhuma.** O SQL busca salt + hash, e a comparação
-acontece no nó `Conferir senha`, em tempo constante. Duas razões: a senha em
-claro não aparece em log de banco nem em `pg_stat_statements`, e os parâmetros
-do nó Postgres são uma lista — uma senha com vírgula viraria dois parâmetros, um
-bug que só apareceria com o cliente errado, no pior momento.
+**A senha digitada não entra em query nenhuma.** O SQL busca a senha do
+cadastro, e a comparação acontece no nó `Conferir senha`, em tempo constante.
+Duas razões: a senha digitada não aparece em log de banco nem em
+`pg_stat_statements`, e os parâmetros do nó Postgres são uma lista — uma senha
+com vírgula viraria dois parâmetros, um bug que só apareceria com o cliente
+errado, no pior momento.
+
+**A senha do SAC fica em claro no cadastro**, porque é assim que o SAC a guarda
+— o site apenas a lê. É o ponto mais frágil do desenho, e não dá para consertar
+só deste lado: enquanto a fonte for texto puro, um vazamento do banco entrega as
+senhas. Se um dia o SAC passar a guardar hash, o único nó a mudar é
+`Conferir senha`.
 
 **Uma instrução SQL por decisão.** Escolher o código, contar a tentativa e
 marcá-lo como usado acontecem num único comando. Em comandos separados haveria a

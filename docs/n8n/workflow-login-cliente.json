@@ -601,7 +601,7 @@
         480
       ],
       "parameters": {
-        "jsCode": "/*\n * Evento `acesso_senha`: prepara a busca do cliente por e-mail ou telefone.\n *\n * O site manda o telefone em E.164 (\"+5549999991234\") e o cadastro guarda só\n * DDD + número. O DDI é removido aqui, e não na query, para o SQL comparar duas\n * strings e nada mais.\n */\nconst dados = $input.first().json.dados ?? {};\nconst tipo = String(dados.tipo_identificador ?? '');\nconst bruto = String(dados.identificador ?? '');\n\nlet identificador = bruto.trim().toLowerCase();\nif (tipo === 'telefone') {\n  const digitos = bruto.replace(/\\D/g, '');\n  identificador =\n    digitos.startsWith('55') && (digitos.length === 12 || digitos.length === 13)\n      ? digitos.slice(2)\n      : digitos;\n}\n\nreturn [{ json: { tipo_identificador: tipo, identificador } }];"
+        "jsCode": "/*\n * Evento `acesso_senha`: prepara a busca do cliente pelo login do SAC.\n *\n * O login é de formato livre — pode ser um usuário, um e-mail, um número de\n * contrato, o que o SAC usar. Aqui só tiramos os espaços das pontas e\n * guardamos a versão minúscula para a busca, que é feita sem diferenciar\n * maiúsculas: quem digita no celular quase sempre manda a primeira letra\n * maiúscula sem querer, e recusar por isso seria só atrito.\n */\nconst dados = $input.first().json.dados ?? {};\nconst login = String(dados.login ?? '').trim();\n\nreturn [{ json: { login, login_busca: login.toLowerCase() } }];"
       }
     },
     {
@@ -616,9 +616,9 @@
       "alwaysOutputData": true,
       "parameters": {
         "operation": "executeQuery",
-        "query": "-- A senha NÃO entra na query: o que sai daqui é o par salt + hash, e a\n-- comparação acontece no nó seguinte. Assim a senha em claro não aparece\n-- em log de banco nem em pg_stat_statements.\nSELECT c.id_cliente, c.nome, c.documento, w.senha_salt, w.senha_hash\n  FROM public.clientes_web c\n  JOIN public.web_credenciais w ON w.id_cliente = c.id_cliente\n WHERE CASE $1\n         WHEN 'email'    THEN c.email = $2\n         WHEN 'telefone' THEN c.celular = $2\n         ELSE false\n       END\n LIMIT 1;",
+        "query": "-- A senha NÃO entra na query: o que sai daqui é a senha do cadastro, e a\n-- comparação acontece no nó seguinte. Assim a senha digitada não aparece\n-- em log de banco nem em pg_stat_statements.\n--\n-- lower() nos dois lados: o login não diferencia maiúsculas, porque o\n-- teclado do celular capitaliza a primeira letra sem pedir licença.\nSELECT c.id_cliente, c.nome, c.documento, c.senha_sac\n  FROM public.clientes_web c\n WHERE lower(c.acesso_sac) = $1\n LIMIT 1;",
         "options": {
-          "queryReplacement": "={{ [$json.tipo_identificador, $json.identificador] }}"
+          "queryReplacement": "={{ [$json.login_busca] }}"
         }
       }
     },
@@ -632,7 +632,7 @@
         480
       ],
       "parameters": {
-        "jsCode": "/*\n * Confere a senha com scrypt, fora do banco.\n *\n * Duas razões para não fazer isso no SQL. A primeira é de segurança: a senha em\n * claro nunca entra numa query, então não aparece em log de banco nem em\n * `pg_stat_statements`. A segunda é bem prosaica: os parâmetros do nó Postgres\n * são uma lista separada por vírgula, e uma senha com vírgula viraria dois\n * parâmetros — um bug que só apareceria com o cliente certo, no pior momento.\n *\n * scrypt vem do `crypto` do próprio Node, sem instalar nada, e é um KDF de\n * verdade: derivar a chave é caro de propósito, o que torna a força bruta sobre\n * a tabela vazada muito mais lenta que com um SHA-256 puro.\n */\nconst crypto = require('crypto');\n\nconst cliente = $input.first()?.json ?? {};\nconst senha = String($('Validar assinatura').first().json.dados?.senha ?? '');\n\nconst recusar = () => [{ json: { confere: false } }];\n\nif (!cliente.id_cliente || !cliente.senha_hash || !cliente.senha_salt) return recusar();\n\nconst esperado = Buffer.from(String(cliente.senha_hash), 'hex');\nconst calculado = crypto.scryptSync(senha, String(cliente.senha_salt), esperado.length || 64);\n\n// Tempo constante: um `===` vazaria, pelo tempo de resposta, quantos bytes bateram.\nif (esperado.length !== calculado.length || !crypto.timingSafeEqual(esperado, calculado)) {\n  return recusar();\n}\n\nreturn [\n  {\n    json: {\n      confere: true,\n      id_cliente: String(cliente.id_cliente),\n      nome: cliente.nome || 'cliente',\n      documento: cliente.documento ?? null,\n    },\n  },\n];"
+        "jsCode": "/*\n * Confere a senha do SAC fora do banco.\n *\n * Duas razões para não comparar no SQL. A primeira é de segurança: a senha em\n * claro nunca entra numa query, então não aparece em log de banco nem em\n * `pg_stat_statements`. A segunda é bem prosaica: os parâmetros do nó Postgres\n * são uma lista separada por vírgula, e uma senha com vírgula viraria dois\n * parâmetros — um bug que só apareceria com o cliente certo, no pior momento.\n */\nconst crypto = require('crypto');\n\nconst cliente = $input.first()?.json ?? {};\nconst senhaDigitada = String($('Validar assinatura').first().json.dados?.senha ?? '');\nconst senhaCadastro = String(cliente.senha_sac ?? '');\n\nconst recusar = () => [{ json: { confere: false } }];\n\n// Cliente sem login/senha no cadastro não entra por este método.\nif (!cliente.id_cliente || !senhaCadastro) return recusar();\n\n/*\n * Comparação em tempo constante: um `===` vaza, pelo tempo de resposta, quantos\n * caracteres iniciais bateram — o bastante para adivinhar a senha caractere a\n * caractere. O SHA-256 dos dois lados iguala o tamanho antes de comparar, que é\n * o que `timingSafeEqual` exige.\n */\nconst digest = (v) => crypto.createHash('sha256').update(v, 'utf8').digest();\nif (!crypto.timingSafeEqual(digest(senhaDigitada), digest(senhaCadastro))) return recusar();\n\nreturn [\n  {\n    json: {\n      confere: true,\n      id_cliente: String(cliente.id_cliente),\n      nome: cliente.nome || 'cliente',\n      documento: cliente.documento ?? null,\n    },\n  },\n];"
       }
     },
     {
@@ -698,7 +698,7 @@
       "alwaysOutputData": true,
       "parameters": {
         "operation": "executeQuery",
-        "query": "SELECT id_cliente, nome, celular, email\n  FROM public.clientes_web\n WHERE documento = $1\n LIMIT 1;",
+        "query": "SELECT id_cliente, nome, celular, email, acesso_sac, senha_sac\n  FROM public.clientes_web\n WHERE documento = $1\n LIMIT 1;",
         "options": {
           "queryReplacement": "={{ [$json.dados.documento] }}"
         }
@@ -714,7 +714,7 @@
         760
       ],
       "parameters": {
-        "jsCode": "/*\n * Evento `solicitacao_login` (\"Esqueci minha senha\").\n *\n * Gera a senha nova e já a deriva com scrypt: o que vai ao banco é o par\n * salt + hash, nunca a senha. Ela só existe em memória, até o nó de envio\n * entregá-la ao cliente.\n */\nconst crypto = require('crypto');\n\nconst cliente = $input.first()?.json ?? {};\nconst encontrado = Boolean(cliente.id_cliente);\n\n// 12 caracteres do gerador criptográfico. base64url não tem \"+\", \"/\" nem \"=\",\n// que quebram ao serem copiados de uma mensagem de WhatsApp.\nconst senha = crypto.randomBytes(9).toString('base64url');\nconst salt = crypto.randomBytes(16).toString('hex');\nconst hash = crypto.scryptSync(senha, salt, 64).toString('hex');\n\nconst dados = $('Validar assinatura').first().json.dados ?? {};\n\nreturn [\n  {\n    json: {\n      encontrado,\n      id_cliente: encontrado ? String(cliente.id_cliente) : null,\n      nome: cliente.nome ?? 'cliente',\n      metodo: String(dados.metodo ?? 'whatsapp'),\n      email: cliente.email || null,\n      celular: String(cliente.celular ?? '').replace(/\\D/g, '') || null,\n      senha,\n      senha_salt: salt,\n      senha_hash: hash,\n    },\n  },\n];"
+        "jsCode": "/*\n * Evento `solicitacao_login` (\"Esqueci minha senha\").\n *\n * Não gera senha nova: as credenciais são as do SAC, e quem manda nelas é o\n * sistema do provedor. Aqui a gente só busca o que já existe e entrega ao\n * cliente pelo canal do cadastro.\n *\n * `encontrado` é falso tanto para documento inexistente quanto para cliente sem\n * login cadastrado — nos dois casos não há o que enviar, e a resposta ao site é\n * a mesma de propósito.\n */\nconst cliente = $input.first()?.json ?? {};\nconst dados = $('Validar assinatura').first().json.dados ?? {};\n\nconst acesso = String(cliente.acesso_sac ?? '').trim();\nconst senha = String(cliente.senha_sac ?? '');\n\nreturn [\n  {\n    json: {\n      encontrado: Boolean(cliente.id_cliente && acesso && senha),\n      id_cliente: cliente.id_cliente ? String(cliente.id_cliente) : null,\n      nome: cliente.nome ?? 'cliente',\n      metodo: String(dados.metodo ?? 'whatsapp'),\n      email: cliente.email || null,\n      celular: String(cliente.celular ?? '').replace(/\\D/g, '') || null,\n      acesso_sac: acesso || null,\n      senha_sac: senha || null,\n    },\n  },\n];"
       }
     },
     {
@@ -753,24 +753,6 @@
     },
     {
       "id": "scnet-044",
-      "name": "Gravar senha",
-      "type": "n8n-nodes-base.postgres",
-      "typeVersion": 2.5,
-      "position": [
-        360,
-        700
-      ],
-      "alwaysOutputData": true,
-      "parameters": {
-        "operation": "executeQuery",
-        "query": "-- Só o par salt + hash; a senha em claro segue apenas para o envio.\nINSERT INTO public.web_credenciais (id_cliente, senha_salt, senha_hash)\nVALUES ($1, $2, $3)\nON CONFLICT (id_cliente) DO UPDATE\n   SET senha_salt = EXCLUDED.senha_salt,\n       senha_hash = EXCLUDED.senha_hash,\n       atualizada_em = now();",
-        "options": {
-          "queryReplacement": "={{ [$json.id_cliente, $json.senha_salt, $json.senha_hash] }}"
-        }
-      }
-    },
-    {
-      "id": "scnet-045",
       "name": "Enviar dados de acesso — CONFIGURE AQUI",
       "type": "n8n-nodes-base.noOp",
       "typeVersion": 1,
@@ -781,7 +763,7 @@
       "parameters": {}
     },
     {
-      "id": "scnet-046",
+      "id": "scnet-045",
       "name": "Responder solicitação",
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1.1,
@@ -798,7 +780,7 @@
       }
     },
     {
-      "id": "scnet-047",
+      "id": "scnet-046",
       "name": "Validar token",
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.5,
@@ -816,7 +798,7 @@
       }
     },
     {
-      "id": "scnet-049",
+      "id": "scnet-048",
       "name": "Token válido?",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.2,
@@ -834,7 +816,7 @@
           },
           "conditions": [
             {
-              "id": "scnet-048",
+              "id": "scnet-047",
               "leftValue": "={{ $json.id_cliente != null }}",
               "rightValue": "",
               "operator": {
@@ -850,7 +832,7 @@
       }
     },
     {
-      "id": "scnet-050",
+      "id": "scnet-049",
       "name": "Responder token inválido",
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1.1,
@@ -867,7 +849,7 @@
       }
     },
     {
-      "id": "scnet-053",
+      "id": "scnet-052",
       "name": "Rotear painel",
       "type": "n8n-nodes-base.switch",
       "typeVersion": 3.2,
@@ -888,7 +870,7 @@
                 },
                 "conditions": [
                   {
-                    "id": "scnet-051",
+                    "id": "scnet-050",
                     "leftValue": "={{ $('Validar assinatura').first().json.evento }}",
                     "rightValue": "consulta_painel",
                     "operator": {
@@ -912,7 +894,7 @@
                 },
                 "conditions": [
                   {
-                    "id": "scnet-052",
+                    "id": "scnet-051",
                     "leftValue": "={{ $('Validar assinatura').first().json.evento }}",
                     "rightValue": "formulario_painel",
                     "operator": {
@@ -935,7 +917,7 @@
       }
     },
     {
-      "id": "scnet-054",
+      "id": "scnet-053",
       "name": "Consultar seção — CONFIGURE AQUI",
       "type": "n8n-nodes-base.noOp",
       "typeVersion": 1,
@@ -946,7 +928,7 @@
       "parameters": {}
     },
     {
-      "id": "scnet-055",
+      "id": "scnet-054",
       "name": "Registrar formulário",
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.5,
@@ -964,7 +946,7 @@
       }
     },
     {
-      "id": "scnet-056",
+      "id": "scnet-055",
       "name": "Montar resposta do painel",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
@@ -977,7 +959,7 @@
       }
     },
     {
-      "id": "scnet-057",
+      "id": "scnet-056",
       "name": "Responder painel",
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1.1,
@@ -1318,7 +1300,7 @@
       "main": [
         [
           {
-            "node": "Gravar senha",
+            "node": "Enviar dados de acesso — CONFIGURE AQUI",
             "type": "main",
             "index": 0
           }
@@ -1326,17 +1308,6 @@
         [
           {
             "node": "Responder solicitação",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Gravar senha": {
-      "main": [
-        [
-          {
-            "node": "Enviar dados de acesso — CONFIGURE AQUI",
             "type": "main",
             "index": 0
           }

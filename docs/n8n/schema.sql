@@ -1,9 +1,8 @@
 -- Estruturas que o workflow `workflow-login-cliente.json` espera no Postgres.
 --
--- Uma view sobre a sua base (adapte) e quatro tabelas do portal (use como estão):
+-- Uma view sobre a sua base (adapte) e três tabelas do portal (use como estão):
 --
 --   public.clientes_web        VIEW sobre a sua base de clientes  ← ADAPTE
---   public.web_credenciais     senha do portal (salt + hash scrypt)
 --   public.web_codigos_acesso  códigos de acesso por SMS/WhatsApp/e-mail
 --   public.web_sessoes         tokens de acesso emitidos no login
 --   public.web_formularios     formulários enviados pelo painel
@@ -25,6 +24,20 @@
 --              coluna com pontuação nunca casa. Daí o regexp_replace.
 --   celular    idem, e SEM DDI: o site manda "+5549999991234", o workflow tira
 --              o "55" antes de comparar, e o que sobra é "49999991234".
+--
+-- `acesso_sac` e `senha_sac` são as credenciais do SAC, usadas pelo segundo
+-- método de login. São de FORMATO LIVRE — o site não valida nem normaliza nada
+-- além de tirar os espaços das pontas.
+
+-- Se a sua tabela de clientes ainda não tem as colunas do SAC:
+--   ALTER TABLE sua_tabela_de_clientes
+--     ADD COLUMN IF NOT EXISTS acesso_sac text,
+--     ADD COLUMN IF NOT EXISTS senha_sac  text;
+--
+-- Um índice no login acelera o `WHERE acesso_sac = $1` do fluxo. `lower()`
+-- porque a comparação é feita sem diferenciar maiúsculas:
+--   CREATE INDEX IF NOT EXISTS clientes_acesso_sac_idx
+--     ON sua_tabela_de_clientes (lower(acesso_sac));
 
 CREATE OR REPLACE VIEW public.clientes_web AS
 SELECT
@@ -32,33 +45,14 @@ SELECT
   c.nome                                                 AS nome,
   regexp_replace(c.cpf_cnpj, '\D', '', 'g')              AS documento,
   regexp_replace(COALESCE(c.celular, ''), '\D', '', 'g') AS celular,
-  lower(trim(COALESCE(c.email, '')))                     AS email
+  lower(trim(COALESCE(c.email, '')))                     AS email,
+  NULLIF(trim(COALESCE(c.acesso_sac, '')), '')           AS acesso_sac,
+  NULLIF(COALESCE(c.senha_sac, ''), '')                  AS senha_sac
 FROM sua_tabela_de_clientes c
 WHERE c.ativo;
 
 -- ---------------------------------------------------------------------------
--- 2. A senha do portal
--- ---------------------------------------------------------------------------
---
--- A senha do site é do PORTAL, não do seu sistema — por isso mora numa tabela
--- própria em vez de numa coluna do cadastro.
---
--- Guardamos salt + hash scrypt, nunca a senha. scrypt é um KDF: derivar a chave
--- custa memória e tempo de propósito, o que torna a força bruta sobre uma
--- tabela vazada ordens de grandeza mais lenta do que com um SHA-256 puro. O
--- cálculo acontece no nó de código do n8n (`crypto.scryptSync`), não aqui: a
--- senha em claro nunca entra numa query, então não aparece em log de banco nem
--- em `pg_stat_statements`.
-
-CREATE TABLE IF NOT EXISTS public.web_credenciais (
-  id_cliente    text        PRIMARY KEY,
-  senha_salt    text        NOT NULL,
-  senha_hash    text        NOT NULL,
-  atualizada_em timestamptz NOT NULL DEFAULT now()
-);
-
--- ---------------------------------------------------------------------------
--- 3. Os códigos de acesso
+-- 2. Os códigos de acesso
 -- ---------------------------------------------------------------------------
 --
 -- Um código por linha, e também só o hash: um código de 6 dígitos tem 1 milhão
@@ -83,7 +77,7 @@ CREATE INDEX IF NOT EXISTS web_codigos_acesso_cliente_idx
   ON public.web_codigos_acesso (id_cliente, criado_em DESC);
 
 -- ---------------------------------------------------------------------------
--- 4. Os tokens de acesso
+-- 3. Os tokens de acesso
 -- ---------------------------------------------------------------------------
 --
 -- Uma sessão por linha. O token é opaco e aleatório (32 bytes), não carrega
@@ -112,7 +106,7 @@ CREATE INDEX IF NOT EXISTS web_sessoes_cliente_idx
 --    WHERE id_cliente = '9911' AND revogada_em IS NULL;
 
 -- ---------------------------------------------------------------------------
--- 5. Os formulários do painel
+-- 4. Os formulários do painel
 -- ---------------------------------------------------------------------------
 --
 -- `id_cliente` vem da SESSÃO (do token), nunca do corpo da requisição — assim
@@ -130,7 +124,7 @@ CREATE INDEX IF NOT EXISTS web_formularios_cliente_idx
   ON public.web_formularios (id_cliente, criado_em DESC);
 
 -- ---------------------------------------------------------------------------
--- 6. Limpeza
+-- 5. Limpeza
 -- ---------------------------------------------------------------------------
 --
 -- Códigos e sessões vencidos não servem para nada e são dado pessoal parado.
@@ -138,3 +132,13 @@ CREATE INDEX IF NOT EXISTS web_formularios_cliente_idx
 
 -- DELETE FROM public.web_codigos_acesso WHERE criado_em < now() - interval '7 days';
 -- DELETE FROM public.web_sessoes        WHERE expira_em < now() - interval '7 days';
+
+-- ---------------------------------------------------------------------------
+-- 6. Migração de uma instalação anterior
+-- ---------------------------------------------------------------------------
+--
+-- A senha do portal deixou de existir: quem autentica agora é o par
+-- acesso_sac/senha_sac do próprio cadastro. Se você já tinha criado a tabela
+-- `web_credenciais`, ela não é mais usada por nó nenhum:
+
+-- DROP TABLE IF EXISTS public.web_credenciais;
