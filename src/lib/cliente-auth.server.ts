@@ -46,6 +46,19 @@ import {
 } from "./tentativas-login";
 import { lerToken } from "./token-acesso";
 import {
+  gravarCachePainel,
+  invalidarCachePainel,
+  lerCachePainel,
+  limparCachePainel,
+} from "./painel-cache.server";
+import {
+  CONSULTAS_PAINEL,
+  FORMULARIOS_PAINEL,
+  SECOES_AFETADAS,
+  type FormularioPainel,
+  type SecaoPainel,
+} from "./painel-tipos";
+import {
   gravarDesafio,
   gravarSessao,
   lerDesafio,
@@ -171,14 +184,28 @@ function lerNomeCliente(data: Record<string, unknown>): string {
 
 /* ---------------- envelope e helpers comuns ---------------- */
 
-type Evento =
+type EventoLogin =
   | "documento_cliente"
   | "envio_codigo"
   | "verificacao_codigo"
   | "acesso_senha"
-  | "solicitacao_login"
+  | "solicitacao_login";
+
+/**
+ * Os eventos do painel: um por consulta e um por formulário.
+ *
+ * Assim o Switch do n8n roteia direto por `evento`, sem precisar abrir `dados`
+ * para descobrir do que a chamada trata. Os dois nomes genéricos
+ * (`consulta_painel` e `formulario_painel`) continuam valendo: uma seção ou um
+ * formulário fora do registro cai neles, e um fluxo antigo segue funcionando.
+ */
+type EventoPainel =
+  | (typeof CONSULTAS_PAINEL)[SecaoPainel]
+  | (typeof FORMULARIOS_PAINEL)[FormularioPainel]
   | "consulta_painel"
   | "formulario_painel";
+
+type Evento = EventoLogin | EventoPainel;
 
 function envelope(
   evento: Evento,
@@ -627,11 +654,17 @@ function lerDadosPainel(data: Record<string, unknown>): DadosPainel {
 }
 
 type ChamadaPainel = {
-  evento: Extract<Evento, "consulta_painel" | "formulario_painel">;
+  evento: EventoPainel;
   dados: Record<string, unknown>;
   label: string;
   acaoRecaptcha: string;
   recaptchaToken?: string | undefined;
+  /** Consulta: sob qual seção guardar a resposta no cache do servidor. */
+  guardarEm?: SecaoPainel | undefined;
+  /** Consulta: ignora o que estiver guardado e vai ao n8n de novo. */
+  forcar?: boolean | undefined;
+  /** Formulário: o que derrubar do cache quando o envio der certo. */
+  invalidar?: readonly SecaoPainel[] | undefined;
 };
 
 async function chamarPainel(chamada: ChamadaPainel): Promise<PainelOk | PainelErro> {
@@ -639,6 +672,17 @@ async function chamarPainel(chamada: ChamadaPainel): Promise<PainelOk | PainelEr
   // `lerSessao` já recusa token vencido, então "sem sessão" aqui inclui
   // "o token expirou desde a última tela".
   if (!sessao) return erroPainel(ERRO_SESSAO_EXPIRADA, true);
+
+  /*
+   * Resposta guardada vale por si: devolvê-la aqui é o que evita uma ida ao
+   * n8n a cada F5, a cada modal aberto e a cada componente que precisa da
+   * mesma lista. O reCAPTCHA fica de fora deste caminho de propósito — não há
+   * nada a proteger numa leitura que não sai deste processo.
+   */
+  if (chamada.guardarEm && !chamada.forcar) {
+    const guardado = lerCachePainel(sessao.idCliente, chamada.guardarEm);
+    if (guardado) return { ok: true, dados: guardado };
+  }
 
   /*
    * Sem contador de tentativas aqui, de propósito. Ele existe para frear quem
@@ -688,19 +732,44 @@ async function chamarPainel(chamada: ChamadaPainel): Promise<PainelOk | PainelEr
     });
   }
 
-  return { ok: true, mensagem: resultado.message, dados: lerDadosPainel(resultado.data) };
+  const dados = lerDadosPainel(resultado.data);
+  if (chamada.guardarEm) gravarCachePainel(sessao.idCliente, chamada.guardarEm, dados);
+  if (chamada.invalidar) invalidarCachePainel(sessao.idCliente, chamada.invalidar);
+
+  return { ok: true, mensagem: resultado.message, dados };
 }
 
-export type ConsultaInput = { secao: string; recaptchaToken?: string | undefined };
+export type ConsultaInput = {
+  secao: string;
+  /** Ignora o cache do servidor e vai ao n8n de novo. */
+  forcar?: boolean | undefined;
+  recaptchaToken?: string | undefined;
+};
 
-/** Lê uma seção do painel (faturas, plano, chamados...) no n8n. */
+const ehSecaoConhecida = (secao: string): secao is SecaoPainel => secao in CONSULTAS_PAINEL;
+
+const ehFormularioConhecido = (nome: string): nome is FormularioPainel =>
+  nome in FORMULARIOS_PAINEL;
+
+/**
+ * Lê uma seção do painel no n8n.
+ *
+ * A seção vira o evento: `bootstrap` sai como `painel_bootstrap`, `faturas`
+ * como `painel_faturas`. Uma seção fora do registro ainda funciona — vai como
+ * `consulta_painel`, com o nome dela em `dados.secao` — mas não é guardada em
+ * cache: sem saber o que ela contém, não dá para saber quando fica velha.
+ */
 export async function consultarPainelServer(data: ConsultaInput): Promise<PainelOk | PainelErro> {
+  const secao = data.secao;
+  const conhecida = ehSecaoConhecida(secao);
   return chamarPainel({
-    evento: "consulta_painel",
-    dados: { secao: data.secao },
-    label: `Área do cliente (consulta: ${data.secao})`,
+    evento: conhecida ? CONSULTAS_PAINEL[secao] : "consulta_painel",
+    dados: { secao },
+    label: `Área do cliente (consulta: ${secao})`,
     acaoRecaptcha: "cliente_consulta",
     recaptchaToken: data.recaptchaToken,
+    ...(conhecida ? { guardarEm: secao } : {}),
+    ...(data.forcar ? { forcar: true } : {}),
   });
 }
 
@@ -710,15 +779,37 @@ export type FormularioInput = {
   recaptchaToken?: string | undefined;
 };
 
-/** Envia um formulário do painel (abrir chamado, atualizar cadastro...). */
+/**
+ * Envia um formulário do painel (abrir chamado, trocar de plano, indicar...).
+ *
+ * Cada formulário do registro tem o seu próprio evento, então o n8n roteia
+ * direto por `evento` e cada ramo trata de um assunto só. `dados.formulario` e
+ * `dados.campos` seguem no corpo de qualquer jeito — um fluxo que prefira um
+ * único ramo genérico continua dando conta.
+ *
+ * Quando o envio dá certo, as seções que aquele formulário desatualiza saem do
+ * cache na hora: quem acabou de trocar de plano não fica um minuto olhando
+ * para o plano antigo.
+ */
 export async function enviarFormularioPainelServer(
   data: FormularioInput,
 ): Promise<PainelOk | PainelErro> {
+  const formulario = data.formulario;
+  const conhecido = ehFormularioConhecido(formulario);
   return chamarPainel({
-    evento: "formulario_painel",
-    dados: { formulario: data.formulario, campos: data.dados },
-    label: `Área do cliente (formulário: ${data.formulario})`,
+    evento: conhecido ? FORMULARIOS_PAINEL[formulario] : "formulario_painel",
+    dados: { formulario, campos: data.dados },
+    label: `Área do cliente (formulário: ${formulario})`,
     acaoRecaptcha: "cliente_formulario",
     recaptchaToken: data.recaptchaToken,
+    // formulário fora do registro pode ter mexido em qualquer coisa: derruba tudo
+    invalidar: conhecido
+      ? SECOES_AFETADAS[formulario]
+      : (Object.keys(CONSULTAS_PAINEL) as SecaoPainel[]),
   });
+}
+
+/** Esquece o retrato guardado deste cliente — chamado ao encerrar a sessão. */
+export async function esquecerPainelServer(idCliente: string) {
+  limparCachePainel(idCliente);
 }

@@ -5,10 +5,11 @@ identidade do `/cliente`: ele decide quem entra pelos dois métodos de login,
 emite o token de acesso da sessão e responde às consultas e formulários do
 painel enquanto esse token estiver válido.
 
-| Arquivo                       | O que é                                   |
-| ----------------------------- | ----------------------------------------- |
-| `workflow-login-cliente.json` | O workflow, pronto para importar (42 nós) |
-| `schema.sql`                  | As estruturas que ele espera no Postgres  |
+| Arquivo                       | O que é                                             |
+| ----------------------------- | --------------------------------------------------- |
+| `workflow-login-cliente.json` | O workflow, pronto para importar (42 nós)           |
+| `schema.sql`                  | As estruturas que ele espera no Postgres            |
+| `painel-cliente.md`           | O contrato JSON de cada evento de `/cliente/painel` |
 
 ## Antes de importar
 
@@ -98,14 +99,33 @@ código ou da senha.
 
 ### Painel (só depois do login)
 
+O workflow importado traz dois ramos genéricos, que atendem qualquer chamada do
+painel:
+
 | Evento              | O que o ramo faz                                            |
 | ------------------- | ----------------------------------------------------------- |
 | `consulta_painel`   | Valida o token e devolve a seção pedida                     |
 | `formulario_painel` | Valida o token e registra o formulário em `web_formularios` |
 
-Os dois passam antes pelo nó `Validar token`. O contrato completo — o que chega
-em `dados`, o que a resposta precisa ter — está no `.env.example`, na seção do
-`WEBHOOK_LOGIN_URL`.
+A tela, porém, manda **um evento por assunto** — `painel_bootstrap` para o
+carregamento inicial, `painel_abrir_chamado` para o suporte, `painel_segunda_via`
+para o boleto, e assim por diante. São 7 consultas e 14 formulários, todos
+listados em **`painel-cliente.md`**, junto do JSON que cada um envia e do JSON
+que a resposta precisa ter.
+
+Duas formas de atender, as duas válidas:
+
+1. **Um ramo por evento** — acrescente as saídas ao Switch `Rotear evento`. É o
+   caminho natural quando cada assunto fala com um sistema diferente.
+2. **Um ramo só** — como `dados.formulario` e `dados.secao` continuam no corpo
+   de todos eles, um Switch interno por esse campo resolve tudo dentro do ramo
+   genérico que já existe.
+
+O importante é responder: um evento sem ramo devolve `status: "erro"`, e a tela
+mostra esse erro ao cliente. Comece pelo `painel_bootstrap` — só ele já monta a
+página inteira.
+
+Os dois passam antes pelo nó `Validar token`.
 
 ## Decisões que valem conhecer antes de mexer
 
