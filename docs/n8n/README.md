@@ -16,16 +16,27 @@ painel enquanto esse token estiver válido.
 parâmetros do Postgres como array (`={{ [a, b] }}`), o que versões antigas do nó
 não aceitam.
 
-Uma variável de ambiente **no serviço do n8n** (não no do site):
+Duas variáveis de ambiente **no serviço do n8n** (não no do site):
 
 ```
+NODE_FUNCTION_ALLOW_BUILTIN=crypto
 WEBHOOK_LOGIN_TOKEN=<a mesma string do WEBHOOK_LOGIN_TOKEN do site>
 ```
 
-Precisa ser **byte a byte igual** à do site — é com ela que a assinatura é
-recalculada, e um caractere de diferença recusa tudo. Se o seu n8n roda com
-`N8N_BLOCK_ENV_ACCESS_IN_NODE=true`, os nós de código não a enxergam; deixe em
-`false` (o padrão).
+**`NODE_FUNCTION_ALLOW_BUILTIN` não é opcional.** O Code node do n8n roda num
+sandbox que bloqueia os módulos nativos do Node, e seis nós deste workflow usam
+`crypto` — a assinatura, o código, o token e as duas pontas da senha. Sem essa
+variável o primeiro deles falha com `Module 'crypto' is disallowed`, e os outros
+cinco falhariam em seguida.
+
+**`WEBHOOK_LOGIN_TOKEN`** precisa ser byte a byte igual à do site — é com ela que
+a assinatura é recalculada, e um caractere de diferença recusa tudo. Atenção ao
+prefixo: aqui vai **só o token**, sem `Bearer`. O `Bearer ` entra apenas na
+credencial Header Auth do nó Webhook, e é o site que o acrescenta ao chamar.
+
+As duas só são lidas na inicialização: depois de adicioná-las, **reinicie o
+serviço do n8n**. E se ele roda com `N8N_BLOCK_ENV_ACCESS_IN_NODE=true`, os nós
+de código não enxergam nenhuma variável de ambiente; deixe em `false` (o padrão).
 
 Rode o `schema.sql` no Postgres. Só a view `clientes_web` precisa ser adaptada:
 ela é o único ponto em que o workflow toca no seu cadastro.
