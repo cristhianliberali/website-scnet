@@ -20,6 +20,7 @@ import {
   acessarComSenhaServer,
   consultarPainelServer,
   enviarCodigoServer,
+  esquecerPainelServer,
   enviarFormularioPainelServer,
   iniciarAcessoDocumentoServer,
   solicitarLoginServer,
@@ -121,8 +122,15 @@ export const getSessaoCliente = createServerFn({ method: "GET" }).handler(
   },
 );
 
-/** Encerra a sessão e o desafio em andamento. */
+/**
+ * Encerra a sessão e o desafio em andamento.
+ *
+ * O retrato do painel guardado na memória do servidor sai junto: manter os
+ * dados de quem acabou de sair seria guardar o que ninguém pediu para guardar.
+ */
 export const logoutCliente = createServerFn({ method: "POST" }).handler(async () => {
+  const sessao = await lerSessao();
+  if (sessao) await esquecerPainelServer(sessao.idCliente);
   await limparSessao();
   await limparDesafio();
   return { ok: true };
@@ -131,12 +139,14 @@ export const logoutCliente = createServerFn({ method: "POST" }).handler(async ()
 /* ---------------- painel (já autenticado pelo token) ---------------- */
 
 const consultaSchema = z.object({
-  // nomes simples: a seção vai ao n8n e é o que ele usa para rotear
+  // nomes simples: a seção decide o evento e é o que o n8n usa para rotear
   secao: z
     .string()
     .min(1)
     .max(60)
     .regex(/^[a-z0-9_-]+$/i),
+  /** Pula o cache do servidor — usado pelo botão de atualizar da tela. */
+  forcar: z.boolean().optional(),
   recaptchaToken: z.string().optional(),
 });
 
@@ -166,7 +176,12 @@ const formularioSchema = z.object({
   recaptchaToken: z.string().optional(),
 });
 
-/** Lê uma seção do painel. O token da sessão vai junto, no servidor. */
+/**
+ * Lê uma seção do painel. O token da sessão vai junto, no servidor.
+ *
+ * `secao: "bootstrap"` é a chamada de abertura: sai uma vez logo depois do
+ * login e traz o painel inteiro numa ida só.
+ */
 export const consultarPainel = createServerFn({ method: "POST" })
   .validator(consultaSchema)
   .handler(async ({ data }): Promise<PainelOk | PainelErro> => consultarPainelServer(data));

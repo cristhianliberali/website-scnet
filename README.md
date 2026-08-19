@@ -281,9 +281,7 @@ Os dois caminhos são decididos pelo **n8n**, no `WEBHOOK_LOGIN_URL`. Não há
 provedor de identidade externo: quem conhece o cadastro do provedor é o n8n, e é
 ele quem diz se alguém entra.
 
-Depois do login o cliente vai para `/cliente/painel`, uma rota protegida que
-nesta versão está propositalmente vazia: ela existe para receber faturas, dados
-cadastrais e chamados sem retrabalho de autenticação.
+Depois do login o cliente vai para **`/cliente/painel`**, descrito logo abaixo.
 
 **O token de acesso.** Os dois logins terminam com o n8n emitindo um token
 temporário. Ele é a credencial que abre os dados do cliente: toda consulta
@@ -367,7 +365,54 @@ já no ar não caia ao atualizar.)
 
 O outro lado do webhook está em **`docs/n8n/`**: um workflow pronto para
 importar, com os eventos de login e de painel, a conferência da assinatura e a
-emissão do token, mais o SQL das estruturas que ele espera no Postgres.
+emissão do token, mais o SQL das estruturas que ele espera no Postgres — e o
+contrato JSON completo do painel em `docs/n8n/painel-cliente.md`.
+
+### O PAINEL (`/cliente/painel`)
+
+Rota protegida: sem sessão válida, volta ao login. Ela reúne o que o cliente
+costuma vir buscar — status financeiro com PIX à mão, indicação, contratos e
+oito serviços de autoatendimento.
+
+**Um carregamento só.** Depois de autenticar, o site dispara **uma** consulta,
+`painel_bootstrap`, que traz o painel inteiro: cadastro, contratos, faturas,
+notas fiscais, indicações, chamados, planos disponíveis e avisos. Uma ida ao n8n
+em vez de sete é a diferença entre a página aparecer pronta e aparecer aos
+pedaços. Ela sai no loader da rota, durante o SSR, então o HTML já chega com
+conteúdo — e o resultado entra no cache do TanStack Query como `initialData`, de
+modo que a hidratação não repete a chamada.
+
+**O resultado fica guardado em dois lugares**, de propósito:
+
+| Camada              | Prazo                         | Some quando                                             |
+| ------------------- | ----------------------------- | ------------------------------------------------------- |
+| TanStack Query (aba) | 5 min                        | recarregar a página, fechar a aba, clicar em "Atualizar" |
+| Memória do servidor | 60 s (`PAINEL_CACHE_SECONDS`) | formulário que muda algo, logout, reinício do container  |
+
+O primeiro faz abrir e fechar modais não custar nada; o segundo faz um F5 — que
+joga fora o cache do navegador inteiro — não virar outra ida ao n8n. Nenhum dos
+dois é fonte de verdade: são atalhos, e o cache do servidor mora na memória do
+processo justamente para sumir sozinho quando o container do EasyPanel é
+reciclado.
+
+**Um evento por formulário.** Cada ação da tela vai ao n8n com o seu próprio
+`evento` — `painel_trocar_plano`, `painel_abrir_chamado`, `painel_segunda_via`,
+`painel_mudanca_endereco`... — de modo que o Switch do n8n roteie direto, sem
+abrir `dados` para descobrir do que a chamada trata. São 14 formulários e 7
+consultas, todos em `docs/n8n/painel-cliente.md` com o JSON de envio e o de
+resposta. Os nomes genéricos `consulta_painel` e `formulario_painel` continuam
+aceitos: uma seção ou formulário fora do registro cai neles.
+
+Quando um formulário muda algo, as seções que ele afeta saem do cache na hora —
+quem acaba de trocar de plano não fica um minuto olhando para o plano antigo. E
+se a resposta do formulário já trouxer as listas atualizadas, elas entram direto
+no cache e não há nem a consulta seguinte. Formulários que não mudam nada
+(diagnóstico, viabilidade, teste de velocidade) não recarregam nada.
+
+**A tela não inventa resultado.** O protocolo do chamado, o PIX copia e cola, a
+data agendada e a medição de velocidade são o que voltou do n8n. Quando um campo
+não vem, a linha correspondente simplesmente não aparece — em vez de um valor
+plausível que ninguém apurou.
 
 This project was built with [Lovable](https://lovable.dev).
 
