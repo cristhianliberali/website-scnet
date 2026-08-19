@@ -2,13 +2,15 @@
  * Server functions da área do cliente — a ponte entre o formulário e a lógica
  * de `cliente-auth.server.ts`.
  *
- * O navegador nunca fala com o n8n nem com o Supabase: tudo passa por aqui, já
- * protegido contra requisições de outros sites pelo middleware CSRF de
- * `src/start.ts` — e o Supabase, na rede interna do EasyPanel, sequer é
- * alcançável de fora. Este
- * arquivo é importado pelo componente de login, então não pode conter nada de
- * servidor fora dos handlers — daí a lógica morar nos módulos `.server.ts`, que
- * o bundle do cliente recusaria.
+ * O navegador nunca fala com o n8n: tudo passa por aqui, já protegido contra
+ * requisições de outros sites pelo middleware CSRF de `src/start.ts`. O token
+ * de acesso emitido no login também mora só deste lado — ele é acrescentado às
+ * chamadas do painel aqui no servidor, a partir do cookie selado, e nenhuma
+ * dessas funções o aceita como parâmetro.
+ *
+ * Este arquivo é importado pelo componente de login, então não pode conter nada
+ * de servidor fora dos handlers — daí a lógica morar nos módulos `.server.ts`,
+ * que o bundle do cliente recusaria.
  */
 
 import { createServerFn } from "@tanstack/react-start";
@@ -16,7 +18,9 @@ import { z } from "zod";
 
 import {
   acessarComSenhaServer,
+  consultarPainelServer,
   enviarCodigoServer,
+  enviarFormularioPainelServer,
   iniciarAcessoDocumentoServer,
   solicitarLoginServer,
   verificarCodigoServer,
@@ -27,7 +31,10 @@ import type {
   LoginConcluido,
   LoginErro,
   MensagemOk,
-  SessaoCliente,
+  PainelErro,
+  PainelOk,
+  SessaoPublica,
+  ValorJson,
 } from "./cliente-tipos";
 
 /* ---------------- schemas ---------------- */
@@ -48,10 +55,13 @@ const codigoSchema = z.object({
   recaptchaToken: z.string().optional(),
 });
 
-// O teto da senha existe para não empurrar 100 KB de texto ao Supabase; o piso
-// é 1 porque quem valida força de senha é o Supabase, no cadastro.
+/*
+ * Login e senha do SAC. Os dois são de formato livre — quem define o que vale é
+ * o SAC, não esta tela. Os tetos existem só para não empurrar 100 KB de texto
+ * ao n8n; quem diz se as credenciais existem é o cadastro.
+ */
 const senhaSchema = z.object({
-  identificador: z.string().min(1).max(160),
+  login: z.string().min(1).max(160),
   senha: z.string().min(1).max(200),
   recaptchaToken: z.string().optional(),
 });
@@ -82,7 +92,7 @@ export const verificarCodigo = createServerFn({ method: "POST" })
   .validator(codigoSchema)
   .handler(async ({ data }): Promise<LoginConcluido | LoginErro> => verificarCodigoServer(data));
 
-/** Método 2: e-mail ou telefone + senha, conferidos no Supabase. */
+/** Método 2: login e senha do SAC, conferidos pelo n8n. */
 export const acessarComSenha = createServerFn({ method: "POST" })
   .validator(senhaSchema)
   .handler(async ({ data }): Promise<LoginConcluido | LoginErro> => acessarComSenhaServer(data));
@@ -94,9 +104,21 @@ export const solicitarLogin = createServerFn({ method: "POST" })
 
 /* ---------------- sessão ---------------- */
 
-/** Usada pelas rotas para saber se há sessão válida. */
+/**
+ * Usada pelas rotas para saber se há sessão válida.
+ *
+ * Devolve tudo menos o token: o resultado atravessa a fronteira para o
+ * navegador, e o token é a credencial que abre os dados do cliente no n8n.
+ * Ele fica no cookie selado e é acrescentado às chamadas aqui no servidor.
+ */
 export const getSessaoCliente = createServerFn({ method: "GET" }).handler(
-  async (): Promise<SessaoCliente | null> => lerSessao(),
+  async (): Promise<SessaoPublica | null> => {
+    const sessao = await lerSessao();
+    if (!sessao) return null;
+    const { token, ...publica } = sessao;
+    void token;
+    return publica;
+  },
 );
 
 /** Encerra a sessão e o desafio em andamento. */
@@ -105,3 +127,51 @@ export const logoutCliente = createServerFn({ method: "POST" }).handler(async ()
   await limparDesafio();
   return { ok: true };
 });
+
+/* ---------------- painel (já autenticado pelo token) ---------------- */
+
+const consultaSchema = z.object({
+  // nomes simples: a seção vai ao n8n e é o que ele usa para rotear
+  secao: z
+    .string()
+    .min(1)
+    .max(60)
+    .regex(/^[a-z0-9_-]+$/i),
+  recaptchaToken: z.string().optional(),
+});
+
+/*
+ * Os campos do formulário. O conteúdo é livre — cada tela do painel manda o
+ * seu, e quem valida campo a campo é o n8n —, mas o formato é fechado em JSON
+ * simples: nada de `unknown`, que as server functions recusam serializar.
+ */
+const valorJsonSchema: z.ZodType<ValorJson> = z.lazy(() =>
+  z.union([
+    z.string(),
+    z.number(),
+    z.boolean(),
+    z.null(),
+    z.array(valorJsonSchema),
+    z.record(valorJsonSchema),
+  ]),
+);
+
+const formularioSchema = z.object({
+  formulario: z
+    .string()
+    .min(1)
+    .max(60)
+    .regex(/^[a-z0-9_-]+$/i),
+  dados: z.record(valorJsonSchema),
+  recaptchaToken: z.string().optional(),
+});
+
+/** Lê uma seção do painel. O token da sessão vai junto, no servidor. */
+export const consultarPainel = createServerFn({ method: "POST" })
+  .validator(consultaSchema)
+  .handler(async ({ data }): Promise<PainelOk | PainelErro> => consultarPainelServer(data));
+
+/** Envia um formulário da área do cliente, com o token da sessão junto. */
+export const enviarFormularioPainel = createServerFn({ method: "POST" })
+  .validator(formularioSchema)
+  .handler(async ({ data }): Promise<PainelOk | PainelErro> => enviarFormularioPainelServer(data));

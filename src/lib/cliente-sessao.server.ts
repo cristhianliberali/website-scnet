@@ -1,11 +1,16 @@
 /**
  * Sessão da área do cliente (só servidor).
  *
- * O n8n verifica as credenciais; quem é dono da sessão é este servidor. Os dois
- * cookies usam a sessão selada do próprio TanStack Start (`useSession`), que
- * criptografa e assina o conteúdo com `SESSION_SECRET`: o navegador guarda um
- * texto opaco, não consegue lê-lo nem forjá-lo, e o cookie é `HttpOnly`, então
- * nem o JavaScript da página o alcança.
+ * O n8n verifica as credenciais e emite o token de acesso; quem é dono da
+ * sessão é este servidor. Os dois cookies usam a sessão selada do próprio
+ * TanStack Start (`useSession`), que criptografa e assina o conteúdo com
+ * `SESSION_SECRET`: o navegador guarda um texto opaco, não consegue lê-lo nem
+ * forjá-lo, e o cookie é `HttpOnly`, então nem o JavaScript da página o alcança.
+ *
+ * É dentro desse selo que mora o **token de acesso** do n8n. Ele não é um
+ * detalhe de armazenamento: é a credencial que abre os dados do cliente no n8n.
+ * Guardá-lo aqui, e não em localStorage ou num cookie legível, é o que impede
+ * que um XSS na página o roube e passe a falar com o n8n direto.
  *
  * - `scnet_cliente` (2h) — a sessão de fato, criada só depois do login completo.
  * - `scnet_cliente_desafio` (10min) — o meio do caminho do login por documento,
@@ -30,7 +35,7 @@ import {
   useSession,
 } from "@tanstack/react-start/server";
 
-import type { DesafioCliente, SessaoCliente } from "./cliente-tipos";
+import type { DesafioCliente, SessaoCliente, TokenAcesso } from "./cliente-tipos";
 
 /** Mínimo exigido pelo selo da sessão. */
 const MIN_SECRET_LENGTH = 32;
@@ -110,11 +115,38 @@ export async function lerSessao(): Promise<SessaoCliente | null> {
   const data = await lerCookieSelado<SessaoCliente>(SESSAO_COOKIE, SESSAO_MAX_AGE);
   if (!data) return null;
 
-  // `documento` e `contato` são só exibição: um login por senha pode não ter
-  // nenhum documento no cadastro do Supabase, e isso não invalida a sessão.
-  const { idCliente, nome, documento, contato, metodo, idSupabase } = data;
+  // `documento` e `contato` são só exibição: um login por senha pode não trazer
+  // documento nenhum, e isso não invalida a sessão.
+  const { idCliente, nome, documento, contato, metodo, token } = data;
   if (!idCliente || !nome || !metodo) return null;
-  return { idCliente, nome, metodo, documento, contato, idSupabase };
+
+  /*
+   * Sem token não há sessão. Uma sessão sem token não consegue consultar nada
+   * no n8n, então manter o cliente "logado" só o levaria a uma tela de erro
+   * atrás da outra — melhor mandá-lo ao login e acabar com isso.
+   *
+   * O prazo é conferido aqui, e não só no cookie: o `maxAge` de 2h do cookie e
+   * a validade que o n8n deu ao token são coisas diferentes, e vale a mais
+   * curta das duas.
+   */
+  if (!token?.valor || !token.expiraEm) return null;
+  if (token.expiraEm <= Math.floor(Date.now() / 1000)) return null;
+
+  return { idCliente, nome, metodo, token, documento, contato };
+}
+
+/**
+ * Troca só o token da sessão, preservando o resto.
+ *
+ * O n8n pode devolver um token novo em qualquer resposta autenticada — é assim
+ * que a validade desliza enquanto o cliente está usando o painel, sem um evento
+ * de renovação separado e sem obrigá-lo a entrar de novo no meio do caminho.
+ */
+export async function renovarToken(token: TokenAcesso) {
+  const session = await useSession<SessaoCliente>(config(SESSAO_COOKIE, SESSAO_MAX_AGE));
+  // `update` recebe o estado atual e devolve o novo: sem isso um token novo
+  // apagaria nome, documento e método junto.
+  await session.update((atual) => ({ ...atual, token }));
 }
 
 export async function limparSessao() {

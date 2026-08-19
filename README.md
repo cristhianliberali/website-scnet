@@ -267,49 +267,51 @@ Como cada coluna aparece no site:
 Página de login com header e rodapé iguais aos das demais, reCAPTCHA v3 em toda
 submissão e dois métodos de acesso, em abas:
 
-1. **Documento do cadastro** (n8n) — CPF ou CNPJ, depois a escolha de onde
-   receber um código (SMS, WhatsApp ou e-mail, só os canais que o cadastro
-   tiver) e por fim o código. O documento é a referência inicial do cliente: é
-   ele que diz ao n8n quais canais existem e para onde o código pode ir.
-2. **E-mail ou telefone + senha** (Supabase) — entra direto, sem código. O campo
-   aceita os dois: com `@` vai como e-mail, senão o número é normalizado para
-   E.164 (`(49) 99999-1234` → `+5549999991234`, que é como o Supabase guarda) e
-   vai como telefone. Abaixo há "Esqueci minha senha", que continua no n8n —
-   pergunta o documento e manda os dados de acesso pelo WhatsApp ou e-mail do
-   cadastro.
+1. **Documento do cadastro** — CPF ou CNPJ, depois a escolha de onde receber um
+   código (SMS, WhatsApp ou e-mail, só os canais que o cadastro tiver) e por fim
+   o código. O documento é a referência inicial do cliente: é ele que diz ao n8n
+   quais canais existem e para onde o código pode ir.
+2. **E-mail ou telefone + senha** — entra direto, sem código. O campo aceita os
+   dois: com `@` vai como e-mail, senão o número é normalizado para E.164
+   (`(49) 99999-1234` → `+5549999991234`) e vai como telefone. Abaixo há
+   "Esqueci minha senha", que pergunta o documento e manda os dados de acesso
+   pelo WhatsApp ou e-mail do cadastro.
+
+Os dois caminhos são decididos pelo **n8n**, no `WEBHOOK_LOGIN_URL`. Não há
+provedor de identidade externo: quem conhece o cadastro do provedor é o n8n, e é
+ele quem diz se alguém entra.
 
 Depois do login o cliente vai para `/cliente/painel`, uma rota protegida que
 nesta versão está propositalmente vazia: ela existe para receber faturas, dados
 cadastrais e chamados sem retrabalho de autenticação.
 
-**Quem decide o quê.** São dois provedores de identidade, cada um no que sabe: o
-Supabase guarda e confere as senhas; o n8n conhece o cadastro do provedor, então
-é ele que resolve documento, canais e código. A **sessão** não é de nenhum dos
-dois — é deste servidor. Os cookies `scnet_cliente` (2h) e
+**O token de acesso.** Os dois logins terminam com o n8n emitindo um token
+temporário. Ele é a credencial que abre os dados do cliente: toda consulta
+(`consulta_painel`) e todo formulário (`formulario_painel`) do painel vão ao n8n
+com esse token junto, e sem ele o n8n não responde nada sobre o cliente. Um
+login que o n8n aceita **sem** devolver token é recusado pelo site — entrar
+assim daria uma sessão que não consulta nada.
+
+O token viaja no corpo da requisição, não num header, porque o corpo é o que a
+assinatura HMAC cobre; num header ele ficaria fora da assinatura. E ele **nunca
+chega ao navegador**: mora no cookie selado e é acrescentado às chamadas aqui no
+servidor, a partir do cookie. É por isso que `getSessaoCliente` devolve a sessão
+sem o token — se ele chegasse à página, um XSS bastaria para roubá-lo e passar a
+falar com o n8n direto, sem passar por nada daqui.
+
+A validade desliza sozinha: qualquer resposta do painel pode trazer um token
+novo, e o site troca o antigo por ele — não há evento de renovação separado.
+Para derrubar uma sessão antes da hora, o n8n responde 401/403 ou
+`status: "token_invalido"`, e o site apaga o cookie e manda o cliente ao login.
+
+**Quem decide o quê.** O n8n verifica as credenciais e emite o token; a
+**sessão** é deste servidor. Os cookies `scnet_cliente` (2h) e
 `scnet_cliente_desafio` (10min) usam a sessão selada do TanStack Start: conteúdo
 criptografado e assinado com `SESSION_SECRET`, `HttpOnly`, `SameSite=Lax` e
 `Secure` quando em https. O navegador não lê nem forja nenhum dos dois, e nada de
 sessão fica guardado no servidor — o que importa porque o container do EasyPanel
-é efêmero.
-
-O token do Supabase serve só como prova de que a senha confere e é descartado ali
-mesmo: não vai ao navegador nem é guardado. Assim os dois caminhos de login
-terminam no mesmo cookie, com um só dono de sessão e uma só forma de sair.
-
-**Supabase.** Roda no mesmo EasyPanel, então `SUPABASE_URL` aponta para o
-endereço interno da rede Docker (`http://supabase-kong:8000`) e nada disso tem
-superfície pública. A única chave configurada é a `anon`, que é a que os
-endpoints de autenticação pedem; a `service_role` ignora RLS e vale como senha
-mestra do banco — quem precisa dela é o n8n, para criar e redefinir credenciais,
-não o site. As variáveis são `SUPABASE_*` sem prefixo `VITE_` de propósito: o
-navegador nunca fala com o Supabase (tudo passa por server functions, protegidas
-por CSRF) e, na rede interna, nem conseguiria.
-
-No Supabase, ligue "Email" e — para o login por telefone — "Phone" com um
-provider de SMS. Em cada usuário, `app_metadata` deve trazer `id_cliente`, `nome`
-e `documento`. O site lê `app_metadata` antes de `user_metadata` porque só a
-chave de serviço escreve nele: `user_metadata` o próprio usuário altera com um
-`updateUser`, e não serve para amarrar a sessão a um cliente do provedor.
+é efêmero. Valem os dois prazos, e o mais curto ganha: o `maxAge` de 2h do cookie
+e a validade que o n8n deu ao token.
 
 **Segurança do webhook de login.** O webhook do n8n costuma ser uma URL pública,
 então a defesa é dos dois lados. Do lado do site: o `id_cliente` nunca vem do
@@ -327,17 +329,15 @@ formulário (sai do cookie de desafio, selado), o navegador nunca fala com o n8n
 - se o n8n roda no mesmo EasyPanel, apontar `WEBHOOK_LOGIN_URL` para a URL
   interna da rede Docker — sem superfície pública não há o que descobrir.
 
-**Falha fechado.** Sem `SESSION_SECRET` (mínimo de 32 caracteres) nenhum login é
-aceito. Sem `WEBHOOK_LOGIN_URL` cai o acesso por documento; sem `SUPABASE_URL` ou
-`SUPABASE_ANON_KEY` cai o acesso por senha. Em todos os casos o servidor registra
-o motivo. É o oposto do `WEBHOOK_URL` dos formulários, que sem configuração deixa
-passar: um login que passa por falta de configuração é um login que qualquer um
-atravessa.
+**Falha fechado.** Sem `WEBHOOK_LOGIN_URL` ou sem `SESSION_SECRET` (mínimo de 32
+caracteres) nenhum login é aceito, e o servidor registra o motivo. É o oposto do
+`WEBHOOK_URL` dos formulários, que sem configuração deixa passar: um login que
+passa por falta de configuração é um login que qualquer um atravessa.
 
-Vale para o Supabase também: quando ele não responde (rede interna fora do ar ou
-timeout), a resposta é "indisponível", não "senha incorreta" — e a tentativa não
-é contada. Dizer o contrário mentiria para quem digitou a senha certa e ainda
-gastaria uma das três tentativas dessa pessoa.
+Quando o n8n não responde (rede fora do ar ou timeout), o login por senha diz
+"indisponível", não "senha incorreta" — e a tentativa não é contada. Dizer o
+contrário mentiria para quem digitou a senha certa e ainda gastaria uma das três
+tentativas dessa pessoa.
 
 **Tentativas.** Duas travas independentes valem no `/cliente`, e é bom não
 confundi-las:
@@ -357,17 +357,17 @@ confundi-las:
 Os dois contadores vivem na memória do processo: reiniciar o container ou rodar
 duas instâncias zera a contagem.
 
-Os eventos e o formato das respostas esperadas do n8n estão documentados no
-`.env.example`, junto das cinco variáveis da área do cliente — `SUPABASE_URL`,
-`SUPABASE_ANON_KEY`, `WEBHOOK_LOGIN_URL`, `WEBHOOK_LOGIN_TOKEN` e
+Os eventos e o formato das respostas esperadas do n8n — inclusive as formas em
+que o token pode vir — estão documentados no `.env.example`, junto das três
+variáveis da área do cliente: `WEBHOOK_LOGIN_URL`, `WEBHOOK_LOGIN_TOKEN` e
 `SESSION_SECRET`. Todas são de runtime: no EasyPanel entram como Environment
 Variables, nunca como Build Args. (Os nomes antigos `WEBHOOK_PAINEL_CLIENTE` e
 `WEBHOOK_PAINEL_CLIENTE_TOKEN` continuam sendo aceitos, para que uma implantação
 já no ar não caia ao atualizar.)
 
 O outro lado do webhook está em **`docs/n8n/`**: um workflow pronto para
-importar, com os quatro eventos, a conferência da assinatura e a criação da
-senha no Supabase, mais o SQL das duas estruturas que ele espera no Postgres.
+importar, com os eventos de login e de painel, a conferência da assinatura e a
+emissão do token, mais o SQL das estruturas que ele espera no Postgres.
 
 This project was built with [Lovable](https://lovable.dev).
 

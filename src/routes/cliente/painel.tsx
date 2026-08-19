@@ -32,7 +32,7 @@ function PainelCliente() {
   }
 
   const primeiroNome = sessao.nome.split(" ")[0] ?? sessao.nome;
-  // quem entrou por senha pode não ter documento no cadastro do Supabase
+  // quem entrou por senha pode não ter documento no cadastro
   const identificacao = sessao.documento ? `Documento ${sessao.documento}` : sessao.contato;
 
   return (

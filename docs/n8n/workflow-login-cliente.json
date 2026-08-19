@@ -1,5 +1,5 @@
 {
-  "name": "SCNET — Login da área do cliente",
+  "name": "SCNET — Login e painel da área do cliente",
   "nodes": [
     {
       "id": "scnet-001",
@@ -7,7 +7,7 @@
       "type": "n8n-nodes-base.webhook",
       "typeVersion": 2,
       "position": [
-        -1200,
+        -1400,
         400
       ],
       "webhookId": "TROQUE-POR-UM-UUID-SEU",
@@ -27,7 +27,7 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        -980,
+        -1180,
         400
       ],
       "parameters": {
@@ -40,7 +40,7 @@
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.2,
       "position": [
-        -760,
+        -960,
         400
       ],
       "parameters": {
@@ -74,8 +74,8 @@
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1.1,
       "position": [
-        -540,
-        620
+        -740,
+        660
       ],
       "parameters": {
         "respondWith": "json",
@@ -86,13 +86,13 @@
       }
     },
     {
-      "id": "scnet-010",
+      "id": "scnet-013",
       "name": "Rotear evento",
       "type": "n8n-nodes-base.switch",
       "typeVersion": 3.2,
       "position": [
-        -540,
-        300
+        -740,
+        320
       ],
       "parameters": {
         "rules": {
@@ -181,6 +181,30 @@
                   {
                     "id": "scnet-009",
                     "leftValue": "={{ $json.evento }}",
+                    "rightValue": "acesso_senha",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "acesso_senha"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "scnet-010",
+                    "leftValue": "={{ $json.evento }}",
                     "rightValue": "solicitacao_login",
                     "operator": {
                       "type": "string",
@@ -192,6 +216,54 @@
               },
               "renameOutput": true,
               "outputKey": "solicitacao_login"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "scnet-011",
+                    "leftValue": "={{ $json.evento }}",
+                    "rightValue": "consulta_painel",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "consulta_painel"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "scnet-012",
+                    "leftValue": "={{ $json.evento }}",
+                    "rightValue": "formulario_painel",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "formulario_painel"
             }
           ]
         },
@@ -202,13 +274,13 @@
       }
     },
     {
-      "id": "scnet-011",
+      "id": "scnet-014",
       "name": "Evento desconhecido",
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1.1,
       "position": [
-        -100,
-        900
+        -300,
+        1500
       ],
       "parameters": {
         "respondWith": "json",
@@ -219,44 +291,92 @@
       }
     },
     {
-      "id": "scnet-012",
+      "id": "scnet-015",
+      "name": "Gerar token",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        900,
+        340
+      ],
+      "parameters": {
+        "jsCode": "/*\n * Emite o token de acesso da sessão — o fim comum dos dois logins.\n *\n * O token é aleatório e opaco: não carrega informação nenhuma, é só uma chave\n * de 32 bytes que aponta para a linha em `web_sessoes`. Isso é o que permite\n * revogá-lo a qualquer momento; um JWT autoassinado, por comparação, continua\n * válido até expirar mesmo depois de você querer derrubá-lo.\n *\n * No banco vai só o SHA-256. Aqui o hash simples basta (diferente da senha):\n * o token tem 256 bits de entropia, então não há o que adivinhar por força\n * bruta — o hash serve para que uma cópia da tabela não entregue sessões vivas.\n */\nconst crypto = require('crypto');\n\nconst VALIDADE_MINUTOS = 30;\n\nconst login = $input.first().json;\nconst token = crypto.randomBytes(32).toString('base64url');\n\nreturn [\n  {\n    json: {\n      id_cliente: String(login.id_cliente ?? ''),\n      nome: login.nome || 'cliente',\n      documento: login.documento ?? null,\n      token,\n      token_hash: crypto.createHash('sha256').update(token).digest('hex'),\n      validade_minutos: VALIDADE_MINUTOS,\n      expira_em_segundos: VALIDADE_MINUTOS * 60,\n    },\n  },\n];"
+      }
+    },
+    {
+      "id": "scnet-016",
+      "name": "Guardar token",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        1120,
+        340
+      ],
+      "alwaysOutputData": true,
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "-- Uma sessão por linha. No banco fica só o SHA-256 do token: uma cópia da\n-- tabela não entrega sessões vivas, e revogar é um UPDATE.\nINSERT INTO public.web_sessoes (token_hash, id_cliente, expira_em)\nVALUES ($1, $2, now() + ($3 || ' minutes')::interval)\nRETURNING extract(epoch FROM expira_em)::bigint AS expira_em;",
+        "options": {
+          "queryReplacement": "={{ [$json.token_hash, $json.id_cliente, $json.validade_minutos] }}"
+        }
+      }
+    },
+    {
+      "id": "scnet-017",
+      "name": "Responder login",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        1340,
+        340
+      ],
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ status: 'ok', id_cliente: $('Gerar token').first().json.id_cliente, cliente: { nome: $('Gerar token').first().json.nome, documento: $('Gerar token').first().json.documento }, token: $('Gerar token').first().json.token, expira_em: Number($json.expira_em) }) }}",
+        "options": {
+          "responseCode": 200
+        }
+      }
+    },
+    {
+      "id": "scnet-018",
       "name": "Buscar cliente por documento",
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.5,
       "position": [
-        -100,
-        -60
+        -300,
+        -280
       ],
       "alwaysOutputData": true,
       "parameters": {
         "operation": "executeQuery",
         "query": "SELECT id_cliente, nome, celular, email\n  FROM public.clientes_web\n WHERE documento = $1\n LIMIT 1;",
         "options": {
-          "queryReplacement": "={{ $json.dados.documento }}"
+          "queryReplacement": "={{ [$json.dados.documento] }}"
         }
       }
     },
     {
-      "id": "scnet-013",
+      "id": "scnet-019",
       "name": "Montar canais",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        180,
-        -60
+        -80,
+        -280
       ],
       "parameters": {
         "jsCode": "/*\n * Resposta do evento `documento_cliente`.\n *\n * O site exige `id_cliente` aqui: é o único momento em que o n8n diz de quem é\n * o login. Daqui em diante esse id viaja no cookie selado do site, não no\n * formulário, então ninguém troca de cliente no meio do caminho.\n */\nconst cliente = $input.first()?.json ?? {};\n\nif (!cliente.id_cliente) {\n  // Mensagem propositalmente vaga: dizer \"documento não cadastrado\" confirma,\n  // a quem só sabe testar CPFs, quais deles são clientes.\n  return [\n    {\n      json: {\n        status: 'erro',\n        mensagem: 'Não conseguimos localizar esse documento. Confira e tente de novo.',\n      },\n    },\n  ];\n}\n\nconst celular = String(cliente.celular ?? '').replace(/\\D/g, '');\nconst email = String(cliente.email ?? '').trim();\n\n// 10 dígitos = fixo com DDD; 11 = celular. Menos que isso não dá para enviar.\nconst temCelular = celular.length >= 10;\nconst temEmail = /^[^\\s@]+@[^\\s@]+\\.[^\\s@]{2,}$/.test(email);\n\n/*\n * Os contatos vão INTEIROS: o site mascara antes de mandar à tela\n * (\"(49)*******234\", \"ma*****@e****.com\"). Mascarar aqui também não faz mal —\n * ele detecta o \"*\" e não mexe — mas não é necessário.\n *\n * Se nenhum canal for `true`, o site mostra um aviso pedindo que o cliente\n * procure o atendimento, em vez de travar numa tela sem opção.\n */\nreturn [\n  {\n    json: {\n      status: 'ok',\n      id_cliente: String(cliente.id_cliente),\n      canais: { sms: temCelular, whatsapp: temCelular, email: temEmail },\n      contatos: {\n        ...(temCelular ? { celular } : {}),\n        ...(temEmail ? { email } : {}),\n      },\n    },\n  },\n];"
       }
     },
     {
-      "id": "scnet-014",
+      "id": "scnet-020",
       "name": "Responder documento",
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1.1,
       "position": [
-        460,
-        -60
+        140,
+        -280
       ],
       "parameters": {
         "respondWith": "json",
@@ -267,44 +387,44 @@
       }
     },
     {
-      "id": "scnet-015",
+      "id": "scnet-021",
       "name": "Gerar código",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        -100,
-        200
+        -300,
+        -80
       ],
       "parameters": {
         "jsCode": "/*\n * Evento `envio_codigo`: gera o código de 6 dígitos.\n *\n * O site nunca vê o código — ele só pede o envio e, depois, manda o que o\n * cliente digitou para conferência. Quem gera, envia e guarda é o n8n.\n */\nconst crypto = require('crypto');\n\nconst envelope = $('Validar assinatura').first().json;\nconst dados = envelope.dados ?? {};\n\n// randomInt é do gerador criptográfico. Math.random() é previsível e não serve\n// para nada que autentica alguém.\nconst codigo = String(crypto.randomInt(0, 1000000)).padStart(6, '0');\n\n/*\n * No banco fica só o hash. Um código de 6 dígitos tem 1 milhão de\n * possibilidades — o SHA-256 aqui não impede quebrá-lo por força bruta offline,\n * mas impede que quem abrir a tabela leia os códigos vivos e entre nas contas\n * antes de eles expirarem, que é o risco real com validade de 5 minutos.\n */\nconst codigoHash = crypto.createHash('sha256').update(codigo).digest('hex');\n\nreturn [\n  {\n    json: {\n      id_cliente: String(dados.id_cliente ?? ''),\n      documento: String(dados.documento ?? ''),\n      metodo: String(dados.metodo ?? ''),\n      codigo, // só para o nó de envio; não vai ao banco nem à resposta\n      codigo_hash: codigoHash,\n    },\n  },\n];"
       }
     },
     {
-      "id": "scnet-016",
+      "id": "scnet-022",
       "name": "Guardar código",
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.5,
       "position": [
-        180,
-        200
+        -80,
+        -80
       ],
       "alwaysOutputData": true,
       "parameters": {
         "operation": "executeQuery",
         "query": "-- Um comando só, para não deixar meio caminho gravado se algo falhar:\n-- confere o par cliente/documento, invalida os códigos anteriores e grava\n-- o novo. Sem cliente correspondente, nada é inserido e nenhum código sai.\nWITH cliente AS (\n  SELECT id_cliente FROM public.clientes_web\n   WHERE id_cliente = $1 AND documento = $2\n), invalidados AS (\n  UPDATE public.web_codigos_acesso SET usado_em = now()\n   WHERE id_cliente = $1 AND usado_em IS NULL\n     AND EXISTS (SELECT 1 FROM cliente)\n)\nINSERT INTO public.web_codigos_acesso\n       (id_cliente, documento, metodo, codigo_hash, expira_em)\nSELECT $1, $2, $3, $4, now() + interval '5 minutes' FROM cliente\nRETURNING id;",
         "options": {
-          "queryReplacement": "={{ $json.id_cliente }}, {{ $json.documento }}, {{ $json.metodo }}, {{ $json.codigo_hash }}"
+          "queryReplacement": "={{ [$json.id_cliente, $json.documento, $json.metodo, $json.codigo_hash] }}"
         }
       }
     },
     {
-      "id": "scnet-018",
+      "id": "scnet-024",
       "name": "Código gravado?",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.2,
       "position": [
-        460,
-        200
+        140,
+        -80
       ],
       "parameters": {
         "conditions": {
@@ -316,7 +436,7 @@
           },
           "conditions": [
             {
-              "id": "scnet-017",
+              "id": "scnet-023",
               "leftValue": "={{ $json.id != null }}",
               "rightValue": "",
               "operator": {
@@ -332,24 +452,24 @@
       }
     },
     {
-      "id": "scnet-019",
+      "id": "scnet-025",
       "name": "Enviar código — CONFIGURE AQUI",
       "type": "n8n-nodes-base.noOp",
       "typeVersion": 1,
       "position": [
-        740,
-        120
+        360,
+        -160
       ],
       "parameters": {}
     },
     {
-      "id": "scnet-020",
+      "id": "scnet-026",
       "name": "Responder envio",
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1.1,
       "position": [
-        1020,
-        120
+        580,
+        -160
       ],
       "parameters": {
         "respondWith": "json",
@@ -360,13 +480,13 @@
       }
     },
     {
-      "id": "scnet-021",
+      "id": "scnet-027",
       "name": "Responder envio recusado",
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1.1,
       "position": [
-        740,
-        300
+        360,
+        20
       ],
       "parameters": {
         "respondWith": "json",
@@ -377,105 +497,365 @@
       }
     },
     {
-      "id": "scnet-022",
+      "id": "scnet-028",
       "name": "Hash do código",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        -100,
-        480
+        -300,
+        200
       ],
       "parameters": {
         "jsCode": "/*\n * Evento `verificacao_codigo`: transforma o código digitado no mesmo hash que\n * foi gravado no envio, para a query comparar hash com hash.\n *\n * Isso é um nó de código, e não uma expressão no nó Postgres, porque as\n * expressões do n8n rodam num sandbox sem `require` — não há como chamar o\n * módulo crypto de dentro delas.\n */\nconst crypto = require('crypto');\n\nconst dados = $input.first().json.dados ?? {};\nconst codigo = String(dados.codigo ?? '').replace(/\\D/g, '');\n\nreturn [\n  {\n    json: {\n      id_cliente: String(dados.id_cliente ?? ''),\n      documento: String(dados.documento ?? ''),\n      codigo_hash: crypto.createHash('sha256').update(codigo).digest('hex'),\n    },\n  },\n];"
       }
     },
     {
-      "id": "scnet-023",
+      "id": "scnet-029",
       "name": "Conferir código",
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.5,
       "position": [
-        180,
-        480
+        -80,
+        200
       ],
       "alwaysOutputData": true,
       "parameters": {
         "operation": "executeQuery",
-        "query": "-- Tudo em uma instrução, de propósito: escolher o código, contar a\n-- tentativa e marcá-lo como usado em comandos separados abriria a janela\n-- em que dois envios simultâneos gastam o mesmo código.\nWITH alvo AS (\n  SELECT id, codigo_hash FROM public.web_codigos_acesso\n   WHERE id_cliente = $1 AND documento = $2\n     AND usado_em IS NULL AND expira_em > now() AND tentativas < 5\n   ORDER BY criado_em DESC LIMIT 1\n), marcado AS (\n  UPDATE public.web_codigos_acesso c\n     SET tentativas = c.tentativas + 1,\n         usado_em = CASE WHEN a.codigo_hash = $3 THEN now() ELSE c.usado_em END\n    FROM alvo a WHERE c.id = a.id\n  RETURNING (a.codigo_hash = $3) AS confere\n)\nSELECT COALESCE((SELECT confere FROM marcado), false) AS confere,\n       (SELECT nome FROM public.clientes_web WHERE id_cliente = $1) AS nome;",
+        "query": "-- Tudo em uma instrução, de propósito: escolher o código, contar a\n-- tentativa e marcá-lo como usado em comandos separados abriria a janela\n-- em que dois envios simultâneos gastam o mesmo código.\nWITH alvo AS (\n  SELECT id, codigo_hash FROM public.web_codigos_acesso\n   WHERE id_cliente = $1 AND documento = $2\n     AND usado_em IS NULL AND expira_em > now() AND tentativas < 5\n   ORDER BY criado_em DESC LIMIT 1\n), marcado AS (\n  UPDATE public.web_codigos_acesso c\n     SET tentativas = c.tentativas + 1,\n         usado_em = CASE WHEN a.codigo_hash = $3 THEN now() ELSE c.usado_em END\n    FROM alvo a WHERE c.id = a.id\n  RETURNING (a.codigo_hash = $3) AS confere\n)\nSELECT COALESCE((SELECT confere FROM marcado), false) AS confere,\n       $1 AS id_cliente,\n       (SELECT nome FROM public.clientes_web WHERE id_cliente = $1) AS nome;",
         "options": {
-          "queryReplacement": "={{ $json.id_cliente }}, {{ $json.documento }}, {{ $json.codigo_hash }}"
+          "queryReplacement": "={{ [$json.id_cliente, $json.documento, $json.codigo_hash] }}"
         }
       }
     },
     {
-      "id": "scnet-024",
-      "name": "Avaliar código",
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
+      "id": "scnet-031",
+      "name": "Código confere?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
       "position": [
-        460,
-        480
+        140,
+        200
       ],
       "parameters": {
-        "jsCode": "/*\n * Resposta do evento `verificacao_codigo` — o momento em que o acesso é ou não\n * concedido.\n *\n * Quem decidiu foi a query do nó anterior, em uma única instrução: ela pega o\n * código mais recente ainda válido do cliente, soma uma tentativa e só o marca\n * como usado se o hash bater. Fazer isso em um comando só evita a corrida em\n * que dois envios simultâneos gastam o mesmo código.\n */\nconst r = $input.first()?.json ?? {};\n\nif (r.confere === true) {\n  return [\n    {\n      json: {\n        status: 'ok',\n        cliente: { nome: r.nome || 'cliente' },\n      },\n    },\n  ];\n}\n\n/*\n * Uma única mensagem para código errado, expirado e tentativas esgotadas. As\n * três diferem para quem está atacando — \"expirado\" confirma que o código\n * existiu — e não mudam nada para o cliente, que precisa da mesma coisa nos\n * três casos: pedir outro.\n */\nreturn [\n  {\n    json: {\n      status: 'erro',\n      mensagem: 'Código inválido ou expirado. Peça um novo código.',\n    },\n  },\n];"
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "scnet-030",
+              "leftValue": "={{ $json.confere }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
       }
     },
     {
-      "id": "scnet-025",
-      "name": "Responder verificação",
+      "id": "scnet-032",
+      "name": "Preparar login (código)",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        360,
+        140
+      ],
+      "parameters": {
+        "jsCode": "/*\n * Código conferido: normaliza o resultado para os nós de token, que são\n * compartilhados com o login por senha.\n */\nconst r = $input.first()?.json ?? {};\nreturn [{ json: { id_cliente: String(r.id_cliente ?? ''), nome: r.nome || 'cliente' } }];"
+      }
+    },
+    {
+      "id": "scnet-033",
+      "name": "Responder código recusado",
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1.1,
       "position": [
-        740,
-        480
+        360,
+        300
       ],
       "parameters": {
         "respondWith": "json",
-        "responseBody": "={{ JSON.stringify($json) }}",
+        "responseBody": "={{ JSON.stringify({ status: 'erro', mensagem: 'Código inválido ou expirado. Peça um novo código.' }) }}",
         "options": {
           "responseCode": 200
         }
       }
     },
     {
-      "id": "scnet-026",
-      "name": "Buscar cliente (solicitação)",
+      "id": "scnet-034",
+      "name": "Preparar consulta de senha",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -300,
+        480
+      ],
+      "parameters": {
+        "jsCode": "/*\n * Evento `acesso_senha`: prepara a busca do cliente pelo login do SAC.\n *\n * O login é de formato livre — pode ser um usuário, um e-mail, um número de\n * contrato, o que o SAC usar. Aqui só tiramos os espaços das pontas e\n * guardamos a versão minúscula para a busca, que é feita sem diferenciar\n * maiúsculas: quem digita no celular quase sempre manda a primeira letra\n * maiúscula sem querer, e recusar por isso seria só atrito.\n */\nconst dados = $input.first().json.dados ?? {};\nconst login = String(dados.login ?? '').trim();\n\nreturn [{ json: { login, login_busca: login.toLowerCase() } }];"
+      }
+    },
+    {
+      "id": "scnet-035",
+      "name": "Buscar credencial",
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.5,
       "position": [
-        -100,
-        740
+        -80,
+        480
       ],
       "alwaysOutputData": true,
       "parameters": {
         "operation": "executeQuery",
-        "query": "SELECT id_cliente, nome, celular, email, supabase_user_id\n  FROM public.clientes_web\n WHERE documento = $1\n LIMIT 1;",
+        "query": "-- A senha NÃO entra na query: o que sai daqui é a senha do cadastro, e a\n-- comparação acontece no nó seguinte. Assim a senha digitada não aparece\n-- em log de banco nem em pg_stat_statements.\n--\n-- lower() nos dois lados: o login não diferencia maiúsculas, porque o\n-- teclado do celular capitaliza a primeira letra sem pedir licença.\nSELECT c.id_cliente, c.nome, c.documento, c.senha_sac\n  FROM public.clientes_web c\n WHERE lower(c.acesso_sac) = $1\n LIMIT 1;",
         "options": {
-          "queryReplacement": "={{ $json.dados.documento }}"
+          "queryReplacement": "={{ [$json.login_busca] }}"
         }
       }
     },
     {
-      "id": "scnet-027",
+      "id": "scnet-036",
+      "name": "Conferir senha",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        140,
+        480
+      ],
+      "parameters": {
+        "jsCode": "/*\n * Confere a senha do SAC fora do banco.\n *\n * Duas razões para não comparar no SQL. A primeira é de segurança: a senha em\n * claro nunca entra numa query, então não aparece em log de banco nem em\n * `pg_stat_statements`. A segunda é bem prosaica: os parâmetros do nó Postgres\n * são uma lista separada por vírgula, e uma senha com vírgula viraria dois\n * parâmetros — um bug que só apareceria com o cliente certo, no pior momento.\n */\nconst crypto = require('crypto');\n\nconst cliente = $input.first()?.json ?? {};\nconst senhaDigitada = String($('Validar assinatura').first().json.dados?.senha ?? '');\nconst senhaCadastro = String(cliente.senha_sac ?? '');\n\nconst recusar = () => [{ json: { confere: false } }];\n\n// Cliente sem login/senha no cadastro não entra por este método.\nif (!cliente.id_cliente || !senhaCadastro) return recusar();\n\n/*\n * Comparação em tempo constante: um `===` vaza, pelo tempo de resposta, quantos\n * caracteres iniciais bateram — o bastante para adivinhar a senha caractere a\n * caractere. O SHA-256 dos dois lados iguala o tamanho antes de comparar, que é\n * o que `timingSafeEqual` exige.\n */\nconst digest = (v) => crypto.createHash('sha256').update(v, 'utf8').digest();\nif (!crypto.timingSafeEqual(digest(senhaDigitada), digest(senhaCadastro))) return recusar();\n\nreturn [\n  {\n    json: {\n      confere: true,\n      id_cliente: String(cliente.id_cliente),\n      nome: cliente.nome || 'cliente',\n      documento: cliente.documento ?? null,\n    },\n  },\n];"
+      }
+    },
+    {
+      "id": "scnet-038",
+      "name": "Senha confere?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        360,
+        480
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "scnet-037",
+              "leftValue": "={{ $json.confere }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "scnet-039",
+      "name": "Responder senha recusada",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        580,
+        580
+      ],
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ status: 'erro', mensagem: 'E-mail, telefone ou senha incorretos.' }) }}",
+        "options": {
+          "responseCode": 200
+        }
+      }
+    },
+    {
+      "id": "scnet-040",
+      "name": "Buscar cliente (solicitação)",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        -300,
+        760
+      ],
+      "alwaysOutputData": true,
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT id_cliente, nome, celular, email, acesso_sac, senha_sac\n  FROM public.clientes_web\n WHERE documento = $1\n LIMIT 1;",
+        "options": {
+          "queryReplacement": "={{ [$json.dados.documento] }}"
+        }
+      }
+    },
+    {
+      "id": "scnet-041",
       "name": "Preparar credencial",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        180,
-        740
+        -80,
+        760
       ],
       "parameters": {
-        "jsCode": "/*\n * Evento `solicitacao_login` (\"Esqueci minha senha\").\n *\n * É a ponte entre os dois provedores: o cadastro está aqui, mas quem guarda a\n * senha é o Supabase. Então geramos uma senha nova, gravamos no Supabase pela\n * chave de serviço e mandamos ao cliente pelo canal que ele escolheu.\n *\n * `acao` decide o caminho no Switch seguinte:\n *   nada       documento não encontrado — respondemos ok assim mesmo\n *   criar      cliente sem usuário no Supabase ainda\n *   atualizar  já tem usuário, só troca a senha\n */\nconst crypto = require('crypto');\n\nconst envelope = $('Validar assinatura').first().json;\nconst dados = envelope.dados ?? {};\nconst cliente = $input.first()?.json ?? {};\n\nconst encontrado = Boolean(cliente.id_cliente);\n\n// 12 caracteres do gerador criptográfico. base64url não tem \"+\", \"/\" nem \"=\",\n// que quebram ao serem copiados de uma mensagem de WhatsApp.\nconst senha = crypto.randomBytes(9).toString('base64url');\n\nconst celular = String(cliente.celular ?? '').replace(/\\D/g, '');\nconst email = String(cliente.email ?? '').trim().toLowerCase();\n\n// O Supabase guarda telefone em E.164. O DDI 55 é acrescentado quando o\n// cadastro traz só DDD + número.\nconst telefoneE164 = celular\n  ? '+' + (celular.startsWith('55') && celular.length > 11 ? celular : '55' + celular)\n  : null;\n\nreturn [\n  {\n    json: {\n      acao: !encontrado ? 'nada' : cliente.supabase_user_id ? 'atualizar' : 'criar',\n      id_cliente: encontrado ? String(cliente.id_cliente) : null,\n      supabase_user_id: cliente.supabase_user_id ?? null,\n      nome: cliente.nome ?? 'cliente',\n      documento: String(dados.documento ?? ''),\n      metodo: String(dados.metodo ?? 'whatsapp'),\n      email: email || null,\n      celular: celular || null,\n      telefone_e164: telefoneE164,\n      senha,\n    },\n  },\n];"
+        "jsCode": "/*\n * Evento `solicitacao_login` (\"Esqueci minha senha\").\n *\n * Não gera senha nova: as credenciais são as do SAC, e quem manda nelas é o\n * sistema do provedor. Aqui a gente só busca o que já existe e entrega ao\n * cliente pelo canal do cadastro.\n *\n * `encontrado` é falso tanto para documento inexistente quanto para cliente sem\n * login cadastrado — nos dois casos não há o que enviar, e a resposta ao site é\n * a mesma de propósito.\n */\nconst cliente = $input.first()?.json ?? {};\nconst dados = $('Validar assinatura').first().json.dados ?? {};\n\nconst acesso = String(cliente.acesso_sac ?? '').trim();\nconst senha = String(cliente.senha_sac ?? '');\n\nreturn [\n  {\n    json: {\n      encontrado: Boolean(cliente.id_cliente && acesso && senha),\n      id_cliente: cliente.id_cliente ? String(cliente.id_cliente) : null,\n      nome: cliente.nome ?? 'cliente',\n      metodo: String(dados.metodo ?? 'whatsapp'),\n      email: cliente.email || null,\n      celular: String(cliente.celular ?? '').replace(/\\D/g, '') || null,\n      acesso_sac: acesso || null,\n      senha_sac: senha || null,\n    },\n  },\n];"
       }
     },
     {
-      "id": "scnet-031",
-      "name": "Ação no Supabase",
+      "id": "scnet-043",
+      "name": "Cliente encontrado?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        140,
+        760
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "scnet-042",
+              "leftValue": "={{ $json.encontrado }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "scnet-044",
+      "name": "Enviar dados de acesso — CONFIGURE AQUI",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        580,
+        700
+      ],
+      "parameters": {}
+    },
+    {
+      "id": "scnet-045",
+      "name": "Responder solicitação",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        800,
+        780
+      ],
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ status: 'ok', mensagem: 'Se o documento estiver no nosso cadastro, seus dados de acesso foram enviados.' }) }}",
+        "options": {
+          "responseCode": 200
+        }
+      }
+    },
+    {
+      "id": "scnet-046",
+      "name": "Validar token",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        -300,
+        1120
+      ],
+      "alwaysOutputData": true,
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "-- O token manda, não o id_cliente que veio na requisição: os dois precisam\n-- bater. Sem esta conferência, quem tivesse um token válido poderia trocar\n-- o id e ler os dados de outro cliente.\n--\n-- O mesmo comando empurra a expiração para frente (sessão deslizante), com\n-- um teto absoluto de 12h desde a criação: deslizar sem teto seria uma\n-- sessão eterna, que é o oposto de um token temporário.\nUPDATE public.web_sessoes\n   SET expira_em = now() + interval '30 minutes',\n       ultimo_uso_em = now()\n WHERE token_hash = encode(sha256(convert_to($1, 'UTF8')), 'hex')\n   AND id_cliente = $2\n   AND revogada_em IS NULL\n   AND expira_em > now()\n   AND criado_em > now() - interval '12 hours'\nRETURNING id_cliente, extract(epoch FROM expira_em)::bigint AS expira_em;",
+        "options": {
+          "queryReplacement": "={{ [$json.token, $json.id_cliente] }}"
+        }
+      }
+    },
+    {
+      "id": "scnet-048",
+      "name": "Token válido?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -80,
+        1120
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "scnet-047",
+              "leftValue": "={{ $json.id_cliente != null }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "scnet-049",
+      "name": "Responder token inválido",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        140,
+        1280
+      ],
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ status: 'token_invalido', mensagem: 'Sua sessão expirou. Entre novamente para continuar.' }) }}",
+        "options": {
+          "responseCode": 401
+        }
+      }
+    },
+    {
+      "id": "scnet-052",
+      "name": "Rotear painel",
       "type": "n8n-nodes-base.switch",
       "typeVersion": 3.2,
       "position": [
-        460,
-        740
+        140,
+        1060
       ],
       "parameters": {
         "rules": {
@@ -490,9 +870,9 @@
                 },
                 "conditions": [
                   {
-                    "id": "scnet-028",
-                    "leftValue": "={{ $json.acao }}",
-                    "rightValue": "criar",
+                    "id": "scnet-050",
+                    "leftValue": "={{ $('Validar assinatura').first().json.evento }}",
+                    "rightValue": "consulta_painel",
                     "operator": {
                       "type": "string",
                       "operation": "equals"
@@ -502,7 +882,7 @@
                 "combinator": "and"
               },
               "renameOutput": true,
-              "outputKey": "criar"
+              "outputKey": "consulta_painel"
             },
             {
               "conditions": {
@@ -514,9 +894,9 @@
                 },
                 "conditions": [
                   {
-                    "id": "scnet-029",
-                    "leftValue": "={{ $json.acao }}",
-                    "rightValue": "atualizar",
+                    "id": "scnet-051",
+                    "leftValue": "={{ $('Validar assinatura').first().json.evento }}",
+                    "rightValue": "formulario_painel",
                     "operator": {
                       "type": "string",
                       "operation": "equals"
@@ -526,143 +906,70 @@
                 "combinator": "and"
               },
               "renameOutput": true,
-              "outputKey": "atualizar"
-            },
-            {
-              "conditions": {
-                "options": {
-                  "caseSensitive": true,
-                  "leftValue": "",
-                  "typeValidation": "strict",
-                  "version": 2
-                },
-                "conditions": [
-                  {
-                    "id": "scnet-030",
-                    "leftValue": "={{ $json.acao }}",
-                    "rightValue": "nada",
-                    "operator": {
-                      "type": "string",
-                      "operation": "equals"
-                    }
-                  }
-                ],
-                "combinator": "and"
-              },
-              "renameOutput": true,
-              "outputKey": "nada"
+              "outputKey": "formulario_painel"
             }
           ]
         },
         "options": {
           "fallbackOutput": "extra",
-          "renameFallbackOutput": "outra"
+          "renameFallbackOutput": "outro"
         }
       }
     },
     {
-      "id": "scnet-032",
-      "name": "Supabase: criar usuário",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.2,
-      "position": [
-        740,
-        640
-      ],
-      "parameters": {
-        "method": "POST",
-        "url": "={{ $env.SUPABASE_URL }}/auth/v1/admin/users",
-        "sendHeaders": true,
-        "headerParameters": {
-          "parameters": [
-            {
-              "name": "apikey",
-              "value": "={{ $env.SUPABASE_SERVICE_ROLE_KEY }}"
-            },
-            {
-              "name": "Authorization",
-              "value": "=Bearer {{ $env.SUPABASE_SERVICE_ROLE_KEY }}"
-            }
-          ]
-        },
-        "sendBody": true,
-        "specifyBody": "json",
-        "jsonBody": "={{ JSON.stringify(Object.assign( { password: $json.senha, email_confirm: true, phone_confirm: true,   app_metadata: { id_cliente: $json.id_cliente, nome: $json.nome, documento: $json.documento } }, $json.email ? { email: $json.email } : {}, $json.telefone_e164 ? { phone: $json.telefone_e164 } : {})) }}",
-        "options": {}
-      }
-    },
-    {
-      "id": "scnet-033",
-      "name": "Guardar supabase_user_id",
-      "type": "n8n-nodes-base.postgres",
-      "typeVersion": 2.5,
-      "position": [
-        1020,
-        640
-      ],
-      "alwaysOutputData": true,
-      "parameters": {
-        "operation": "executeQuery",
-        "query": "UPDATE public.clientes_web SET supabase_user_id = $1 WHERE id_cliente = $2;",
-        "options": {
-          "queryReplacement": "={{ $json.id }}, {{ $('Preparar credencial').first().json.id_cliente }}"
-        }
-      }
-    },
-    {
-      "id": "scnet-034",
-      "name": "Supabase: redefinir senha",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.2,
-      "position": [
-        740,
-        820
-      ],
-      "parameters": {
-        "method": "PUT",
-        "url": "={{ $env.SUPABASE_URL }}/auth/v1/admin/users/{{ $json.supabase_user_id }}",
-        "sendHeaders": true,
-        "headerParameters": {
-          "parameters": [
-            {
-              "name": "apikey",
-              "value": "={{ $env.SUPABASE_SERVICE_ROLE_KEY }}"
-            },
-            {
-              "name": "Authorization",
-              "value": "=Bearer {{ $env.SUPABASE_SERVICE_ROLE_KEY }}"
-            }
-          ]
-        },
-        "sendBody": true,
-        "specifyBody": "json",
-        "jsonBody": "={{ JSON.stringify({ password: $json.senha }) }}",
-        "options": {}
-      }
-    },
-    {
-      "id": "scnet-035",
-      "name": "Enviar dados de acesso — CONFIGURE AQUI",
+      "id": "scnet-053",
+      "name": "Consultar seção — CONFIGURE AQUI",
       "type": "n8n-nodes-base.noOp",
       "typeVersion": 1,
       "position": [
-        1300,
-        740
+        360,
+        980
       ],
       "parameters": {}
     },
     {
-      "id": "scnet-036",
-      "name": "Responder solicitação",
+      "id": "scnet-054",
+      "name": "Registrar formulário",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        360,
+        1140
+      ],
+      "alwaysOutputData": true,
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "-- O que o painel recebe fica registrado, com o cliente que o enviou vindo\n-- da sessão (não do corpo), para o registro não poder ser atribuído a\n-- outra pessoa.\nINSERT INTO public.web_formularios (id_cliente, formulario, campos)\nVALUES ($1, $2, $3::jsonb)\nRETURNING id;",
+        "options": {
+          "queryReplacement": "={{ [$('Validar token').first().json.id_cliente, $('Validar assinatura').first().json.dados.formulario, JSON.stringify($('Validar assinatura').first().json.dados.campos ?? {})] }}"
+        }
+      }
+    },
+    {
+      "id": "scnet-055",
+      "name": "Montar resposta do painel",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        580,
+        1060
+      ],
+      "parameters": {
+        "jsCode": "/*\n * Resposta das chamadas já autenticadas do painel.\n *\n * Devolve junto o token com o prazo novo: o nó `Validar token` empurrou a\n * expiração para frente a cada uso, e o site troca a validade que tem pela que\n * vier aqui. É assim que a sessão desliza enquanto o cliente está usando o\n * painel, sem um evento de renovação separado.\n */\nconst sessao = $('Validar token').first().json;\nconst conteudo = $input.first()?.json ?? {};\n\n// `dados` é onde o site procura o conteúdo; o resto do corpo é protocolo.\nconst dados = conteudo.dados ?? conteudo;\n\nreturn [\n  {\n    json: {\n      status: 'ok',\n      token: $('Validar assinatura').first().json.token,\n      expira_em: Number(sessao.expira_em),\n      dados,\n    },\n  },\n];"
+      }
+    },
+    {
+      "id": "scnet-056",
+      "name": "Responder painel",
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1.1,
       "position": [
-        1580,
-        740
+        800,
+        1060
       ],
       "parameters": {
         "respondWith": "json",
-        "responseBody": "={{ JSON.stringify({ status: 'ok', mensagem: 'Se o documento estiver no nosso cadastro, seus dados de acesso foram enviados.' }) }}",
+        "responseBody": "={{ JSON.stringify($json) }}",
         "options": {
           "responseCode": 200
         }
@@ -735,7 +1042,28 @@
         ],
         [
           {
+            "node": "Preparar consulta de senha",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
             "node": "Buscar cliente (solicitação)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Validar token",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Validar token",
             "type": "main",
             "index": 0
           }
@@ -837,18 +1165,109 @@
       "main": [
         [
           {
-            "node": "Avaliar código",
+            "node": "Código confere?",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Avaliar código": {
+    "Código confere?": {
       "main": [
         [
           {
-            "node": "Responder verificação",
+            "node": "Preparar login (código)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Responder código recusado",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Preparar login (código)": {
+      "main": [
+        [
+          {
+            "node": "Gerar token",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Preparar consulta de senha": {
+      "main": [
+        [
+          {
+            "node": "Buscar credencial",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Buscar credencial": {
+      "main": [
+        [
+          {
+            "node": "Conferir senha",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Conferir senha": {
+      "main": [
+        [
+          {
+            "node": "Senha confere?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Senha confere?": {
+      "main": [
+        [
+          {
+            "node": "Gerar token",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Responder senha recusada",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gerar token": {
+      "main": [
+        [
+          {
+            "node": "Guardar token",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Guardar token": {
+      "main": [
+        [
+          {
+            "node": "Responder login",
             "type": "main",
             "index": 0
           }
@@ -870,57 +1289,14 @@
       "main": [
         [
           {
-            "node": "Ação no Supabase",
+            "node": "Cliente encontrado?",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Ação no Supabase": {
-      "main": [
-        [
-          {
-            "node": "Supabase: criar usuário",
-            "type": "main",
-            "index": 0
-          }
-        ],
-        [
-          {
-            "node": "Supabase: redefinir senha",
-            "type": "main",
-            "index": 0
-          }
-        ],
-        [
-          {
-            "node": "Responder solicitação",
-            "type": "main",
-            "index": 0
-          }
-        ],
-        [
-          {
-            "node": "Responder solicitação",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Supabase: criar usuário": {
-      "main": [
-        [
-          {
-            "node": "Guardar supabase_user_id",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Guardar supabase_user_id": {
+    "Cliente encontrado?": {
       "main": [
         [
           {
@@ -928,14 +1304,10 @@
             "type": "main",
             "index": 0
           }
-        ]
-      ]
-    },
-    "Supabase: redefinir senha": {
-      "main": [
+        ],
         [
           {
-            "node": "Enviar dados de acesso — CONFIGURE AQUI",
+            "node": "Responder solicitação",
             "type": "main",
             "index": 0
           }
@@ -947,6 +1319,93 @@
         [
           {
             "node": "Responder solicitação",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validar token": {
+      "main": [
+        [
+          {
+            "node": "Token válido?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Token válido?": {
+      "main": [
+        [
+          {
+            "node": "Rotear painel",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Responder token inválido",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Rotear painel": {
+      "main": [
+        [
+          {
+            "node": "Consultar seção — CONFIGURE AQUI",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Registrar formulário",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Responder token inválido",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Consultar seção — CONFIGURE AQUI": {
+      "main": [
+        [
+          {
+            "node": "Montar resposta do painel",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Registrar formulário": {
+      "main": [
+        [
+          {
+            "node": "Montar resposta do painel",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Montar resposta do painel": {
+      "main": [
+        [
+          {
+            "node": "Responder painel",
             "type": "main",
             "index": 0
           }
