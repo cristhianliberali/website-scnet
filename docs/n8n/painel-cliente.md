@@ -41,7 +41,7 @@ fluxo, e é lá que ela continua.
 | `webhook`       | só n8n, mesmo com o banco ligado                                         |
 
 Em `auto`, uma falha na consulta ao banco (tabela ausente, conexão fora do ar,
-cliente que não está na view) cai para o `painel_bootstrap` no webhook, com o
+cliente que não está no cadastro) cai para o `painel_bootstrap` no webhook, com o
 motivo no log do servidor. É por isso que o contrato do `painel_bootstrap`
 descrito abaixo continua valendo mesmo com o banco em uso — ele é a rede de
 segurança.

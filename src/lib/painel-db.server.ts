@@ -21,7 +21,7 @@
  * Variáveis próprias deste módulo:
  *
  *   PAINEL_FONTE               "banco" | "webhook" | "auto" (padrão)
- *   POSTGRES_CLIENTES_VIEW     padrão "clientes_web"
+ *   POSTGRES_CLIENTES_TABLE    padrão "clientes_web"
  *   POSTGRES_CONTRATOS_TABLE   padrão "contratos_web"
  *   POSTGRES_FATURAS_TABLE     padrão "faturas_web"
  *
@@ -236,7 +236,14 @@ export async function carregarPainelDoBanco(idCliente: string): Promise<DadosPai
   if (!sql) return null;
 
   const schema = identifier(env("POSTGRES_SCHEMA"), DEFAULT_SCHEMA, "POSTGRES_SCHEMA");
-  const clientes = tabela(DEFAULT_CLIENTES, DEFAULT_CLIENTES, "POSTGRES_CLIENTES_VIEW");
+  /*
+   * `clientes_web` é uma tabela nesta instalação, mas o `schema.sql` também
+   * documenta a variante em view — por isso o nome antigo da variável continua
+   * aceito. Quem já o definiu não precisa mexer em nada.
+   */
+  const clientes = env("POSTGRES_CLIENTES_TABLE")
+    ? tabela(DEFAULT_CLIENTES, DEFAULT_CLIENTES, "POSTGRES_CLIENTES_TABLE")
+    : tabela(DEFAULT_CLIENTES, DEFAULT_CLIENTES, "POSTGRES_CLIENTES_VIEW");
   const contratos = tabela(DEFAULT_CONTRATOS, DEFAULT_CONTRATOS, "POSTGRES_CONTRATOS_TABLE");
   const faturas = tabela(DEFAULT_FATURAS, DEFAULT_FATURAS, "POSTGRES_FATURAS_TABLE");
   const planos = tabela(DEFAULT_PLANOS, DEFAULT_PLANOS, "POSTGRES_PLANOS_TABLE");

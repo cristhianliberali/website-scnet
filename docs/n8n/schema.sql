@@ -13,6 +13,14 @@
 -- 1. A ponte com a sua base de clientes
 -- ---------------------------------------------------------------------------
 --
+-- >>> NA INSTALAÇÃO DA SCNET, `clientes_web` É UMA TABELA, NÃO ESTA VIEW. <<<
+--
+-- As duas formas valem, e o site não vê diferença — ele só faz
+-- `SELECT ... WHERE id_cliente = $1`. A view abaixo serve a quem sincroniza de
+-- uma base existente; a tabela serve a quem mantém um cadastro próprio do
+-- portal, alimentado por uma rotina. Se for o seu caso, pule esta seção: o
+-- `schema-painel.sql` traz a lista de colunas atual e como acrescentá-las.
+--
 -- O workflow inteiro lê o cadastro por esta view, e só por ela. É o único ponto
 -- que você precisa adaptar: troque `sua_tabela_de_clientes` e os nomes das
 -- colunas pelos do seu sistema, mantendo os nomes de saída.
