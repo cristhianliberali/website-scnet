@@ -45,6 +45,8 @@ import {
   registrarFalha,
 } from "./tentativas-login";
 import { lerToken } from "./token-acesso";
+import { carregarPainelDoBanco, fontePainel } from "./painel-db.server";
+import { env } from "./postgres.server";
 import {
   gravarCachePainel,
   invalidarCachePainel,
@@ -458,6 +460,7 @@ export async function verificarCodigoServer(
 
   await limparDesafio();
   limparTentativas(chaves);
+  aquecerPainel(desafio.idCliente);
   return { ok: true, mensagem: resultado.message, nome };
 }
 
@@ -542,6 +545,7 @@ export async function acessarComSenhaServer(data: SenhaInput): Promise<LoginConc
   }
 
   limparTentativas(chaves);
+  aquecerPainel(idCliente);
   return { ok: true, mensagem: resultado.message, nome };
 }
 
@@ -748,6 +752,66 @@ export type ConsultaInput = {
 
 const ehSecaoConhecida = (secao: string): secao is SecaoPainel => secao in CONSULTAS_PAINEL;
 
+/**
+ * Tenta responder a consulta com o Postgres, sem passar pelo n8n.
+ *
+ * Só o `bootstrap` vem daqui: ele é o retrato inteiro, e as recargas por seção
+ * existem justamente para o caso em que o n8n é a fonte. Como toda mudança
+ * derruba o `bootstrap` do cache, recarregar por ele custa o mesmo.
+ *
+ * Devolve `null` quando não deu — banco desligado, cliente fora da view,
+ * consulta com erro — e aí a chamada segue para o webhook, que é o caminho de
+ * sempre. A única exceção é `PAINEL_FONTE=banco`: ali o silêncio seria pior que
+ * o erro, porque esconderia uma configuração errada atrás de um fallback que
+ * funciona.
+ */
+async function consultarNoBanco(
+  secao: SecaoPainel,
+  forcar: boolean,
+): Promise<PainelOk | PainelErro | null> {
+  if (secao !== "bootstrap" || fontePainel() !== "banco") return null;
+
+  const sessao = await lerSessao();
+  if (!sessao) return erroPainel(ERRO_SESSAO_EXPIRADA, true);
+
+  if (!forcar) {
+    const guardado = lerCachePainel(sessao.idCliente, "bootstrap");
+    if (guardado) return { ok: true, dados: guardado };
+  }
+
+  const dados = await carregarPainelDoBanco(sessao.idCliente);
+  if (!dados) {
+    if (env("PAINEL_FONTE")?.toLowerCase() === "banco") {
+      console.error("PAINEL_FONTE=banco, mas a consulta ao Postgres falhou.");
+      return erroPainel(ERRO_GENERICO);
+    }
+    return null;
+  }
+
+  gravarCachePainel(sessao.idCliente, "bootstrap", dados);
+  return { ok: true, dados };
+}
+
+/**
+ * Deixa o painel pronto no cache logo depois do login.
+ *
+ * Roda solta, sem `await`: o cliente não deve esperar por ela para entrar, e se
+ * ela falhar o painel simplesmente consulta por conta própria daqui a um
+ * instante. O ganho é a primeira tela já vir do cache, que é o que o login
+ * acabou de tornar possível.
+ */
+function aquecerPainel(idCliente: string) {
+  if (fontePainel() !== "banco") return;
+
+  void carregarPainelDoBanco(idCliente)
+    .then((dados) => {
+      if (dados) gravarCachePainel(idCliente, "bootstrap", dados);
+    })
+    .catch((err: unknown) => {
+      console.error("Não foi possível preparar o painel depois do login", err);
+    });
+}
+
 const ehFormularioConhecido = (nome: string): nome is FormularioPainel =>
   nome in FORMULARIOS_PAINEL;
 
@@ -762,6 +826,12 @@ const ehFormularioConhecido = (nome: string): nome is FormularioPainel =>
 export async function consultarPainelServer(data: ConsultaInput): Promise<PainelOk | PainelErro> {
   const secao = data.secao;
   const conhecida = ehSecaoConhecida(secao);
+
+  if (conhecida) {
+    const doBanco = await consultarNoBanco(secao, Boolean(data.forcar));
+    if (doBanco) return doBanco;
+  }
+
   return chamarPainel({
     evento: conhecida ? CONSULTAS_PAINEL[secao] : "consulta_painel",
     dados: { secao },

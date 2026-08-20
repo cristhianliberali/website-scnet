@@ -77,9 +77,12 @@ export const SECOES_AFETADAS: Record<FormularioPainel, readonly SecaoPainel[]> =
 
 export type StatusFinanceiro = "em_dia" | "em_aberto" | "vencido";
 export type StatusConexao = "online" | "alerta" | "offline";
-export type StatusFatura = "pago" | "aberto" | "vencido";
+export type StatusFatura = "pago" | "aberto" | "vencido" | "cancelado";
 export type StatusIndicacao = "pendente" | "em_instalacao" | "instalado" | "cancelado";
 export type StatusChamado = "aberto" | "em_analise" | "agendado" | "resolvido" | "cancelado";
+
+export type TipoCadastro = "cpf" | "cnpj" | "";
+export type StatusCliente = "ativo" | "inativo";
 
 export type ClientePainel = {
   id: string;
@@ -92,6 +95,11 @@ export type ClientePainel = {
   codigoIndicacao: string;
   linkIndicacao: string;
   descontoAcumulado: number;
+  nascimento: string;
+  tipoCadastro: TipoCadastro;
+  /** Endereço do cadastro — o do titular, que nem sempre é o da instalação. */
+  endereco: EnderecoContrato;
+  status: StatusCliente;
 };
 
 export type EnderecoContrato = {
@@ -109,6 +117,15 @@ export type Contrato = {
   numero: string;
   apelido: string;
   endereco: EnderecoContrato;
+  /**
+   * O endereço já escrito numa linha só.
+   *
+   * Existe porque os dois formatos são legítimos: o cadastro que guarda o
+   * endereço em campos separados preenche `endereco`, e o que guarda tudo numa
+   * coluna preenche este. A tela usa este quando ele existe — reescrever um
+   * texto que já veio pronto só arrisca estragá-lo.
+   */
+  enderecoTexto: string;
   plano: string;
   download: string;
   upload: string;
@@ -121,6 +138,12 @@ export type Contrato = {
   ip: string;
   instaladoEm: string;
   tecnologia: string;
+  /** Os itens que acompanham o plano, já separados. */
+  composicao: string[];
+  /** Quando o contrato foi assinado. */
+  adesao: string;
+  /** Fim da fidelidade/vigência, quando existe. */
+  vigenciaAte: string;
 };
 
 export type Fatura = {
@@ -135,6 +158,14 @@ export type Fatura = {
   /** Link do boleto em PDF, quando o provedor tiver um. */
   urlBoleto: string;
   pagoEm: string;
+  /**
+   * O valor de face da fatura. `valor` é o que se paga hoje — com juros e multa
+   * quando vencida —, e é por isso que os dois existem: exibir só o atualizado
+   * esconderia o acréscimo, e exibir só o original cobraria a menos.
+   */
+  valorOriginal: number;
+  /** Texto da fatura ("Mensalidade Agosto/2026"), quando o cadastro manda um. */
+  descricao: string;
 };
 
 export type NotaFiscal = {

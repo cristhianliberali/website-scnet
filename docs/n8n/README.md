@@ -5,11 +5,12 @@ identidade do `/cliente`: ele decide quem entra pelos dois métodos de login,
 emite o token de acesso da sessão e responde às consultas e formulários do
 painel enquanto esse token estiver válido.
 
-| Arquivo                       | O que é                                             |
-| ----------------------------- | --------------------------------------------------- |
-| `workflow-login-cliente.json` | O workflow, pronto para importar (42 nós)           |
-| `schema.sql`                  | As estruturas que ele espera no Postgres            |
-| `painel-cliente.md`           | O contrato JSON de cada evento de `/cliente/painel` |
+| Arquivo                       | O que é                                                         |
+| ----------------------------- | --------------------------------------------------------------- |
+| `workflow-login-cliente.json` | O workflow, pronto para importar (42 nós)                       |
+| `schema.sql`                  | As estruturas que ele espera no Postgres                        |
+| `painel-cliente.md`           | O contrato JSON de cada evento de `/cliente/painel`             |
+| `schema-painel.sql`           | As tabelas que alimentam o painel (rode depois do `schema.sql`) |
 
 ## Antes de importar
 

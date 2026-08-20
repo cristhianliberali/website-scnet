@@ -68,6 +68,7 @@ const SELO_FATURA: Record<StatusFatura, Selo> = {
   pago: { texto: "Paga", classe: "bg-emerald-100 text-emerald-800 border-emerald-200" },
   aberto: { texto: "Em aberto", classe: "bg-amber-100 text-amber-900 border-amber-200" },
   vencido: { texto: "Vencida", classe: "bg-red-100 text-red-800 border-red-200" },
+  cancelado: { texto: "Cancelada", classe: "bg-slate-100 text-slate-500 border-slate-200" },
 };
 
 const SELO_INDICACAO: Record<StatusIndicacao, Selo> = {

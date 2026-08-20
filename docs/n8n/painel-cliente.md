@@ -8,6 +8,7 @@ cobre só o painel.
 
 ## Índice
 
+- [Duas fontes: o banco e o webhook](#duas-fontes-o-banco-e-o-webhook)
 - [Como um evento do painel chega](#como-um-evento-do-painel-chega)
 - [O carregamento inicial e o cache](#o-carregamento-inicial-e-o-cache)
 - [Consultas](#consultas)
@@ -15,6 +16,47 @@ cobre só o painel.
   - [Recargas por seção](#recargas-por-seção)
 - [Formulários](#formulários)
 - [Regras que valem para todas as respostas](#regras-que-valem-para-todas-as-respostas)
+
+---
+
+## Duas fontes: o banco e o webhook
+
+O painel lê de dois lugares, e a divisão segue o que cada um faz melhor:
+
+| O quê                                                           | De onde          |
+| --------------------------------------------------------------- | ---------------- |
+| **Consulta de abertura** (cadastro, contratos, faturas, planos) | Postgres, direto |
+| **Formulários** (abrir chamado, trocar de plano, segunda via…)  | n8n, sempre      |
+
+Dado que já está numa tabela nossa não precisa de um salto até o n8n para
+voltar. Ação, sim: quem fala com o ERP, o gateway de pagamento e o WhatsApp é o
+fluxo, e é lá que ela continua.
+
+`PAINEL_FONTE` decide:
+
+| Valor           | Comportamento                                                            |
+| --------------- | ------------------------------------------------------------------------ |
+| `auto` (padrão) | Postgres quando configurado; webhook quando não                          |
+| `banco`         | só Postgres — uma falha vira erro, em vez de cair no webhook em silêncio |
+| `webhook`       | só n8n, mesmo com o banco ligado                                         |
+
+Em `auto`, uma falha na consulta ao banco (tabela ausente, conexão fora do ar,
+cliente que não está na view) cai para o `painel_bootstrap` no webhook, com o
+motivo no log do servidor. É por isso que o contrato do `painel_bootstrap`
+descrito abaixo continua valendo mesmo com o banco em uso — ele é a rede de
+segurança.
+
+**O que autoriza a consulta ao banco.** O `id_cliente` sai do cookie de sessão,
+que é selado e foi escrito pelo n8n no login. O navegador não o lê nem o forja,
+e nenhuma função aceita um id vindo do formulário — daí um `WHERE cod_cliente =
+$1` bastar para ninguém enxergar o cliente do vizinho.
+
+**O que o banco ainda não tem.** As tabelas de hoje cobrem cadastro, contratos,
+faturas e o catálogo de planos. Notas fiscais, indicações e chamados voltam
+vazios pelo caminho do banco, e a tela mostra o estado vazio de cada um. Para
+servi-los pelo n8n enquanto as tabelas não existem, use `PAINEL_FONTE=webhook`.
+
+O schema está em [`schema-painel.sql`](./schema-painel.sql).
 
 ---
 
@@ -260,6 +302,33 @@ comuns funcionam. O que ele não reconhecer cai no padrão da coluna.
 | Datas           | `"2026-08-10"` (vira `10/08/2026`) ou já escrita: `"10/08/2026"`, `"Agosto/2026"`     |
 | Listas de texto | `["Wi-Fi 6", "Sem adesão"]` ou `"Wi-Fi 6;Sem adesão"`                                 |
 | Booleanos       | `true`, `"true"`, `"sim"`, `1`                                                        |
+
+#### De onde cada campo sai, quando a fonte é o banco
+
+| Campo do JSON                   | Coluna                                         |
+| ------------------------------- | ---------------------------------------------- |
+| `cliente.*`                     | `clientes_web`                                 |
+| `cliente.cliente_desde`         | a `data_adesao` mais antiga entre os contratos |
+| `cliente.codigo`                | `clientes_web.id_cliente`                      |
+| `contratos[].id` / `.numero`    | `contratos_web.cod_contrato`                   |
+| `contratos[].apelido`           | o primeiro trecho de `contratos_web.endereco`  |
+| `contratos[].status_conexao`    | `contratos_web.status_contrato`                |
+| `contratos[].status_financeiro` | `contratos_web.status_fatura`                  |
+| `contratos[].download`          | `contratos_web.velocidade`                     |
+| `faturas[].valor`               | `faturas_web.valor_atual` (com juros e multa)  |
+| `faturas[].valor_original`      | `faturas_web.valor_original`                   |
+| `faturas[].referencia`          | `faturas_web.descricao`                        |
+| `planos[]`                      | `planos_web` — a mesma tabela da home          |
+
+Contratos com `status_contrato = 'cancelado'` e faturas com
+`status_fatura = 'cancelada'` ficam de fora da consulta: não há mais nada a
+fazer com eles na tela, e uma fatura cancelada ao lado das abertas é o tipo de
+coisa que faz o cliente ligar para o financeiro.
+
+`desbloqueio_disponivel` sai como `true` quando há contrato bloqueado ou
+suspenso. É um **padrão**, não a política do provedor — para mandar nisso,
+recuse o formulário `painel_desbloqueio_confianca` ou passe a consulta para o
+webhook.
 
 #### Apelidos de chave
 

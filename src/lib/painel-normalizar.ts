@@ -134,11 +134,14 @@ const STATUS_FINANCEIRO: Record<string, StatusFinanceiro> = {
   adimplente: "em_dia",
   pago: "em_dia",
   in_good_standing: "em_dia",
+  paga: "em_dia",
   em_aberto: "em_aberto",
   aberto: "em_aberto",
+  aberta: "em_aberto",
   pendente: "em_aberto",
   pending_invoice: "em_aberto",
   vencido: "vencido",
+  vencida: "vencido",
   atrasado: "vencido",
   inadimplente: "vencido",
   overdue_invoices: "vencido",
@@ -156,6 +159,9 @@ const STATUS_CONEXAO: Record<string, StatusConexao> = {
   inativo: "offline",
   suspenso: "offline",
   bloqueado: "offline",
+  cancelado: "offline",
+  cancelada: "offline",
+  encerrado: "offline",
 };
 
 const STATUS_FATURA: Record<string, StatusFatura> = {
@@ -170,6 +176,8 @@ const STATUS_FATURA: Record<string, StatusFatura> = {
   vencido: "vencido",
   vencida: "vencido",
   atrasado: "vencido",
+  cancelado: "cancelado",
+  cancelada: "cancelado",
 };
 
 const STATUS_INDICACAO: Record<string, StatusIndicacao> = {
@@ -199,6 +207,9 @@ const STATUS_CHAMADO: Record<string, StatusChamado> = {
 /* ---------------- normalizadores ---------------- */
 
 function normalizarCliente(fonte: Bruto): ClientePainel {
+  const endereco = objeto(campo(fonte, "endereco", "address"));
+  const tipo = texto(fonte, "tipo_cadastro", "tipoCadastro", "tipo_pessoa").toLowerCase();
+
   return {
     id: texto(fonte, "id", "id_cliente", "idCliente", "codigo_cliente"),
     nome: texto(fonte, "nome", "name", "razao_social"),
@@ -215,6 +226,21 @@ function normalizarCliente(fonte: Bruto): ClientePainel {
       "descontoAcumulado",
       "discountsAccumulated",
     ),
+    nascimento: texto(fonte, "data_nascimento", "nascimento", "dataNascimento", "birthDate"),
+    // o cadastro pode mandar "cpf"/"cnpj" ou "fisica"/"juridica"
+    tipoCadastro:
+      tipo.startsWith("cnpj") || tipo.startsWith("jur")
+        ? "cnpj"
+        : tipo.startsWith("cpf") || tipo.startsWith("fis")
+          ? "cpf"
+          : "",
+    // o endereço pode vir aninhado ou solto entre os campos do cliente
+    endereco: normalizarEndereco(Object.keys(endereco).length > 0 ? endereco : fonte),
+    status: texto(fonte, "status_cliente", "statusCliente", "situacao")
+      .toLowerCase()
+      .startsWith("inativ")
+      ? "inativo"
+      : "ativo",
   };
 }
 
@@ -231,12 +257,14 @@ function normalizarEndereco(fonte: Bruto): EnderecoContrato {
 }
 
 function normalizarContrato(fonte: Bruto, indice: number): Contrato {
-  const endereco = objeto(campo(fonte, "endereco", "address"));
+  const bruto = campo(fonte, "endereco", "address");
+  const endereco = objeto(bruto);
   return {
     id: texto(fonte, "id", "id_contrato", "idContrato") || `contrato_${indice + 1}`,
     numero: texto(fonte, "numero", "numero_contrato", "contractNumber", "contrato"),
     apelido: texto(fonte, "apelido", "label", "nome", "descricao") || "Contrato",
     endereco: normalizarEndereco(Object.keys(endereco).length > 0 ? endereco : fonte),
+    enderecoTexto: typeof bruto === "string" ? bruto.trim() : "",
     plano: texto(fonte, "plano", "nome_plano", "planName"),
     download: texto(fonte, "download", "velocidade_download", "downloadSpeed", "velocidade"),
     upload: texto(fonte, "upload", "velocidade_upload", "uploadSpeed"),
@@ -249,12 +277,29 @@ function normalizarContrato(fonte: Bruto, indice: number): Contrato {
       "mensalidade",
     ),
     statusFinanceiro: opcao(
-      texto(fonte, "status_financeiro", "statusFinanceiro", "situacao_financeira", "paymentStatus"),
+      // `status_fatura` é o nome da coluna em `contratos_web`
+      texto(
+        fonte,
+        "status_financeiro",
+        "statusFinanceiro",
+        "status_fatura",
+        "situacao_financeira",
+        "paymentStatus",
+      ),
       STATUS_FINANCEIRO,
       "em_dia",
     ),
     statusConexao: opcao(
-      texto(fonte, "status_conexao", "statusConexao", "situacao", "connectionStatus", "status"),
+      // `status_contrato` é o nome da coluna em `contratos_web`
+      texto(
+        fonte,
+        "status_conexao",
+        "statusConexao",
+        "status_contrato",
+        "situacao",
+        "connectionStatus",
+        "status",
+      ),
       STATUS_CONEXAO,
       "online",
     ),
@@ -264,6 +309,15 @@ function normalizarContrato(fonte: Bruto, indice: number): Contrato {
     ip: texto(fonte, "ip", "ip_address", "ipAddress", "endereco_ip"),
     instaladoEm: texto(fonte, "instalado_em", "instaladoEm", "data_instalacao", "installationDate"),
     tecnologia: texto(fonte, "tecnologia", "technology"),
+    composicao: listaDeTextos(fonte, "composicao", "itens", "beneficios", "features"),
+    adesao: texto(fonte, "data_adesao", "adesao", "dataAdesao", "contratado_em"),
+    vigenciaAte: texto(
+      fonte,
+      "data_vencimento_contrato",
+      "vigencia_ate",
+      "vigenciaAte",
+      "fidelidade_ate",
+    ),
   };
 }
 
@@ -273,12 +327,23 @@ function normalizarFatura(fonte: Bruto, indice: number): Fatura {
     idContrato: texto(fonte, "id_contrato", "idContrato", "contractId", "contrato"),
     referencia: texto(fonte, "referencia", "mes_referencia", "referenceMonth", "competencia"),
     vencimento: texto(fonte, "vencimento", "data_vencimento", "dueDate"),
-    valor: numero(fonte, "valor", "value", "valor_total"),
-    status: opcao(texto(fonte, "status", "situacao"), STATUS_FATURA, "aberto"),
+    // o atualizado manda: é ele que o cliente precisa pagar hoje
+    valor: numero(fonte, "valor_atual", "valorAtual", "valor", "value", "valor_total"),
+    status: opcao(texto(fonte, "status", "situacao", "status_fatura"), STATUS_FATURA, "aberto"),
     linhaDigitavel: texto(fonte, "linha_digitavel", "linhaDigitavel", "codigo_barras", "barcode"),
     pixCopiaECola: texto(fonte, "pix_copia_e_cola", "pixCopiaECola", "pix", "qrcode_pix", "brcode"),
     urlBoleto: texto(fonte, "url_boleto", "urlBoleto", "link_boleto", "boleto_url", "pdf"),
     pagoEm: texto(fonte, "pago_em", "pagoEm", "data_pagamento", "paidAt"),
+    /*
+     * `valor` é o que se paga hoje; `valor_original` é o de face. Quando só um
+     * dos dois vem, os dois valem o mesmo — é o caso da fatura no prazo, em que
+     * não há acréscimo nenhum a mostrar.
+     */
+    valorOriginal:
+      campo(fonte, "valor_original", "valorOriginal") !== undefined
+        ? numero(fonte, "valor_original", "valorOriginal")
+        : numero(fonte, "valor", "valor_atual", "value"),
+    descricao: texto(fonte, "descricao", "description", "historico"),
   };
 }
 
@@ -384,6 +449,16 @@ export function numeroDaResposta(dados: DadosPainel, ...nomes: string[]): number
 
 /* ---------------- entrada pública ---------------- */
 
+const ENDERECO_VAZIO: EnderecoContrato = {
+  cep: "",
+  logradouro: "",
+  numero: "",
+  complemento: "",
+  bairro: "",
+  cidade: "",
+  uf: "",
+};
+
 const VAZIO: ClientePainel = {
   id: "",
   nome: "",
@@ -395,6 +470,10 @@ const VAZIO: ClientePainel = {
   codigoIndicacao: "",
   linkIndicacao: "",
   descontoAcumulado: 0,
+  nascimento: "",
+  tipoCadastro: "",
+  endereco: ENDERECO_VAZIO,
+  status: "ativo",
 };
 
 /**

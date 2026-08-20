@@ -374,12 +374,27 @@ Rota protegida: sem sessão válida, volta ao login. Ela reúne o que o cliente
 costuma vir buscar — status financeiro com PIX à mão, indicação, contratos e
 oito serviços de autoatendimento.
 
+**De onde vêm os dados.** Cadastro, contratos, faturas e o catálogo de planos
+saem do **Postgres**, direto — dado que já está numa tabela nossa não precisa
+de um salto até o n8n para voltar. Os **formulários** continuam indo ao n8n:
+são ações, e quem fala com o ERP, o gateway e o WhatsApp é o fluxo. As tabelas
+estão em `docs/n8n/schema-painel.sql` (`clientes_web` com o cadastro completo,
+`contratos_web`, `faturas_web`), e o SQL traz um cliente fake para conferir a
+tela antes de plugar a base de verdade.
+
+`PAINEL_FONTE` decide o caminho: `auto` (padrão) usa o banco quando ele está
+configurado e cai no webhook quando não; `banco` recusa o webhook, para que uma
+configuração errada apareça como erro em vez de virar um silencioso "sempre
+pelo n8n"; `webhook` mantém tudo pelo n8n. Em `auto`, uma falha no banco cai
+para o `painel_bootstrap` com o motivo no log — é a rede de segurança.
+
 **Um carregamento só.** Depois de autenticar, o site dispara **uma** consulta,
 `painel_bootstrap`, que traz o painel inteiro: cadastro, contratos, faturas,
 notas fiscais, indicações, chamados, planos disponíveis e avisos. Uma ida ao n8n
 em vez de sete é a diferença entre a página aparecer pronta e aparecer aos
 pedaços. Ela sai no loader da rota, durante o SSR, então o HTML já chega com
-conteúdo — e o resultado entra no cache do TanStack Query como `initialData`, de
+conteúdo — e, quando a fonte é o banco, o retrato já foi preparado no cache no
+instante do login — e o resultado entra no cache do TanStack Query como `initialData`, de
 modo que a hidratação não repete a chamada.
 
 **O resultado fica guardado em dois lugares**, de propósito:
