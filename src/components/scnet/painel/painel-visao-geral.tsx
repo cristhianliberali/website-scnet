@@ -11,6 +11,7 @@
 
 import {
   AlertTriangle,
+  Check,
   ArrowRight,
   BadgeCheck,
   CheckCircle2,
@@ -31,8 +32,17 @@ import {
 } from "lucide-react";
 import { useState } from "react";
 
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { data, moeda, situacaoFinanceira } from "@/lib/painel-formato";
+import {
+  data,
+  documento,
+  enderecoEmLinha,
+  faturaEmAberto,
+  moeda,
+  situacaoFinanceira,
+  telefone,
+} from "@/lib/painel-formato";
 import { cn } from "@/lib/utils";
 import type {
   Chamado,
@@ -85,7 +95,7 @@ export function BannerFinanceiro({
   const aparencia = APARENCIA[situacao];
   const Icone = aparencia.icone;
 
-  const pendentes = faturas.filter((f) => f.status !== "pago");
+  const pendentes = faturas.filter(faturaEmAberto);
   const total = pendentes.reduce((soma, f) => soma + f.valor, 0);
   const proxima = pendentes[0];
 
@@ -277,21 +287,33 @@ function CartaoContrato({
     aoAbrir(modal);
   };
 
-  const endereco = [
-    [contrato.endereco.logradouro, contrato.endereco.numero].filter(Boolean).join(", "),
-    contrato.endereco.complemento,
-    contrato.endereco.bairro,
-    [contrato.endereco.cidade, contrato.endereco.uf].filter(Boolean).join("/"),
-  ]
-    .filter(Boolean)
-    .join(" • ");
+  const endereco = contrato.enderecoTexto || enderecoEmLinha(contrato.endereco);
+
+  /*
+   * Os detalhes técnicos só existem quando o cadastro os tem. Um botão que abre
+   * cinco linhas de "—" é pior do que botão nenhum.
+   */
+  const tecnicos = [
+    ["Rede Wi-Fi", contrato.ssidWifi],
+    ["Equipamento", contrato.roteador],
+    ["Endereço IP", contrato.ip],
+    ["Instalado em", data(contrato.instaladoEm)],
+    ["Início do contrato", data(contrato.adesao)],
+    ["Vigência até", data(contrato.vigenciaAte)],
+    ["Tecnologia", contrato.tecnologia],
+  ].filter(([, valor]) => valor && valor !== "\u2014");
 
   return (
     <CartaoPainel>
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div className="min-w-0">
+      {/*
+        Sem `flex-wrap`: o apelido vem do endereço e pode ser longo, e com wrap
+        o valor caía para baixo do título em um card e ficava à direita no
+        outro. O título encolhe (`min-w-0`) e o valor fica onde sempre está.
+      */}
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
-            <p className="font-display text-base font-extrabold text-brand-deep">
+            <p className="min-w-0 break-words font-display text-base font-extrabold text-brand-deep">
               {contrato.apelido}
             </p>
             <SeloStatus tipo="conexao" valor={contrato.statusConexao} />
@@ -303,7 +325,7 @@ function CartaoContrato({
             </p>
           )}
         </div>
-        <div className="text-right">
+        <div className="shrink-0 text-right">
           <p className="font-display text-lg font-extrabold text-foreground">
             {moeda(contrato.valorMensal)}
           </p>
@@ -325,6 +347,20 @@ function CartaoContrato({
           {contrato.upload && <span>Upload: {contrato.upload}</span>}
           {contrato.tecnologia && <span>{contrato.tecnologia}</span>}
         </div>
+
+        {contrato.composicao.length > 0 && (
+          <ul className="mt-3 grid gap-1 sm:grid-cols-2">
+            {contrato.composicao.map((item) => (
+              <li
+                key={item}
+                className="flex items-start gap-1.5 font-body text-xs text-muted-foreground"
+              >
+                <Check className="mt-0.5 size-3 shrink-0 text-brand" />
+                {item}
+              </li>
+            ))}
+          </ul>
+        )}
         {endereco && (
           <p className="mt-2 flex items-start gap-1.5 font-body text-xs text-muted-foreground">
             <MapPin className="mt-0.5 size-3.5 shrink-0" />
@@ -362,23 +398,27 @@ function CartaoContrato({
         </Button>
       </div>
 
-      <button
-        type="button"
-        onClick={() => setDetalhes((v) => !v)}
-        className="mt-3 flex cursor-pointer items-center gap-1 font-ui text-xs font-bold text-brand hover:underline"
-      >
-        {detalhes ? "Esconder detalhes técnicos" : "Ver detalhes técnicos"}
-        <ChevronDown className={cn("size-3.5 transition-transform", detalhes && "rotate-180")} />
-      </button>
+      {tecnicos.length > 0 && (
+        <>
+          <button
+            type="button"
+            onClick={() => setDetalhes((v) => !v)}
+            className="mt-3 flex cursor-pointer items-center gap-1 font-ui text-xs font-bold text-brand hover:underline"
+          >
+            {detalhes ? "Esconder detalhes do contrato" : "Ver detalhes do contrato"}
+            <ChevronDown
+              className={cn("size-3.5 transition-transform", detalhes && "rotate-180")}
+            />
+          </button>
 
-      {detalhes && (
-        <div className="mt-2 rounded-xl border border-border p-3">
-          <LinhaDado rotulo="Rede Wi-Fi" valor={contrato.ssidWifi} />
-          <LinhaDado rotulo="Equipamento" valor={contrato.roteador} />
-          <LinhaDado rotulo="Endereço IP" valor={contrato.ip} />
-          <LinhaDado rotulo="Instalado em" valor={data(contrato.instaladoEm)} />
-          <LinhaDado rotulo="Tecnologia" valor={contrato.tecnologia} />
-        </div>
+          {detalhes && (
+            <div className="mt-2 rounded-xl border border-border p-3">
+              {tecnicos.map(([rotulo, valor]) => (
+                <LinhaDado key={rotulo} rotulo={rotulo as string} valor={valor} />
+              ))}
+            </div>
+          )}
+        </>
       )}
     </CartaoPainel>
   );
@@ -531,15 +571,63 @@ export function SecaoChamados({
 
 export function ResumoCliente({ painel }: { painel: PainelSnapshot }) {
   const { cliente } = painel;
+  const endereco = enderecoEmLinha(cliente.endereco);
+
   return (
     <CartaoPainel>
-      <TituloSecao>Meu cadastro</TituloSecao>
+      <TituloSecao
+        acao={
+          cliente.status === "inativo" ? (
+            <Badge
+              variant="outline"
+              className="border-slate-200 bg-slate-100 font-ui font-semibold text-slate-600"
+            >
+              Cadastro inativo
+            </Badge>
+          ) : undefined
+        }
+      >
+        Meu cadastro
+      </TituloSecao>
+
       <LinhaDado rotulo="Nome" valor={cliente.nome} />
-      <LinhaDado rotulo="Documento" valor={cliente.documento} />
+      <LinhaDado
+        rotulo={cliente.tipoCadastro === "cnpj" ? "CNPJ" : "CPF"}
+        valor={documento(cliente.documento)}
+      />
       <LinhaDado rotulo="Código" valor={cliente.codigo} />
+      {cliente.tipoCadastro !== "cnpj" && cliente.nascimento && (
+        <LinhaDado rotulo="Nascimento" valor={data(cliente.nascimento)} />
+      )}
       <LinhaDado rotulo="E-mail" valor={cliente.email} />
-      <LinhaDado rotulo="Telefone" valor={cliente.telefone} />
+      <LinhaDado rotulo="Telefone" valor={telefone(cliente.telefone)} />
+      {endereco && <LinhaDado rotulo="Endereço" valor={endereco} />}
       <LinhaDado rotulo="Cliente desde" valor={data(cliente.clienteDesde)} />
     </CartaoPainel>
+  );
+}
+
+/**
+ * O aviso de cadastro inativo.
+ *
+ * Vale um bloco próprio no topo, e não só o selo do cartão: um cadastro
+ * inativo explica de uma vez por que a conexão caiu, por que não há fatura
+ * nova e por que os pedidos vão demorar — e sem essa frase o cliente atribui
+ * cada um desses sintomas a um problema diferente.
+ */
+export function AvisoCadastroInativo() {
+  return (
+    <div className="flex items-start gap-3 rounded-2xl border border-amber-200 bg-amber-50 p-5">
+      <AlertTriangle className="mt-0.5 size-5 shrink-0 text-amber-700" />
+      <div>
+        <p className="font-display text-sm font-extrabold text-amber-900">
+          Seu cadastro está inativo
+        </p>
+        <p className="mt-0.5 font-body text-sm text-amber-900/80">
+          Enquanto ele estiver assim, os serviços desta página ficam limitados. Fale com o
+          atendimento para reativar.
+        </p>
+      </div>
+    </div>
   );
 }

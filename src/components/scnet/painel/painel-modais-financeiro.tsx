@@ -33,7 +33,7 @@ import {
 import { useErroPainel, useFormularioPainel } from "@/hooks/use-painel";
 import { textoDaResposta } from "@/lib/painel-normalizar";
 import type { Fatura, NotaFiscal } from "@/lib/painel-tipos";
-import { data, moeda } from "@/lib/painel-formato";
+import { data, faturaEmAberto, moeda } from "@/lib/painel-formato";
 import { cn } from "@/lib/utils";
 import {
   AcoesModal,
@@ -68,7 +68,7 @@ export function ModalSegundaVia({
   const tratarErro = useErroPainel();
 
   const visiveis = useMemo(() => {
-    if (filtro === "pendentes") return faturas.filter((f) => f.status !== "pago");
+    if (filtro === "pendentes") return faturas.filter(faturaEmAberto);
     if (filtro === "pagas") return faturas.filter((f) => f.status === "pago");
     return faturas;
   }, [faturas, filtro]);
@@ -76,7 +76,7 @@ export function ModalSegundaVia({
   // a primeira pendente já vem escolhida: é dela que o cliente veio atrás
   useEffect(() => {
     if (!aberto) return;
-    const pendente = faturas.find((f) => f.status !== "pago");
+    const pendente = faturas.find(faturaEmAberto);
     setSelecionada(pendente?.id ?? faturas[0]?.id ?? "");
     setPagamento(null);
     setFiltro("pendentes");
@@ -188,7 +188,17 @@ export function ModalSegundaVia({
                     </p>
                   </div>
                   <div className="flex items-center gap-3">
-                    <span className="font-display text-sm font-extrabold">{moeda(f.valor)}</span>
+                    <span className="text-right">
+                      <span className="block font-display text-sm font-extrabold">
+                        {moeda(f.valor)}
+                      </span>
+                      {/* só aparece quando juros e multa entraram */}
+                      {f.valorOriginal > 0 && f.valorOriginal !== f.valor && (
+                        <span className="block font-body text-[11px] text-muted-foreground line-through">
+                          {moeda(f.valorOriginal)}
+                        </span>
+                      )}
+                    </span>
                     <SeloStatus tipo="fatura" valor={f.status} />
                   </div>
                 </button>
@@ -196,12 +206,20 @@ export function ModalSegundaVia({
             </div>
           )}
 
-          {fatura && fatura.status !== "pago" && (
+          {fatura && faturaEmAberto(fatura) && (
             <div className="rounded-xl border border-border p-4">
               <div className="flex flex-wrap items-center justify-between gap-2">
-                <p className="font-ui text-sm font-bold text-foreground">
-                  Pagar {fatura.referencia || "a fatura"} — {moeda(fatura.valor)}
-                </p>
+                <div>
+                  <p className="font-ui text-sm font-bold text-foreground">
+                    Pagar {fatura.referencia || "a fatura"} — {moeda(fatura.valor)}
+                  </p>
+                  {fatura.valorOriginal > 0 && fatura.valorOriginal !== fatura.valor && (
+                    <p className="font-body text-xs text-muted-foreground">
+                      {moeda(fatura.valorOriginal)} de valor original +{" "}
+                      {moeda(fatura.valor - fatura.valorOriginal)} de juros e multa até hoje.
+                    </p>
+                  )}
+                </div>
                 <Button
                   type="button"
                   size="sm"

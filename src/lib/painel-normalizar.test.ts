@@ -80,3 +80,103 @@ test("uma lista vazia na resposta apaga a lista — não é ausência de dado", 
   const depois = mesclarPainel(atual, { faturas: [] });
   expect(depois.faturas).toEqual([]);
 });
+
+/* ---------------- o que veio com as tabelas do painel ---------------- */
+
+test("cliente traz nascimento, tipo de cadastro, endereço e status", () => {
+  const { cliente } = normalizarPainel({
+    cliente: {
+      nome: "Mariana",
+      data_nascimento: "1988-04-17",
+      tipo_cadastro: "cpf",
+      status_cliente: "inativo",
+      endereco: { cep: "89801100", logradouro: "Av. Getúlio Vargas", numero: "1842", uf: "SC" },
+    },
+  });
+
+  expect(cliente.nascimento).toBe("1988-04-17");
+  expect(cliente.tipoCadastro).toBe("cpf");
+  expect(cliente.status).toBe("inativo");
+  expect(cliente.endereco.logradouro).toBe("Av. Getúlio Vargas");
+});
+
+test("aceita pessoa física/jurídica no lugar de cpf/cnpj", () => {
+  expect(normalizarPainel({ cliente: { tipo_cadastro: "JURIDICA" } }).cliente.tipoCadastro).toBe(
+    "cnpj",
+  );
+  expect(normalizarPainel({ cliente: { tipo_cadastro: "Fisica" } }).cliente.tipoCadastro).toBe(
+    "cpf",
+  );
+  // sem informação não se inventa uma: fica vazio
+  expect(normalizarPainel({ cliente: { nome: "X" } }).cliente.tipoCadastro).toBe("");
+});
+
+test("status do cliente só é inativo quando o cadastro diz isso", () => {
+  expect(normalizarPainel({ cliente: { nome: "X" } }).cliente.status).toBe("ativo");
+  expect(normalizarPainel({ cliente: { status_cliente: "Inativo" } }).cliente.status).toBe(
+    "inativo",
+  );
+});
+
+test("contrato separa o endereço em coluna única do endereço em campos", () => {
+  const emTexto = normalizarPainel({
+    contratos: [{ id: "c1", endereco: "Av. Getúlio Vargas, 1842 - Centro, Chapecó/SC" }],
+  }).contratos[0];
+  expect(emTexto?.enderecoTexto).toBe("Av. Getúlio Vargas, 1842 - Centro, Chapecó/SC");
+
+  const emCampos = normalizarPainel({
+    contratos: [{ id: "c1", endereco: { logradouro: "Av. Getúlio Vargas", numero: "1842" } }],
+  }).contratos[0];
+  expect(emCampos?.enderecoTexto).toBe("");
+  expect(emCampos?.endereco.numero).toBe("1842");
+});
+
+test("composição do contrato aceita a coluna com itens separados por ;", () => {
+  const contrato = normalizarPainel({
+    contratos: [{ id: "c1", composicao: "Roteador Wi-Fi 6;Paramount+;Suporte 24h" }],
+  }).contratos[0];
+
+  expect(contrato?.composicao).toEqual(["Roteador Wi-Fi 6", "Paramount+", "Suporte 24h"]);
+});
+
+test("contrato traz adesão e vigência", () => {
+  const contrato = normalizarPainel({
+    contratos: [{ id: "c1", data_adesao: "2022-03-15", data_vencimento_contrato: "2027-03-15" }],
+  }).contratos[0];
+
+  expect(contrato?.adesao).toBe("2022-03-15");
+  expect(contrato?.vigenciaAte).toBe("2027-03-15");
+});
+
+test("a fatura cobra o valor atualizado e guarda o original", () => {
+  const [comJuros, noPrazo] = normalizarPainel({
+    faturas: [
+      { id: "f1", valor_original: 219.9, valor_atual: 234.87, status: "vencida" },
+      { id: "f2", valor: 129.9, status: "aberta" },
+    ],
+  }).faturas;
+
+  // é o atualizado que o cliente paga hoje
+  expect(comJuros?.valor).toBe(234.87);
+  expect(comJuros?.valorOriginal).toBe(219.9);
+  expect(comJuros?.status).toBe("vencido");
+
+  // sem acréscimo, os dois são o mesmo — e a tela não mostra desconto nenhum
+  expect(noPrazo?.valor).toBe(129.9);
+  expect(noPrazo?.valorOriginal).toBe(129.9);
+  expect(noPrazo?.status).toBe("aberto");
+});
+
+test("fatura cancelada não vira fatura em aberto", () => {
+  const fatura = normalizarPainel({ faturas: [{ id: "f1", status: "cancelada" }] }).faturas[0];
+  expect(fatura?.status).toBe("cancelado");
+});
+
+test("as formas femininas do banco chegam ao status do contrato", () => {
+  const contrato = normalizarPainel({
+    contratos: [{ id: "c1", status_fatura: "vencida", status_contrato: "bloqueado" }],
+  }).contratos[0];
+
+  expect(contrato?.statusFinanceiro).toBe("vencido");
+  expect(contrato?.statusConexao).toBe("offline");
+});

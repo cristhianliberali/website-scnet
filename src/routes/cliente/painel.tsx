@@ -30,6 +30,7 @@ import { Header } from "@/components/scnet/header";
 import { Footer, WhatsFloat } from "@/components/scnet/sections";
 import { Blobs } from "@/components/scnet/shared";
 import {
+  AvisoCadastroInativo,
   BannerFinanceiro,
   BannerIndicacao,
   GradeServicos,
@@ -61,6 +62,7 @@ import {
   useFormularioPainel,
 } from "@/hooks/use-painel";
 import { consultarPainel, getSessaoCliente, logoutCliente } from "@/lib/cliente-auth";
+import { faturaEmAberto } from "@/lib/painel-formato";
 import { normalizarPainel } from "@/lib/painel-normalizar";
 import type { PainelSnapshot } from "@/lib/painel-tipos";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -302,10 +304,12 @@ function ConteudoPainel({
   aoReiniciar: (contrato: PainelSnapshot["contratos"][number]) => void;
   reiniciando: string | null;
 }) {
-  const emAberto = painel.faturas.filter((f) => f.status !== "pago").length;
+  const emAberto = painel.faturas.filter(faturaEmAberto).length;
 
   return (
     <>
+      {painel.cliente.status === "inativo" && <AvisoCadastroInativo />}
+
       <BannerFinanceiro
         faturas={painel.faturas}
         desbloqueioDisponivel={painel.desbloqueioDisponivel}

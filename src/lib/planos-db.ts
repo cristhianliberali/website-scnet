@@ -1,16 +1,9 @@
 /**
- * Conexão com o Postgres que alimenta os planos do site.
+ * Os planos do site, lidos do Postgres.
  *
- * Roda só no servidor (é usada pelo server function `fetchPlanos`), lendo a
- * configuração de `process.env` em tempo de execução:
+ * Roda só no servidor (é usada pelo server function `fetchPlanos`). A conexão
+ * em si mora em `postgres.server.ts`; daqui saem só a consulta e o cache:
  *
- *   POSTGRES_URL              string de conexão completa (tem prioridade)
- *   POSTGRES_HOST             host do banco
- *   POSTGRES_PORT             porta (padrão 5432)
- *   POSTGRES_DB               nome do banco
- *   POSTGRES_USER             usuário
- *   POSTGRES_PASSWORD         senha
- *   POSTGRES_SSL              "require" | "no-verify" | "true" | "false"
  *   POSTGRES_SCHEMA           schema da tabela (padrão "public")
  *   POSTGRES_PLANOS_TABLE     tabela dos planos (padrão "planos_web")
  *   POSTGRES_PLANOS_CACHE_SECONDS  cache em memória do resultado (padrão 60)
@@ -20,80 +13,12 @@
  * embutida de reserva — ela só mascararia uma falha de configuração.
  */
 
-import postgres from "postgres";
+import { env, getClient, identifier } from "./postgres.server";
 import { formatBRL, splitList, type Plan } from "./plans";
 
 const DEFAULT_SCHEMA = "public";
 const DEFAULT_TABLE = "planos_web";
 const DEFAULT_CACHE_SECONDS = 60;
-/** Identificadores vêm de env var — só aceitamos nomes simples de tabela/schema. */
-const IDENTIFIER_RE = /^[A-Za-z_][A-Za-z0-9_$]*$/;
-
-const env = (name: string) => process.env[name]?.trim() || undefined;
-
-function identifier(name: string | undefined, fallback: string, varName: string) {
-  if (!name) return fallback;
-  if (!IDENTIFIER_RE.test(name)) {
-    console.error(`${varName} inválido ("${name}") — usando "${fallback}".`);
-    return fallback;
-  }
-  return name;
-}
-
-function sslOption(): NonNullable<postgres.Options<Record<string, never>>["ssl"]> {
-  const value = env("POSTGRES_SSL")?.toLowerCase();
-  if (!value || value === "false" || value === "disable" || value === "0") return false;
-  // Certificado autoassinado (comum em banco gerenciado atrás de proxy).
-  if (value === "no-verify" || value === "allow" || value === "prefer") {
-    return { rejectUnauthorized: false };
-  }
-  return "require";
-}
-
-type Sql = ReturnType<typeof postgres>;
-
-let client: Sql | null = null;
-let clientReady = false;
-
-/** Abre (uma vez) a conexão; devolve null quando o banco não está configurado. */
-function getClient(): Sql | null {
-  if (clientReady) return client;
-  clientReady = true;
-
-  const url = env("POSTGRES_URL");
-  const host = env("POSTGRES_HOST");
-  if (!url && !host) {
-    console.error(
-      "Postgres não configurado (POSTGRES_URL/POSTGRES_HOST) — nenhum plano será exibido.",
-    );
-    return null;
-  }
-
-  const options: postgres.Options<Record<string, never>> = {
-    max: 3,
-    idle_timeout: 30,
-    connect_timeout: 10,
-    ssl: sslOption(),
-    onnotice: () => {},
-  };
-
-  try {
-    client = url
-      ? postgres(url, options)
-      : postgres({
-          ...options,
-          host: host as string,
-          port: Number(env("POSTGRES_PORT") ?? 5432),
-          database: env("POSTGRES_DB") ?? "postgres",
-          username: env("POSTGRES_USER") ?? "postgres",
-          password: env("POSTGRES_PASSWORD") ?? "",
-        });
-  } catch (err) {
-    console.error("Falha ao inicializar a conexão com o Postgres", err);
-    client = null;
-  }
-  return client;
-}
 
 /* ---------------- consulta ---------------- */
 
@@ -173,7 +98,11 @@ export async function loadPlanos(): Promise<Plan[]> {
   }
 
   const sql = getClient();
-  if (!sql) return [];
+  if (!sql) {
+    // o "por quê" sai em postgres.server.ts; aqui fica a consequência
+    console.error("Sem banco configurado — nenhum plano será exibido.");
+    return [];
+  }
 
   const schema = identifier(env("POSTGRES_SCHEMA"), DEFAULT_SCHEMA, "POSTGRES_SCHEMA");
   const table = identifier(env("POSTGRES_PLANOS_TABLE"), DEFAULT_TABLE, "POSTGRES_PLANOS_TABLE");
