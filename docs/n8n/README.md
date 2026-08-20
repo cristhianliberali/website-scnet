@@ -12,6 +12,9 @@ painel enquanto esse token estiver válido.
 | `painel-cliente.md`           | O contrato JSON de cada evento de `/cliente/painel`             |
 | `schema-painel.sql`           | As tabelas que alimentam o painel (rode depois do `schema.sql`) |
 
+`schema-painel.sql` também cria `planos_web`, que alimenta a grade de planos da
+home e o modal "Trocar de plano" do painel.
+
 ## Antes de importar
 
 **n8n 1.60 ou mais novo** — o workflow usa Switch v3.2, If v2.2 e passa os
@@ -40,8 +43,11 @@ As duas só são lidas na inicialização: depois de adicioná-las, **reinicie o
 serviço do n8n**. E se ele roda com `N8N_BLOCK_ENV_ACCESS_IN_NODE=true`, os nós
 de código não enxergam nenhuma variável de ambiente; deixe em `false` (o padrão).
 
-Rode o `schema.sql` no Postgres. Só a view `clientes_web` precisa ser adaptada:
-ela é o único ponto em que o workflow toca no seu cadastro.
+Rode o `schema.sql` no Postgres. Só `clientes_web` precisa ser adaptada: ela é o
+único ponto em que o workflow toca no seu cadastro. O arquivo a propõe como uma
+**view** sobre a sua base, mas na instalação da SCNET ela é uma **tabela** do
+próprio portal — o site não vê diferença entre as duas, e o `schema-painel.sql`
+traz a lista de colunas atual e o `ALTER TABLE` que a completa.
 
 ## Depois de importar
 
