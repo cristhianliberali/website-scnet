@@ -26,6 +26,8 @@ export type PlanoDiag = {
   valor: string;
   ativo: boolean;
   ordem_grade: number;
+  /** Preenchido = plano de campanha: some da home sem ?codigo_oferta= na URL. */
+  codigo_oferta: string | null;
 };
 
 export type OndeEsta = { tabela: string; schemas: string[] };
@@ -48,7 +50,17 @@ export type Diagnostico = {
   bancos_no_servidor: string[];
   /** Em quais schemas deste banco cada tabela aparece, se aparecer. */
   onde_estao_as_tabelas: OndeEsta[];
-  planos: { tabela: string; total: number; ativos: PlanoDiag[]; erro: string | null };
+  planos: {
+    tabela: string;
+    /** Linhas na tabela, sem filtro nenhum. */
+    total: number;
+    ativos: PlanoDiag[];
+    /** Dos ativos, quantos são de campanha (some da home sem ?codigo_oferta=). */
+    restritos_a_campanha: number;
+    /** Os que a home mostra de verdade: ativos e sem `codigo_oferta`. */
+    aparecem_na_home: number;
+    erro: string | null;
+  };
 };
 
 /** Esconde a senha dentro da URL de conexão, mantendo host e banco visíveis. */
@@ -112,7 +124,14 @@ export async function coletarDiagnostico(): Promise<Diagnostico> {
     colunas_faltando_em_clientes_web: [],
     bancos_no_servidor: [],
     onde_estao_as_tabelas: [],
-    planos: { tabela: `${schema}.${tabelaPlanos}`, total: 0, ativos: [], erro: null },
+    planos: {
+      tabela: `${schema}.${tabelaPlanos}`,
+      total: 0,
+      ativos: [],
+      restritos_a_campanha: 0,
+      aparecem_na_home: 0,
+      erro: null,
+    },
   };
 
   const sql = getClient();
@@ -225,12 +244,15 @@ export async function coletarDiagnostico(): Promise<Diagnostico> {
    */
   try {
     const linhas = (await sql.unsafe(
-      `select id_plano::text as id_plano, nome, valor::text as valor, ativo, ordem_grade
+      `select id_plano::text as id_plano, nome, valor::text as valor, ativo, ordem_grade,
+              nullif(trim(coalesce(codigo_oferta, '')), '') as codigo_oferta
          from "${schema}"."${tabelaPlanos}"
         order by ordem_grade asc, id_plano asc`,
     )) as unknown as PlanoDiag[];
     base.planos.total = linhas.length;
     base.planos.ativos = linhas.filter((p) => p.ativo);
+    base.planos.restritos_a_campanha = base.planos.ativos.filter((p) => p.codigo_oferta).length;
+    base.planos.aparecem_na_home = base.planos.ativos.length - base.planos.restritos_a_campanha;
   } catch (err) {
     base.planos.erro = mensagem(err);
   }

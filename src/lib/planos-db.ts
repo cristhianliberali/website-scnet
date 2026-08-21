@@ -138,8 +138,29 @@ export async function loadPlanos(): Promise<Plan[]> {
 
     const planos = rows.map(toPlan);
     if (!planos.length) {
-      console.warn(`Nenhum plano ativo em ${schema}.${table} — a página ficará sem planos.`);
+      console.warn(
+        `Nenhum plano ATIVO em ${schema}.${table} — a página ficará sem planos. ` +
+          "A consulta funcionou; o filtro é `where ativo is true`, então confira se as " +
+          "linhas existem e se `ativo` está marcado.",
+      );
       return [];
+    }
+
+    /*
+     * Plano com `codigo_oferta` é de campanha: ele só aparece quando a URL traz
+     * `?codigo_oferta=` com o mesmo valor (veja `planosVisiveis`). Se TODOS
+     * estiverem assim, a home fica vazia mesmo com a consulta perfeita — e sem
+     * este aviso não há como descobrir isso olhando a tela ou a tabela.
+     */
+    const restritos = planos.filter((p) => p.codigo_oferta).length;
+    if (restritos === planos.length) {
+      console.warn(
+        `Todos os ${planos.length} planos ativos de ${schema}.${table} têm \`codigo_oferta\` ` +
+          "preenchido, ou seja, são de campanha: a home só os mostra com ?codigo_oferta=<código> " +
+          "na URL. Para um plano aparecer sempre, deixe `codigo_oferta` nulo.",
+      );
+    } else if (restritos > 0) {
+      console.info(`${restritos} de ${planos.length} planos são de campanha (codigo_oferta).`);
     }
 
     console.info(`Planos carregados do Postgres: ${planos.length}.`);
