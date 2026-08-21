@@ -99,8 +99,24 @@ function listarProblemas(d: Diagnostico): string[] {
     );
   }
 
-  if (d.planos.erro) problemas.push(`Planos: ${d.planos.erro}`);
-  else if (d.planos.ativos.length === 0) problemas.push("Nenhum plano ativo — a home fica vazia.");
+  if (d.planos.erro) {
+    problemas.push(`Planos: ${d.planos.erro}`);
+  } else if (d.planos.total === 0) {
+    problemas.push(
+      `${d.planos.tabela} está VAZIA — nenhuma linha. A home não tem o que mostrar. ` +
+        "Se você editou planos e eles não aparecem aqui, foi em outro banco.",
+    );
+  } else if (d.planos.ativos.length === 0) {
+    problemas.push(
+      `${d.planos.tabela} tem ${d.planos.total} linha(s), mas nenhuma com ativo = true.`,
+    );
+  } else if (d.planos.aparecem_na_home === 0) {
+    problemas.push(
+      `Os ${d.planos.ativos.length} planos ativos têm "codigo_oferta" preenchido, ou seja, são ` +
+        "de campanha: a home só os mostra com ?codigo_oferta=<código> na URL. Para um plano " +
+        "aparecer sempre, deixe codigo_oferta nulo.",
+    );
+  }
 
   return problemas;
 }
