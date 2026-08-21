@@ -424,6 +424,24 @@ se a resposta do formulário já trouxer as listas atualizadas, elas entram dire
 no cache e não há nem a consulta seguinte. Formulários que não mudam nada
 (diagnóstico, viabilidade, teste de velocidade) não recarregam nada.
 
+**Quando algo não bate, dá para ver.** `/diagnostico?token=...` responde o que o
+servidor enxerga do Postgres: **qual banco** ele abriu (nome, host e porta),
+quais tabelas ele acha, quantas linhas cada uma tem e quais planos ele leria
+agora. Sem `DIAGNOSTICO_TOKEN` a rota é 404 — ela nem existe. Foi a falta dessa
+resposta que já fez um erro de configuração (o site lendo um banco, o SQL
+aplicado em outro) parecer um bug de código por dias.
+
+Vale saber que são **duas conexões diferentes** com o Postgres, e confundi-las
+custa caro: o **login** passa pelo n8n, que usa a credencial de banco dele; o
+**painel e os planos** passam pela conexão do site (`POSTGRES_*`). O login
+funcionar não diz nada sobre a conexão do site — e vice-versa.
+
+**Se o n8n ainda não tem os ramos novos**, o site se vira: manda o evento
+específico, e se o workflow responder "Evento não reconhecido", refaz com
+`consulta_painel`/`formulario_painel` e passa a usar os nomes antigos. É o
+`PAINEL_EVENTOS=auto`, o padrão. Sem isso, um workflow desatualizado derruba o
+painel inteiro, formulários incluídos.
+
 **A tela não inventa resultado.** O protocolo do chamado, o PIX copia e cola, a
 data agendada e a medição de velocidade são o que voltou do n8n. Quando um campo
 não vem, a linha correspondente simplesmente não aparece — em vez de um valor
