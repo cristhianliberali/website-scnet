@@ -28,6 +28,8 @@ export type PlanoDiag = {
   ordem_grade: number;
 };
 
+export type OndeEsta = { tabela: string; schemas: string[] };
+
 export type Diagnostico = {
   gerado_em: string;
   ambiente: Record<string, string>;
@@ -42,6 +44,10 @@ export type Diagnostico = {
   schema: string;
   tabelas: TabelaDiag[];
   colunas_faltando_em_clientes_web: string[];
+  /** Outros bancos no MESMO servidor — o SQL pode ter sido rodado num deles. */
+  bancos_no_servidor: string[];
+  /** Em quais schemas deste banco cada tabela aparece, se aparecer. */
+  onde_estao_as_tabelas: OndeEsta[];
   planos: { tabela: string; total: number; ativos: PlanoDiag[]; erro: string | null };
 };
 
@@ -80,7 +86,6 @@ function ambiente(): Record<string, string> {
     POSTGRES_CLIENTES_TABLE: env("POSTGRES_CLIENTES_TABLE") ?? "(vazia → clientes_web)",
     POSTGRES_CONTRATOS_TABLE: env("POSTGRES_CONTRATOS_TABLE") ?? "(vazia → contratos_web)",
     POSTGRES_FATURAS_TABLE: env("POSTGRES_FATURAS_TABLE") ?? "(vazia → faturas_web)",
-    PAINEL_FONTE: env("PAINEL_FONTE") ?? "(vazia → auto)",
     PAINEL_EVENTOS: env("PAINEL_EVENTOS") ?? "(vazia → auto)",
     PAINEL_CACHE_SECONDS: env("PAINEL_CACHE_SECONDS") ?? "(vazia → 60)",
     WEBHOOK_LOGIN_URL: env("WEBHOOK_LOGIN_URL") ? "(definida)" : "(vazia)",
@@ -105,6 +110,8 @@ export async function coletarDiagnostico(): Promise<Diagnostico> {
     schema,
     tabelas: [],
     colunas_faltando_em_clientes_web: [],
+    bancos_no_servidor: [],
+    onde_estao_as_tabelas: [],
     planos: { tabela: `${schema}.${tabelaPlanos}`, total: 0, ativos: [], erro: null },
   };
 
@@ -170,6 +177,45 @@ export async function coletarDiagnostico(): Promise<Diagnostico> {
     base.colunas_faltando_em_clientes_web = COLUNAS_PAINEL.filter((c) => !presentes.has(c));
   } catch (err) {
     base.colunas_faltando_em_clientes_web = [`(não deu para conferir: ${mensagem(err)})`];
+  }
+
+  /*
+   * "A tabela não existe" quase nunca é a resposta útil. As duas perguntas
+   * seguintes é que resolvem, e são as que ninguém pensa em fazer:
+   *
+   *   - ela existe em OUTRO SCHEMA deste mesmo banco?
+   *   - ou o SQL foi rodado em outro BANCO do mesmo servidor?
+   *
+   * O segundo caso é o mais traiçoeiro: conectar no servidor certo e rodar o
+   * SQL no banco errado parece ter dado certo — o comando não reclama de nada.
+   */
+  try {
+    const achadas = (await sql`
+      select table_name::text as tabela, table_schema::text as schema
+        from information_schema.tables
+       where table_name = any(${["clientes_web", "contratos_web", "faturas_web", "planos_web"]})
+       order by table_name, table_schema
+    `) as unknown as { tabela: string; schema: string }[];
+
+    const porTabela = new Map<string, string[]>();
+    for (const a of achadas) {
+      porTabela.set(a.tabela, [...(porTabela.get(a.tabela) ?? []), a.schema]);
+    }
+    base.onde_estao_as_tabelas = ["clientes_web", "contratos_web", "faturas_web", "planos_web"].map(
+      (tabela) => ({ tabela, schemas: porTabela.get(tabela) ?? [] }),
+    );
+  } catch {
+    // catálogo indisponível é detalhe — o resto do relatório continua valendo
+  }
+
+  try {
+    const bancos = (await sql`
+      select datname::text as nome from pg_database
+       where not datistemplate and datallowconn order by datname
+    `) as unknown as { nome: string }[];
+    base.bancos_no_servidor = bancos.map((b) => b.nome);
+  } catch {
+    // idem
   }
 
   /*

@@ -382,17 +382,16 @@ estão em `docs/n8n/schema-painel.sql` (`clientes_web` com o cadastro completo,
 `contratos_web`, `faturas_web`), e o SQL traz um cliente fake para conferir a
 tela antes de plugar a base de verdade.
 
-`PAINEL_FONTE` decide o caminho: `auto` (padrão) usa o banco quando ele está
-configurado e cai no webhook quando não; `banco` recusa o webhook, para que uma
-configuração errada apareça como erro em vez de virar um silencioso "sempre
-pelo n8n"; `webhook` mantém tudo pelo n8n. Em `auto`, uma falha no banco cai
-para o `painel_bootstrap` com o motivo no log — é a rede de segurança.
+**Leitura é sempre do banco, sem reserva.** Não há mais queda para o webhook
+quando a consulta falha. Ela existia, e foi ela que escondeu um banco mal
+configurado por dias: a consulta quebrava, a chamada seguia para o n8n em
+silêncio, e a tela carregava **vazia** — como se o cliente não tivesse contrato
+nenhum. Agora uma falha de leitura é uma falha visível, com o motivo no log e
+uma mensagem que diz o que aconteceu.
 
-**Um carregamento só.** Depois de autenticar, o site dispara **uma** consulta,
-`painel_bootstrap`, que traz o painel inteiro: cadastro, contratos, faturas,
-notas fiscais, indicações, chamados, planos disponíveis e avisos. Uma ida ao n8n
-em vez de sete é a diferença entre a página aparecer pronta e aparecer aos
-pedaços. Ela sai no loader da rota, durante o SSR, então o HTML já chega com
+**Um carregamento só.** Depois de autenticar, o site lê o painel inteiro do
+Postgres numa consulta: cadastro, contratos, faturas, planos disponíveis e
+avisos. Ela sai no loader da rota, durante o SSR, então o HTML já chega com
 conteúdo — e, quando a fonte é o banco, o retrato já foi preparado no cache no
 instante do login — e o resultado entra no cache do TanStack Query como `initialData`, de
 modo que a hidratação não repete a chamada.
