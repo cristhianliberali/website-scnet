@@ -84,6 +84,22 @@ const cacheMs = () => {
 };
 
 /**
+ * Por quanto tempo, no máximo, vale servir o último resultado bom depois que a
+ * consulta passou a falhar.
+ *
+ * Antes não havia limite: numa falha permanente o site servia o mesmo retrato
+ * para sempre, e a página parecia viva enquanto o banco estava fora. Um preço
+ * errado no ar por dias é pior que um "indisponível" honesto — o primeiro vira
+ * promessa comercial que o provedor não vai cumprir.
+ */
+const DEFAULT_STALE_SECONDS = 600;
+
+const staleMs = () => {
+  const seconds = Number(env("POSTGRES_PLANOS_STALE_SECONDS") ?? DEFAULT_STALE_SECONDS);
+  return (Number.isFinite(seconds) && seconds >= 0 ? seconds : DEFAULT_STALE_SECONDS) * 1000;
+};
+
+/**
  * Planos ativos, na ordem da grade. Cada caminho aparece no log do servidor —
  * é por ele que se sabe se a página está mostrando dados do banco.
  *
@@ -108,6 +124,7 @@ export async function loadPlanos(): Promise<Plan[]> {
   const table = identifier(env("POSTGRES_PLANOS_TABLE"), DEFAULT_TABLE, "POSTGRES_PLANOS_TABLE");
 
   console.info(`Carregando planos do Postgres (${schema}.${table})...`);
+  await registrarBanco(sql);
   try {
     const rows = (await sql<PlanoRow[]>`
       select
@@ -131,9 +148,45 @@ export async function loadPlanos(): Promise<Plan[]> {
   } catch (err) {
     console.error("Falha ao consultar os planos no Postgres", err);
     if (cache) {
-      console.warn(`Reaproveitando o último resultado do banco (${cache.planos.length}).`);
-      return cache.planos;
+      const vencidoHa = Date.now() - cache.expiresAt;
+      if (vencidoHa <= staleMs()) {
+        console.warn(
+          `Reaproveitando o último resultado do banco (${cache.planos.length}), ` +
+            `vencido há ${Math.round(vencidoHa / 1000)}s.`,
+        );
+        return cache.planos;
+      }
+      console.error(
+        `O último resultado do banco venceu há ${Math.round(vencidoHa / 1000)}s e não será ` +
+          "mais servido — a página vai mostrar o estado vazio até o banco voltar.",
+      );
+      cache = null;
     }
     return [];
+  }
+}
+
+/**
+ * Diz uma vez, no log, a QUAL banco este processo se conectou.
+ *
+ * Saber a tabela não basta quando o problema é o site estar lendo outro banco
+ * — e essa foi exatamente a confusão que levou horas para desfazer. Sai uma vez
+ * por processo, porque a conexão não muda no meio do caminho.
+ */
+let bancoRegistrado = false;
+
+async function registrarBanco(sql: ReturnType<typeof getClient>) {
+  if (bancoRegistrado || !sql) return;
+  bancoRegistrado = true;
+  try {
+    const linhas = (await sql`
+      select current_database()::text                            as banco,
+             coalesce(inet_server_addr()::text, '(socket local)') as servidor,
+             inet_server_port()                                  as porta
+    `) as unknown as { banco: string; servidor: string; porta: number }[];
+    const i = linhas[0];
+    if (i) console.info(`Postgres conectado: banco "${i.banco}" em ${i.servidor}:${i.porta}.`);
+  } catch {
+    // saber o nome do banco é conforto, não requisito — nunca derruba a consulta
   }
 }

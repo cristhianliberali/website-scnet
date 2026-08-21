@@ -659,6 +659,11 @@ function lerDadosPainel(data: Record<string, unknown>): DadosPainel {
 
 type ChamadaPainel = {
   evento: EventoPainel;
+  /**
+   * O nome antigo do mesmo evento, para quando o n8n não conhecer o novo.
+   * Veja `modoEventos()`.
+   */
+  eventoGenerico: "consulta_painel" | "formulario_painel";
   dados: Record<string, unknown>;
   label: string;
   acaoRecaptcha: string;
@@ -670,6 +675,50 @@ type ChamadaPainel = {
   /** Formulário: o que derrubar do cache quando o envio der certo. */
   invalidar?: readonly SecaoPainel[] | undefined;
 };
+
+/**
+ * Como o site nomeia os eventos do painel.
+ *
+ * O site manda um evento por assunto (`painel_bootstrap`,
+ * `painel_abrir_chamado`, ...), mas um workflow do n8n que ainda não tenha
+ * esses ramos só conhece os dois nomes antigos — e responde "Evento não
+ * reconhecido" a todo o resto, o que derruba o painel inteiro.
+ *
+ *   auto        (padrão) tenta o específico e, se o n8n recusar, refaz com o
+ *               genérico e passa a usar o genérico daí em diante
+ *   especificos só o nome novo, sem rede de proteção
+ *   genericos   só os nomes antigos — para quem ainda não criou os ramos
+ */
+type ModoEventos = "auto" | "especificos" | "genericos";
+
+function modoEventos(): ModoEventos {
+  const escolha = env("PAINEL_EVENTOS")?.toLowerCase();
+  if (escolha === "especificos" || escolha === "especifico") return "especificos";
+  if (escolha === "genericos" || escolha === "generico" || escolha === "compat") {
+    return "genericos";
+  }
+  return "auto";
+}
+
+/**
+ * O que já se descobriu sobre o n8n do outro lado, em modo `auto`.
+ *
+ * `null` é "ainda não sei". Vive na memória do processo: o custo do
+ * aprendizado é uma chamada a mais por processo, e um deploy o refaz — que é o
+ * certo, porque o workflow pode ter ganhado os ramos novos nesse meio-tempo.
+ */
+let n8nConheceEventosNovos: boolean | null = null;
+
+/*
+ * O workflow responde `{"status":"erro","mensagem":"Evento não reconhecido."}`
+ * ao que ele não sabe rotear. Casar por texto é frágil como contrato — por
+ * isso `PAINEL_EVENTOS=genericos` existe: ele força o caminho compatível sem
+ * depender de adivinhar a frase.
+ */
+const EVENTO_RECUSADO = /n[ãa]o\s+reconhecid|evento\s+desconhecid|unknown\s+event/i;
+
+const eventoNaoReconhecido = (resultado: WebhookOutcomeWithData) =>
+  EVENTO_RECUSADO.test(resultado.message ?? "");
 
 async function chamarPainel(chamada: ChamadaPainel): Promise<PainelOk | PainelErro> {
   const sessao = await lerSessao();
@@ -702,13 +751,41 @@ async function chamarPainel(chamada: ChamadaPainel): Promise<PainelOk | PainelEr
   );
   if (isLikelyBot(recaptcha)) return erroPainel(ERRO_ROBO);
 
-  const resultado = await postToPainelWebhook(
-    envelope(chamada.evento, chamada.dados, recaptcha, {
-      token: sessao.token.valor,
-      idCliente: sessao.idCliente,
-    }),
+  const autenticacao = { token: sessao.token.valor, idCliente: sessao.idCliente };
+  const modo = modoEventos();
+
+  /*
+   * Em `auto`, depois de descobrir que o n8n não conhece os nomes novos, já se
+   * manda o antigo — insistir no específico gastaria duas idas a cada clique.
+   */
+  const usarGenerico =
+    modo === "genericos" || (modo === "auto" && n8nConheceEventosNovos === false);
+  const primeiro = usarGenerico ? chamada.eventoGenerico : chamada.evento;
+
+  let resultado = await postToPainelWebhook(
+    envelope(primeiro, chamada.dados, recaptcha, autenticacao),
     chamada.label,
   );
+
+  /*
+   * O n8n não soube rotear o evento novo. Isso não é falha do cliente nem da
+   * sessão: é o workflow ainda sem os ramos. Refaz com o nome antigo, que todo
+   * workflow tem, e anota para não repetir a descoberta.
+   */
+  if (!resultado.ok && modo === "auto" && !usarGenerico && eventoNaoReconhecido(resultado)) {
+    console.warn(
+      `O n8n não reconheceu "${primeiro}". Repetindo como "${chamada.eventoGenerico}" e ` +
+        "usando os nomes antigos daqui em diante. Para calar este aviso, crie os ramos novos " +
+        "no workflow ou defina PAINEL_EVENTOS=genericos.",
+    );
+    n8nConheceEventosNovos = false;
+    resultado = await postToPainelWebhook(
+      envelope(chamada.eventoGenerico, chamada.dados, recaptcha, autenticacao),
+      chamada.label,
+    );
+  } else if (resultado.ok && !usarGenerico) {
+    n8nConheceEventosNovos = true;
+  }
 
   if (!resultado.ok) {
     if (tokenRecusado(resultado)) {
@@ -719,6 +796,18 @@ async function chamarPainel(chamada: ChamadaPainel): Promise<PainelOk | PainelEr
        */
       await limparSessao();
       return erroPainel(mensagemDoWebhook(resultado.message, ERRO_SESSAO_EXPIRADA), true);
+    }
+    /*
+     * "Evento não reconhecido" é recado de configuração entre o site e o n8n,
+     * não algo que o cliente possa entender ou resolver. Ele vai para o log,
+     * onde alguém age; a tela recebe o texto de indisponibilidade.
+     */
+    if (eventoNaoReconhecido(resultado)) {
+      console.error(
+        `O n8n recusou o evento "${chamada.evento}" e também "${chamada.eventoGenerico}". ` +
+          "O workflow precisa rotear pelo menos os nomes antigos (consulta_painel/formulario_painel).",
+      );
+      return erroPainel(ERRO_INDISPONIVEL);
     }
     return erroPainel(mensagemDeFalha(resultado, ERRO_GENERICO));
   }
@@ -785,6 +874,17 @@ async function consultarNoBanco(
       console.error("PAINEL_FONTE=banco, mas a consulta ao Postgres falhou.");
       return erroPainel(ERRO_GENERICO);
     }
+    /*
+     * O motivo já saiu no log de `carregarPainelDoBanco`. Esta linha existe
+     * para deixar a CADEIA visível: sem ela, o próximo erro no log é o do n8n
+     * recusando o evento, e parece um problema de webhook quando na verdade é
+     * o banco que não respondeu.
+     */
+    console.warn(
+      "Painel: a consulta ao Postgres não respondeu — caindo para o webhook do n8n. " +
+        "Se as tabelas do painel não existirem neste banco, é essa a causa raiz; " +
+        "abra /diagnostico?token=... para ver qual banco o site abriu.",
+    );
     return null;
   }
 
@@ -834,6 +934,7 @@ export async function consultarPainelServer(data: ConsultaInput): Promise<Painel
 
   return chamarPainel({
     evento: conhecida ? CONSULTAS_PAINEL[secao] : "consulta_painel",
+    eventoGenerico: "consulta_painel",
     dados: { secao },
     label: `Área do cliente (consulta: ${secao})`,
     acaoRecaptcha: "cliente_consulta",
@@ -868,6 +969,7 @@ export async function enviarFormularioPainelServer(
   const conhecido = ehFormularioConhecido(formulario);
   return chamarPainel({
     evento: conhecido ? FORMULARIOS_PAINEL[formulario] : "formulario_painel",
+    eventoGenerico: "formulario_painel",
     dados: { formulario, campos: data.dados },
     label: `Área do cliente (formulário: ${formulario})`,
     acaoRecaptcha: "cliente_formulario",
