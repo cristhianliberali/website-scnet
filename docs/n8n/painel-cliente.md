@@ -32,19 +32,15 @@ Dado que já está numa tabela nossa não precisa de um salto até o n8n para
 voltar. Ação, sim: quem fala com o ERP, o gateway de pagamento e o WhatsApp é o
 fluxo, e é lá que ela continua.
 
-`PAINEL_FONTE` decide:
+**Não há reserva pelo webhook.** Uma falha de leitura (tabela ausente, conexão
+fora do ar, cliente que não está no cadastro) vira **erro na tela**, com o
+motivo no log. Antes ela caía para o n8n em silêncio, e a tela carregava vazia
+— o que fez um banco mal configurado passar dias sem ser notado. Falhar visível
+é melhor que suceder errado.
 
-| Valor           | Comportamento                                                            |
-| --------------- | ------------------------------------------------------------------------ |
-| `auto` (padrão) | Postgres quando configurado; webhook quando não                          |
-| `banco`         | só Postgres — uma falha vira erro, em vez de cair no webhook em silêncio |
-| `webhook`       | só n8n, mesmo com o banco ligado                                         |
-
-Em `auto`, uma falha na consulta ao banco (tabela ausente, conexão fora do ar,
-cliente que não está no cadastro) cai para o `painel_bootstrap` no webhook, com o
-motivo no log do servidor. É por isso que o contrato do `painel_bootstrap`
-descrito abaixo continua valendo mesmo com o banco em uso — ele é a rede de
-segurança.
+Na prática isso quer dizer que **o site não manda mais nenhum evento de
+consulta**. Os únicos eventos que chegam ao n8n são os de login e os catorze de
+formulário.
 
 **O que autoriza a consulta ao banco.** O `id_cliente` sai do cookie de sessão,
 que é selado e foi escrito pelo n8n no login. O navegador não o lê nem o forja,
@@ -53,8 +49,8 @@ $1` bastar para ninguém enxergar o cliente do vizinho.
 
 **O que o banco ainda não tem.** As tabelas de hoje cobrem cadastro, contratos,
 faturas e o catálogo de planos. Notas fiscais, indicações e chamados voltam
-vazios pelo caminho do banco, e a tela mostra o estado vazio de cada um. Para
-servi-los pelo n8n enquanto as tabelas não existem, use `PAINEL_FONTE=webhook`.
+vazios, e a tela mostra o estado vazio de cada um — até existirem as tabelas
+correspondentes.
 
 O schema está em [`schema-painel.sql`](./schema-painel.sql).
 

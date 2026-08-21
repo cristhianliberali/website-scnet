@@ -45,7 +45,7 @@ import {
   registrarFalha,
 } from "./tentativas-login";
 import { lerToken } from "./token-acesso";
-import { carregarPainelDoBanco, fontePainel } from "./painel-db.server";
+import { carregarPainelDoBanco } from "./painel-db.server";
 import { env } from "./postgres.server";
 import {
   gravarCachePainel,
@@ -201,11 +201,7 @@ type EventoLogin =
  * (`consulta_painel` e `formulario_painel`) continuam valendo: uma seção ou um
  * formulário fora do registro cai neles, e um fluxo antigo segue funcionando.
  */
-type EventoPainel =
-  | (typeof CONSULTAS_PAINEL)[SecaoPainel]
-  | (typeof FORMULARIOS_PAINEL)[FormularioPainel]
-  | "consulta_painel"
-  | "formulario_painel";
+type EventoPainel = (typeof FORMULARIOS_PAINEL)[FormularioPainel] | "formulario_painel";
 
 type Evento = EventoLogin | EventoPainel;
 
@@ -663,15 +659,11 @@ type ChamadaPainel = {
    * O nome antigo do mesmo evento, para quando o n8n não conhecer o novo.
    * Veja `modoEventos()`.
    */
-  eventoGenerico: "consulta_painel" | "formulario_painel";
+  eventoGenerico: "formulario_painel";
   dados: Record<string, unknown>;
   label: string;
   acaoRecaptcha: string;
   recaptchaToken?: string | undefined;
-  /** Consulta: sob qual seção guardar a resposta no cache do servidor. */
-  guardarEm?: SecaoPainel | undefined;
-  /** Consulta: ignora o que estiver guardado e vai ao n8n de novo. */
-  forcar?: boolean | undefined;
   /** Formulário: o que derrubar do cache quando o envio der certo. */
   invalidar?: readonly SecaoPainel[] | undefined;
 };
@@ -725,17 +717,6 @@ async function chamarPainel(chamada: ChamadaPainel): Promise<PainelOk | PainelEr
   // `lerSessao` já recusa token vencido, então "sem sessão" aqui inclui
   // "o token expirou desde a última tela".
   if (!sessao) return erroPainel(ERRO_SESSAO_EXPIRADA, true);
-
-  /*
-   * Resposta guardada vale por si: devolvê-la aqui é o que evita uma ida ao
-   * n8n a cada F5, a cada modal aberto e a cada componente que precisa da
-   * mesma lista. O reCAPTCHA fica de fora deste caminho de propósito — não há
-   * nada a proteger numa leitura que não sai deste processo.
-   */
-  if (chamada.guardarEm && !chamada.forcar) {
-    const guardado = lerCachePainel(sessao.idCliente, chamada.guardarEm);
-    if (guardado) return { ok: true, dados: guardado };
-  }
 
   /*
    * Sem contador de tentativas aqui, de propósito. Ele existe para frear quem
@@ -826,7 +807,6 @@ async function chamarPainel(chamada: ChamadaPainel): Promise<PainelOk | PainelEr
   }
 
   const dados = lerDadosPainel(resultado.data);
-  if (chamada.guardarEm) gravarCachePainel(sessao.idCliente, chamada.guardarEm, dados);
   if (chamada.invalidar) invalidarCachePainel(sessao.idCliente, chamada.invalidar);
 
   return { ok: true, mensagem: resultado.message, dados };
@@ -839,57 +819,56 @@ export type ConsultaInput = {
   recaptchaToken?: string | undefined;
 };
 
-const ehSecaoConhecida = (secao: string): secao is SecaoPainel => secao in CONSULTAS_PAINEL;
-
 /**
- * Tenta responder a consulta com o Postgres, sem passar pelo n8n.
+ * Lê o painel do Postgres. É o único caminho de leitura.
  *
- * Só o `bootstrap` vem daqui: ele é o retrato inteiro, e as recargas por seção
- * existem justamente para o caso em que o n8n é a fonte. Como toda mudança
- * derruba o `bootstrap` do cache, recarregar por ele custa o mesmo.
+ * Não existe mais reserva pelo webhook. Ela existia, e foi ela que escondeu um
+ * banco mal configurado por dias: quando a consulta falhava, a chamada seguia
+ * para o n8n em silêncio, e a tela carregava **vazia** — como se o cliente não
+ * tivesse contrato nenhum — em vez de dizer que não conseguiu ler. Falhar
+ * visível é melhor que suceder errado.
  *
- * Devolve `null` quando não deu — banco desligado, cliente fora da view,
- * consulta com erro — e aí a chamada segue para o webhook, que é o caminho de
- * sempre. A única exceção é `PAINEL_FONTE=banco`: ali o silêncio seria pior que
- * o erro, porque esconderia uma configuração errada atrás de um fallback que
- * funciona.
+ * O webhook continua dono das **ações**: abrir chamado, trocar de plano, gerar
+ * segunda via. Isso ele faz em sistemas que o site não alcança.
  */
-async function consultarNoBanco(
-  secao: SecaoPainel,
-  forcar: boolean,
-): Promise<PainelOk | PainelErro | null> {
-  if (secao !== "bootstrap" || fontePainel() !== "banco") return null;
-
+async function lerPainel(forcar: boolean): Promise<PainelOk | PainelErro> {
   const sessao = await lerSessao();
   if (!sessao) return erroPainel(ERRO_SESSAO_EXPIRADA, true);
 
+  /*
+   * O retrato guardado responde na hora. É o que faz abrir e fechar modais, e
+   * um F5, não custarem uma ida ao banco.
+   */
   if (!forcar) {
     const guardado = lerCachePainel(sessao.idCliente, "bootstrap");
     if (guardado) return { ok: true, dados: guardado };
   }
 
-  const dados = await carregarPainelDoBanco(sessao.idCliente);
-  if (!dados) {
-    if (env("PAINEL_FONTE")?.toLowerCase() === "banco") {
-      console.error("PAINEL_FONTE=banco, mas a consulta ao Postgres falhou.");
-      return erroPainel(ERRO_GENERICO);
-    }
-    /*
-     * O motivo já saiu no log de `carregarPainelDoBanco`. Esta linha existe
-     * para deixar a CADEIA visível: sem ela, o próximo erro no log é o do n8n
-     * recusando o evento, e parece um problema de webhook quando na verdade é
-     * o banco que não respondeu.
-     */
-    console.warn(
-      "Painel: a consulta ao Postgres não respondeu — caindo para o webhook do n8n. " +
-        "Se as tabelas do painel não existirem neste banco, é essa a causa raiz; " +
-        "abra /diagnostico?token=... para ver qual banco o site abriu.",
-    );
-    return null;
+  const leitura = await carregarPainelDoBanco(sessao.idCliente);
+  if (leitura.ok) {
+    gravarCachePainel(sessao.idCliente, "bootstrap", leitura.dados);
+    return { ok: true, dados: leitura.dados };
   }
 
-  gravarCachePainel(sessao.idCliente, "bootstrap", dados);
-  return { ok: true, dados };
+  /*
+   * Cada motivo tem a sua mensagem. Nenhuma delas manda o cliente "tentar de
+   * novo" quando tentar de novo não vai adiantar.
+   */
+  if (leitura.motivo === "sem_conexao") {
+    console.error(
+      "Painel: sem conexão com o Postgres. Confira POSTGRES_URL/POSTGRES_HOST " +
+        "e abra /diagnostico?token=... para ver o que o servidor enxerga.",
+    );
+    return erroPainel(ERRO_INDISPONIVEL);
+  }
+
+  if (leitura.motivo === "cliente_ausente") {
+    return erroPainel(
+      "Não encontramos seu cadastro completo. Nosso atendimento resolve isso rapidinho pelo WhatsApp.",
+    );
+  }
+
+  return erroPainel(ERRO_INDISPONIVEL);
 }
 
 /**
@@ -897,15 +876,12 @@ async function consultarNoBanco(
  *
  * Roda solta, sem `await`: o cliente não deve esperar por ela para entrar, e se
  * ela falhar o painel simplesmente consulta por conta própria daqui a um
- * instante. O ganho é a primeira tela já vir do cache, que é o que o login
- * acabou de tornar possível.
+ * instante. O ganho é a primeira tela já vir do cache.
  */
 function aquecerPainel(idCliente: string) {
-  if (fontePainel() !== "banco") return;
-
   void carregarPainelDoBanco(idCliente)
-    .then((dados) => {
-      if (dados) gravarCachePainel(idCliente, "bootstrap", dados);
+    .then((leitura) => {
+      if (leitura.ok) gravarCachePainel(idCliente, "bootstrap", leitura.dados);
     })
     .catch((err: unknown) => {
       console.error("Não foi possível preparar o painel depois do login", err);
@@ -924,24 +900,13 @@ const ehFormularioConhecido = (nome: string): nome is FormularioPainel =>
  * cache: sem saber o que ela contém, não dá para saber quando fica velha.
  */
 export async function consultarPainelServer(data: ConsultaInput): Promise<PainelOk | PainelErro> {
-  const secao = data.secao;
-  const conhecida = ehSecaoConhecida(secao);
-
-  if (conhecida) {
-    const doBanco = await consultarNoBanco(secao, Boolean(data.forcar));
-    if (doBanco) return doBanco;
-  }
-
-  return chamarPainel({
-    evento: conhecida ? CONSULTAS_PAINEL[secao] : "consulta_painel",
-    eventoGenerico: "consulta_painel",
-    dados: { secao },
-    label: `Área do cliente (consulta: ${secao})`,
-    acaoRecaptcha: "cliente_consulta",
-    recaptchaToken: data.recaptchaToken,
-    ...(conhecida ? { guardarEm: secao } : {}),
-    ...(data.forcar ? { forcar: true } : {}),
-  });
+  /*
+   * A seção não muda mais o caminho: a leitura traz o painel inteiro do banco
+   * numa consulta só, e recarregar "faturas" custaria exatamente o mesmo que
+   * recarregar tudo. O nome segue aceito para as telas que já o mandam.
+   */
+  void data.secao;
+  return lerPainel(Boolean(data.forcar));
 }
 
 export type FormularioInput = {

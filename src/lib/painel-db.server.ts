@@ -14,13 +14,14 @@
  * aceita um id vindo do formulário — é por isso que um `WHERE cod_cliente = $1`
  * basta para ninguém enxergar o cliente do vizinho.
  *
- * **O formato da saída** é de propósito o mesmo do webhook: `normalizarPainel`
- * não sabe (nem precisa saber) de onde os dados vieram, e trocar a fonte não
- * mexe em uma linha da tela.
+ * **Leitura é sempre daqui.** O webhook ficou com o que só ele faz: as ações
+ * (abrir chamado, trocar de plano, gerar segunda via), que mexem em sistemas
+ * que o site não alcança. Consulta não passa mais por lá — antes passava, como
+ * reserva, e essa reserva escondia por dias que o banco estava errado: a tela
+ * carregava vazia em vez de dizer que não conseguiu ler.
  *
  * Variáveis próprias deste módulo:
  *
- *   PAINEL_FONTE               "banco" | "webhook" | "auto" (padrão)
  *   POSTGRES_CLIENTES_TABLE    padrão "clientes_web"
  *   POSTGRES_CONTRATOS_TABLE   padrão "contratos_web"
  *   POSTGRES_FATURAS_TABLE     padrão "faturas_web"
@@ -28,7 +29,7 @@
  * O schema está em `docs/n8n/schema-painel.sql`.
  */
 
-import { env, getClient, identifier, postgresConfigurado, type Sql } from "./postgres.server";
+import { env, getClient, identifier, type Sql } from "./postgres.server";
 import type { DadosPainel, ValorJson } from "./cliente-tipos";
 
 const DEFAULT_SCHEMA = "public";
@@ -38,21 +39,16 @@ const DEFAULT_FATURAS = "faturas_web";
 const DEFAULT_PLANOS = "planos_web";
 
 /**
- * De onde o painel lê.
+ * O que a leitura do painel devolve.
  *
- * `auto` — o padrão — usa o banco quando ele está configurado e cai no webhook
- * quando não. As outras duas existem para forçar um caminho: `webhook` mantém o
- * comportamento antigo mesmo com o Postgres ligado (útil enquanto as tabelas
- * novas ainda não estão populadas), e `banco` recusa o webhook, o que faz uma
- * configuração errada aparecer como erro em vez de virar um silencioso "sempre
- * pelo n8n".
+ * O motivo importa: "o banco não respondeu" e "este cliente não está na tabela"
+ * pedem mensagens diferentes na tela e ações diferentes de quem opera. Enquanto
+ * os dois eram `null`, os dois viravam a mesma tela vazia — e foi isso que fez
+ * um banco errado passar dias sem ser notado.
  */
-export function fontePainel(): "banco" | "webhook" {
-  const escolha = env("PAINEL_FONTE")?.toLowerCase();
-  if (escolha === "banco" || escolha === "db" || escolha === "postgres") return "banco";
-  if (escolha === "webhook" || escolha === "n8n") return "webhook";
-  return postgresConfigurado() ? "banco" : "webhook";
-}
+export type LeituraPainel =
+  | { ok: true; dados: DadosPainel }
+  | { ok: false; motivo: "sem_conexao" | "cliente_ausente" | "erro"; detalhe: string };
 
 /* ---------------- linhas do banco ---------------- */
 
@@ -231,9 +227,15 @@ const tabela = (nome: string, padrao: string, variavel: string) =>
  * quem chamou decide se cai para o webhook. Um `null` nunca significa "cliente
  * sem dados": isso é um objeto com listas vazias.
  */
-export async function carregarPainelDoBanco(idCliente: string): Promise<DadosPainel | null> {
+export async function carregarPainelDoBanco(idCliente: string): Promise<LeituraPainel> {
   const sql = getClient();
-  if (!sql) return null;
+  if (!sql) {
+    return {
+      ok: false,
+      motivo: "sem_conexao",
+      detalhe: "Postgres não configurado (POSTGRES_URL/POSTGRES_HOST).",
+    };
+  }
 
   const schema = identifier(env("POSTGRES_SCHEMA"), DEFAULT_SCHEMA, "POSTGRES_SCHEMA");
   /*
@@ -259,16 +261,20 @@ export async function carregarPainelDoBanco(idCliente: string): Promise<DadosPai
     const cliente = linhasCliente[0];
     if (!cliente) {
       /*
-       * A sessão existe mas o cadastro não responde por ela. Acontece quando o
-       * cliente é desativado (a view filtra por `ativo`) enquanto a sessão dele
-       * ainda está válida. Devolver `null` manda a chamada ao webhook, que é
-       * quem sabe dizer se aquele token ainda vale.
+       * A sessão é válida — o n8n a emitiu — mas o cadastro que o site lê não
+       * tem esse cliente. Na prática isso quase sempre significa que o n8n e o
+       * site estão olhando bancos diferentes, e é melhor dizer isso do que
+       * mostrar um painel vazio como se o cliente não tivesse nada.
        */
-      console.warn(`Painel: cliente ${idCliente} não encontrado em ${schema}.${clientes}.`);
-      return null;
+      const detalhe = `cliente ${idCliente} não está em ${schema}.${clientes}`;
+      console.warn(
+        `Painel: ${detalhe}. O n8n autenticou este id, então confira se ele e o site ` +
+          "apontam para o MESMO banco (veja /diagnostico?token=...).",
+      );
+      return { ok: false, motivo: "cliente_ausente", detalhe };
     }
 
-    return {
+    const dados: DadosPainel = {
       cliente: montarCliente(cliente, linhasContratos),
       contratos: linhasContratos.map(montarContrato),
       faturas: linhasFaturas.map(montarFatura),
@@ -286,15 +292,18 @@ export async function carregarPainelDoBanco(idCliente: string): Promise<DadosPai
        * Padrão, não política: oferecemos o desbloqueio a quem está com a
        * conexão cortada. Quem decide de verdade quem pode pedir é o provedor —
        * para mandar nisso, responda o formulário `painel_desbloqueio_confianca`
-       * com uma recusa, ou passe a consulta para o webhook (`PAINEL_FONTE`).
+       * com uma recusa.
        */
       desbloqueio_disponivel: linhasContratos.some((c) =>
         ["bloqueado", "suspenso"].includes(txt(c.status_contrato).toLowerCase()),
       ),
     };
+
+    return { ok: true, dados };
   } catch (err) {
+    const detalhe = err instanceof Error ? err.message : String(err);
     console.error(`Falha ao carregar o painel do cliente ${idCliente} no Postgres`, err);
-    return null;
+    return { ok: false, motivo: "erro", detalhe };
   }
 }
 
