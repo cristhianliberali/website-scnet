@@ -47,18 +47,64 @@ export const FORMULARIOS_PAINEL = {
   segunda_via: "painel_segunda_via",
   nota_fiscal: "painel_nota_fiscal",
   abrir_chamado: "painel_abrir_chamado",
-  diagnostico_conexao: "painel_diagnostico_conexao",
   desbloqueio_confianca: "painel_desbloqueio_confianca",
 } as const;
 
 /*
- * `painel_reiniciar_conexao` e `painel_teste_velocidade` saíram daqui junto com
- * os botões que os disparavam: os dois precisavam de um comando e de uma
- * medição no equipamento do cliente, que nenhuma tabela nossa alcança hoje. Os
- * ramos podem continuar no workflow — o site simplesmente não os chama mais.
+ * `painel_reiniciar_conexao`, `painel_teste_velocidade` e
+ * `painel_diagnostico_conexao` saíram daqui junto com os botões que os
+ * disparavam: os três precisavam de uma medição ou de um comando no
+ * equipamento do cliente, que nenhuma tabela nossa alcança hoje. Os ramos podem
+ * continuar no workflow — o site simplesmente não os chama mais.
  */
 
 export type FormularioPainel = keyof typeof FORMULARIOS_PAINEL;
+
+/**
+ * Como cada formulário se chama para quem lê — no atendimento do cliente e na
+ * fila do /admin. O nome do evento é vocabulário de máquina; isto é o que uma
+ * pessoa reconhece.
+ */
+export const ROTULO_FORMULARIO: Record<FormularioPainel, string> = {
+  trocar_plano: "Troca de plano",
+  indicar_amigo: "Indicação",
+  pix_automatico: "PIX automático",
+  debito_automatico: "Débito em conta",
+  viabilidade_endereco: "Consulta de cobertura",
+  mudanca_endereco: "Mudança de endereço",
+  trocar_titular: "Troca de titular",
+  segunda_via: "2ª via de fatura",
+  nota_fiscal: "Nota fiscal",
+  abrir_chamado: "Suporte técnico",
+  desbloqueio_confianca: "Desbloqueio em confiança",
+};
+
+/**
+ * Quais formulários viram atendimento — linha em `web_formularios`, com
+ * protocolo e status que o cliente acompanha e um humano move.
+ *
+ * Fora ficam os três que não deixam nada pendente: a **consulta de cobertura**
+ * responde na hora, a **2ª via** entrega o PIX na hora e a **nota fiscal** abre
+ * o PDF na hora. Abrir um chamado para eles encheria a tela de atendimentos já
+ * resolvidos e esconderia os que de fato esperam alguém.
+ *
+ * A **indicação** também fica de fora daqui, mas por outro motivo: ela tem
+ * tabela própria (`indicacoes_web`), protocolo próprio e o extrato dela na tela
+ * do cliente.
+ */
+export const GERA_CHAMADO: Record<FormularioPainel, boolean> = {
+  trocar_plano: true,
+  indicar_amigo: false,
+  pix_automatico: true,
+  debito_automatico: true,
+  viabilidade_endereco: false,
+  mudanca_endereco: true,
+  trocar_titular: true,
+  segunda_via: false,
+  nota_fiscal: false,
+  abrir_chamado: true,
+  desbloqueio_confianca: true,
+};
 
 /** Quais seções cada formulário desatualiza — invalidadas assim que ele volta `ok`. */
 export const SECOES_AFETADAS: Record<FormularioPainel, readonly SecaoPainel[]> = {
@@ -72,7 +118,6 @@ export const SECOES_AFETADAS: Record<FormularioPainel, readonly SecaoPainel[]> =
   segunda_via: ["faturas"],
   nota_fiscal: ["notas_fiscais"],
   abrir_chamado: ["chamados"],
-  diagnostico_conexao: [],
   desbloqueio_confianca: ["contratos", "faturas"],
 };
 
@@ -194,6 +239,14 @@ export type Indicacao = {
   data: string;
   status: StatusIndicacao;
   /**
+   * A campanha que valia no dia do envio.
+   *
+   * O bônus de uma indicação é o da campanha vigente **quando ela foi feita** —
+   * o cliente participa de várias ao longo do ano, e o extrato precisa mostrar
+   * o que foi prometido em cada uma, não o que está valendo hoje.
+   */
+  campanha: string;
+  /**
    * O bônus já escrito para ler ("Desconto na fatura", "PIX de R$ 50,00").
    * O que a tabela guarda é o par tipo + descrição; a frase sai da leitura.
    */
@@ -247,6 +300,8 @@ export type AdicionalPlano = {
  */
 export type PainelSnapshot = {
   cliente: ClientePainel;
+  /** Título, banner e liga/desliga da seção de indicação — editados no /admin. */
+  indicacaoConfig: ConfigIndicacaoPainel;
   contratos: Contrato[];
   faturas: Fatura[];
   notasFiscais: NotaFiscal[];
@@ -259,6 +314,23 @@ export type PainelSnapshot = {
   desbloqueioDisponivel: boolean;
   /** Quando o site montou este retrato, em epoch de milissegundos. */
   atualizadoEm: number;
+};
+
+/**
+ * A parte da configuração da indicação que interessa à tela do cliente.
+ *
+ * É um recorte de `ConfigIndicacao` (o tipo do /admin) de propósito: o painel
+ * não precisa saber o valor da campanha nem o tipo de bônus vigente — isso já
+ * veio carimbado em cada indicação. Aqui só entra o que muda o que se vê.
+ */
+export type ConfigIndicacaoPainel = {
+  ativo: boolean;
+  titulo: string;
+  descricao: string;
+  bannerDesktopUrl: string;
+  bannerMobileUrl: string;
+  bannerAlt: string;
+  bannerLink: string;
 };
 
 export type AvisoPainel = {

@@ -211,15 +211,21 @@ export function Campo({
   children,
   dica,
   className,
+  htmlFor,
 }: {
   rotulo: string;
   children: ReactNode;
   dica?: string | undefined;
   className?: string | undefined;
+  /** Liga o rótulo ao campo: clicar no texto foca, e o leitor de tela o anuncia. */
+  htmlFor?: string | undefined;
 }) {
   return (
     <div className={cn("space-y-1.5", className)}>
-      <Label className="font-ui text-xs font-bold uppercase tracking-wide text-muted-foreground">
+      <Label
+        htmlFor={htmlFor}
+        className="font-ui text-xs font-bold uppercase tracking-wide text-muted-foreground"
+      >
         {rotulo}
       </Label>
       {children}
@@ -244,7 +250,7 @@ export function CampoTexto({
 } & Omit<React.ComponentProps<typeof Input>, "value" | "onChange" | "className">) {
   const [id] = useState(proximoId);
   return (
-    <Campo rotulo={rotulo} dica={dica} className={className}>
+    <Campo rotulo={rotulo} dica={dica} className={className} htmlFor={id}>
       <Input id={id} value={valor} onChange={(e) => aoMudar(e.target.value)} {...props} />
     </Campo>
   );
@@ -276,7 +282,7 @@ export function CampoTelefone({
 }) {
   const [id] = useState(proximoId);
   return (
-    <Campo rotulo={rotulo} dica={dica} className={className}>
+    <Campo rotulo={rotulo} dica={dica} className={className} htmlFor={id}>
       <div className="flex">
         <span className="inline-flex items-center rounded-l-md border border-r-0 border-input bg-secondary px-3 font-ui text-sm font-semibold text-muted-foreground">
           +55
@@ -309,9 +315,10 @@ export function CampoTextoLongo({
   dica?: string | undefined;
   className?: string | undefined;
 } & Omit<React.ComponentProps<typeof Textarea>, "value" | "onChange" | "className">) {
+  const [id] = useState(proximoId);
   return (
-    <Campo rotulo={rotulo} dica={dica} className={className}>
-      <Textarea value={valor} onChange={(e) => aoMudar(e.target.value)} {...props} />
+    <Campo rotulo={rotulo} dica={dica} className={className} htmlFor={id}>
+      <Textarea id={id} value={valor} onChange={(e) => aoMudar(e.target.value)} {...props} />
     </Campo>
   );
 }

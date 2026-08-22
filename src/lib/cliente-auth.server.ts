@@ -34,7 +34,11 @@ import {
   verifyRecaptcha,
   type RecaptchaVerdict,
 } from "./verify-recaptcha";
-import { postToPainelWebhook, type WebhookOutcomeWithData } from "./webhook";
+import {
+  painelWebhookConfigurado,
+  postToPainelWebhook,
+  type WebhookOutcomeWithData,
+} from "./webhook";
 import { clientIpFromHeaders } from "./rate-limit";
 import {
   checkTentativas,
@@ -46,6 +50,7 @@ import {
 } from "./tentativas-login";
 import { lerToken } from "./token-acesso";
 import { carregarPainelDoBanco } from "./painel-db.server";
+import { registrarIndicacao, registrarSolicitacao } from "./registro-db.server";
 import { env } from "./postgres.server";
 import {
   gravarCachePainel,
@@ -56,6 +61,7 @@ import {
 import {
   CONSULTAS_PAINEL,
   FORMULARIOS_PAINEL,
+  GERA_CHAMADO,
   SECOES_AFETADAS,
   type FormularioPainel,
   type SecaoPainel,
@@ -923,6 +929,18 @@ export type FormularioInput = {
  * `dados.campos` seguem no corpo de qualquer jeito — um fluxo que prefira um
  * único ramo genérico continua dando conta.
  *
+ * **Depois do webhook, o registro.** Um pedido que só existe dentro do n8n é um
+ * pedido que o cliente não consegue acompanhar e que ninguém consegue mover de
+ * estado. Por isso, quando o formulário é uma solicitação (veja `GERA_CHAMADO`),
+ * ele também vira linha em `web_formularios` — protocolo gerado pelo banco,
+ * status `em_aberto` — e a indicação vira linha em `indicacoes_web`, com o
+ * carimbo da campanha vigente.
+ *
+ * A ordem importa: **o webhook primeiro**. Gravar antes deixaria um pedido
+ * registrado toda vez que o n8n recusasse a ação — e o cliente, que viu o erro,
+ * tentaria de novo, criando o segundo. A exceção é a instalação sem webhook
+ * nenhum: aí o banco é o destino, e não há o que recusar.
+ *
  * Quando o envio dá certo, as seções que aquele formulário desatualiza saem do
  * cache na hora: quem acabou de trocar de plano não fica um minuto olhando
  * para o plano antigo.
@@ -932,7 +950,8 @@ export async function enviarFormularioPainelServer(
 ): Promise<PainelOk | PainelErro> {
   const formulario = data.formulario;
   const conhecido = ehFormularioConhecido(formulario);
-  return chamarPainel({
+
+  const resposta = await chamarPainel({
     evento: conhecido ? FORMULARIOS_PAINEL[formulario] : "formulario_painel",
     eventoGenerico: "formulario_painel",
     dados: { formulario, campos: data.dados },
@@ -944,6 +963,60 @@ export async function enviarFormularioPainelServer(
       ? SECOES_AFETADAS[formulario]
       : (Object.keys(CONSULTAS_PAINEL) as SecaoPainel[]),
   });
+
+  if (!conhecido) return resposta;
+  return registrarPedido(formulario, data.dados, resposta);
+}
+
+/**
+ * Grava o pedido no banco e devolve a resposta que o cliente vai ler.
+ *
+ * Três saídas possíveis, e cada uma existe por um motivo:
+ *
+ * - **O formulário não deixa nada pendente** (consulta de cobertura, 2ª via,
+ *   nota fiscal): passa reto, sem registro nenhum.
+ * - **O n8n recusou** e há webhook configurado: nada é gravado. A recusa é do
+ *   fluxo, e um registro sem ação do outro lado só viraria trabalho fantasma na
+ *   fila do /admin.
+ * - **Deu certo, ou não há webhook nenhum**: grava, e o protocolo do banco
+ *   entra na resposta quando o n8n não mandou um dele.
+ */
+async function registrarPedido(
+  formulario: FormularioPainel,
+  campos: DadosPainel,
+  resposta: PainelOk | PainelErro,
+): Promise<PainelOk | PainelErro> {
+  const indicacao = formulario === "indicar_amigo";
+  if (!indicacao && !GERA_CHAMADO[formulario]) return resposta;
+
+  // sessão morta não grava nada: o pedido nem tem dono
+  if (!resposta.ok && resposta.expirado) return resposta;
+
+  const semWebhook = !painelWebhookConfigurado();
+  if (!resposta.ok && !semWebhook) return resposta;
+
+  const sessao = await lerSessao();
+  if (!sessao) return resposta;
+
+  const protocolo = indicacao
+    ? await registrarIndicacao(sessao.idCliente, sessao.nome, campos)
+    : await registrarSolicitacao(sessao.idCliente, formulario, campos);
+
+  if (!protocolo) return resposta;
+
+  // a lista de atendimentos (ou de indicações) acabou de mudar
+  invalidarCachePainel(sessao.idCliente, indicacao ? ["indicacoes"] : ["chamados"]);
+
+  const dados = resposta.ok ? resposta.dados : {};
+  const jaTemProtocolo = typeof (dados as Record<string, unknown>)["protocolo"] === "string";
+
+  return {
+    ok: true,
+    mensagem: resposta.ok
+      ? resposta.mensagem
+      : "Pedido registrado. Nosso time entra em contato com você.",
+    dados: jaTemProtocolo ? dados : { ...dados, protocolo },
+  };
 }
 
 /** Esquece o retrato guardado deste cliente — chamado ao encerrar a sessão. */

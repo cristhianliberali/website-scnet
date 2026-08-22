@@ -284,6 +284,15 @@ const loginWebhookToken = () =>
   process.env["WEBHOOK_LOGIN_TOKEN"] ?? process.env["WEBHOOK_PAINEL_CLIENTE_TOKEN"];
 
 /**
+ * Há webhook do painel configurado?
+ *
+ * Quem pergunta é o registro de solicitações: sem webhook, o banco é o destino
+ * do pedido, e a recusa que este módulo devolve por falta de configuração não
+ * deve impedir que ele seja gravado.
+ */
+export const painelWebhookConfigurado = () => Boolean(loginWebhookUrl()?.trim());
+
+/**
  * Envia o payload ao WEBHOOK_LOGIN_URL (login por documento e código).
  *
  * Ao contrário de `postToWebhook`, **falha fechado**: sem a URL configurada

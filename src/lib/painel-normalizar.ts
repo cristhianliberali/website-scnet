@@ -12,6 +12,7 @@
 import type {
   AdicionalPlano,
   AvisoPainel,
+  ConfigIndicacaoPainel,
   Chamado,
   ClientePainel,
   Contrato,
@@ -201,7 +202,9 @@ const STATUS_INDICACAO: Record<string, StatusIndicacao> = {
   recusado: "cancelado",
 };
 
+/* `em_aberto` e `concluido` são os valores de `web_formularios.status`. */
 const STATUS_CHAMADO: Record<string, StatusChamado> = {
+  em_aberto: "aberto",
   aberto: "aberto",
   novo: "aberto",
   em_analise: "em_analise",
@@ -387,6 +390,7 @@ function normalizarIndicacao(fonte: Bruto, indice: number): Indicacao {
     cidade: texto(fonte, "cidade", "city", "municipio"),
     data: texto(fonte, "data", "criado_em", "date", "createdAt"),
     status: opcao(texto(fonte, "status", "situacao"), STATUS_INDICACAO, "pendente"),
+    campanha: texto(fonte, "campanha", "campanha_nome"),
     bonus: texto(fonte, "bonus", "descricao_bonus", "descricaoBonus", "tipo_bonus"),
     desconto: numero(
       fonte,
@@ -468,6 +472,26 @@ export function numeroDaResposta(dados: DadosPainel, ...nomes: string[]): number
   return numero(dados as Bruto, ...nomes);
 }
 
+/**
+ * A configuração da seção de indicação.
+ *
+ * O padrão é "ligada, com o texto de sempre": uma resposta sem esta chave — um
+ * n8n antigo, um banco sem a tabela — não pode apagar a indicação da tela.
+ */
+function normalizarConfigIndicacao(fonte: Bruto): ConfigIndicacaoPainel {
+  return {
+    ativo: campo(fonte, "ativo") !== undefined ? booleano(fonte, "ativo") : true,
+    titulo: texto(fonte, "titulo", "title") || "Indique e ganhe desconto",
+    descricao:
+      texto(fonte, "descricao", "description") ||
+      "A cada amigo que instalar a SCNET, o desconto entra na sua próxima fatura.",
+    bannerDesktopUrl: texto(fonte, "banner_desktop_url", "bannerDesktopUrl"),
+    bannerMobileUrl: texto(fonte, "banner_mobile_url", "bannerMobileUrl"),
+    bannerAlt: texto(fonte, "banner_alt", "bannerAlt"),
+    bannerLink: texto(fonte, "banner_link", "bannerLink"),
+  };
+}
+
 /* ---------------- entrada pública ---------------- */
 
 const ENDERECO_VAZIO: EnderecoContrato = {
@@ -511,6 +535,9 @@ export function normalizarPainel(dados: DadosPainel): PainelSnapshot {
 
   return {
     cliente: Object.keys(cliente).length > 0 ? normalizarCliente(cliente) : VAZIO,
+    indicacaoConfig: normalizarConfigIndicacao(
+      objeto(campo(fonte, "indicacao_config", "config_indicacao", "indicacaoConfig")),
+    ),
     contratos: colecao(fonte, "contratos", "contracts").map(normalizarContrato),
     faturas: colecao(fonte, "faturas", "invoices", "titulos").map(normalizarFatura),
     notasFiscais: colecao(fonte, "notas_fiscais", "notasFiscais", "notas", "taxInvoices").map(
@@ -567,6 +594,10 @@ export function mesclarPainel(atual: PainelSnapshot, dados: DadosPainel): Painel
 
   return {
     cliente: clienteVeio ? parcial.cliente : atual.cliente,
+    indicacaoConfig:
+      campo(raiz, "indicacao_config", "config_indicacao", "indicacaoConfig") !== undefined
+        ? parcial.indicacaoConfig
+        : atual.indicacaoConfig,
     contratos: trocar(parcial.contratos, atual.contratos, "contratos", "contracts"),
     faturas: trocar(parcial.faturas, atual.faturas, "faturas", "invoices", "titulos"),
     notasFiscais: trocar(

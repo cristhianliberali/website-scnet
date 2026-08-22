@@ -109,10 +109,15 @@ código ou da senha.
 O workflow importado traz dois ramos genéricos, que atendem qualquer chamada do
 painel:
 
-| Evento              | O que o ramo faz                                            |
-| ------------------- | ----------------------------------------------------------- |
-| `consulta_painel`   | Valida o token e devolve a seção pedida                     |
-| `formulario_painel` | Valida o token e registra o formulário em `web_formularios` |
+| Evento              | O que o ramo faz                        |
+| ------------------- | --------------------------------------- |
+| `consulta_painel`   | Valida o token e devolve a seção pedida |
+| `formulario_painel` | Valida o token e executa a ação         |
+
+> **Quem grava o formulário é o site.** A linha em `web_formularios` — com
+> protocolo e status — é escrita pela aplicação depois que o webhook responde
+> `ok`. Se o fluxo também gravar, o mesmo atendimento aparece duas vezes na tela
+> do cliente e na fila do /admin.
 
 A tela, porém, manda **um evento por assunto** — `painel_bootstrap` para o
 carregamento inicial, `painel_abrir_chamado` para o suporte, `painel_segunda_via`

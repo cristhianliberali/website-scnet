@@ -44,6 +44,7 @@ import { cn } from "@/lib/utils";
 import type {
   Chamado,
   ClientePainel,
+  ConfigIndicacaoPainel,
   Contrato,
   Fatura,
   Indicacao,
@@ -166,10 +167,12 @@ export function BannerFinanceiro({
 export function BannerIndicacao({
   cliente,
   indicacoes,
+  config,
   aoAbrir,
 }: {
   cliente: ClientePainel;
   indicacoes: Indicacao[];
+  config: ConfigIndicacaoPainel;
   aoAbrir: (servico: ServicoPainelId) => void;
 }) {
   const instaladas = indicacoes.filter((i) => i.status === "instalado").length;
@@ -183,11 +186,10 @@ export function BannerIndicacao({
             <Users className="size-6" />
           </div>
           <div>
-            <p className="font-display text-lg font-extrabold text-brand-deep">
-              Indique e ganhe desconto
-            </p>
+            {/* título e texto vêm do /admin: mudar a chamada da campanha não é deploy */}
+            <p className="font-display text-lg font-extrabold text-brand-deep">{config.titulo}</p>
             <p className="mt-1 max-w-xl font-body text-sm text-muted-foreground">
-              A cada amigo que instalar a SCNET, o desconto entra na sua próxima fatura.
+              {config.descricao}
               {instaladas > 0 &&
                 ` Você já tem ${instaladas} indicação${instaladas > 1 ? "ões" : ""} instalada${instaladas > 1 ? "s" : ""}.`}
               {cliente.descontoAcumulado > 0 &&
@@ -411,16 +413,19 @@ function CartaoContrato({
 
 export function GradeServicos({
   faturasEmAberto,
+  servicosOcultos,
   aoAbrir,
 }: {
   faturasEmAberto: number;
+  /** Serviços desligados no /admin — não aparecem nem por link direto. */
+  servicosOcultos: readonly ServicoPainelId[];
   aoAbrir: (servico: ServicoPainelId) => void;
 }) {
   return (
     <div>
       <TituloSecao>Serviços</TituloSecao>
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-        {SERVICOS.filter((s) => !s.oculto).map((servico) => {
+        {SERVICOS.filter((s) => !s.oculto && !servicosOcultos.includes(s.id)).map((servico) => {
           const Icone = servico.icone;
           const aviso =
             servico.id === "segunda_via" && faturasEmAberto > 0 ? faturasEmAberto : null;

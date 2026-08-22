@@ -100,16 +100,21 @@ export const servicoPorId = (id: ServicoPainelId): ServicoPainel =>
  */
 export function TelaServico({
   servico,
+  servicosOcultos,
   aoAbrir,
   aoVoltar,
   children,
 }: {
   servico: ServicoPainelId;
+  /** Desligados no /admin. Somem da navegação como somem da grade. */
+  servicosOcultos: readonly ServicoPainelId[];
   aoAbrir: (id: ServicoPainelId) => void;
   aoVoltar: () => void;
   children: ReactNode;
 }) {
-  const visiveis = SERVICOS.filter((s) => !s.oculto || s.id === servico);
+  const visiveis = SERVICOS.filter(
+    (s) => (!s.oculto || s.id === servico) && !servicosOcultos.includes(s.id),
+  );
 
   return (
     <div className="space-y-4">

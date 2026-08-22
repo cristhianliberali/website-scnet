@@ -10,6 +10,7 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as AdminRouteImport } from './routes/admin'
 import { Route as ContratacaoRouteImport } from './routes/contratacao'
 import { Route as DiagnosticoRouteImport } from './routes/diagnostico'
 import { Route as ClienteIndexRouteImport } from './routes/cliente/index'
@@ -18,6 +19,11 @@ import { Route as ClientePainelRouteImport } from './routes/cliente/painel'
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AdminRoute = AdminRouteImport.update({
+  id: '/admin',
+  path: '/admin',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ContratacaoRoute = ContratacaoRouteImport.update({
@@ -43,6 +49,7 @@ const ClientePainelRoute = ClientePainelRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/admin': typeof AdminRoute
   '/contratacao': typeof ContratacaoRoute
   '/diagnostico': typeof DiagnosticoRoute
   '/cliente/painel': typeof ClientePainelRoute
@@ -50,6 +57,7 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/admin': typeof AdminRoute
   '/contratacao': typeof ContratacaoRoute
   '/diagnostico': typeof DiagnosticoRoute
   '/cliente/painel': typeof ClientePainelRoute
@@ -58,6 +66,7 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/admin': typeof AdminRoute
   '/contratacao': typeof ContratacaoRoute
   '/diagnostico': typeof DiagnosticoRoute
   '/cliente/painel': typeof ClientePainelRoute
@@ -66,12 +75,24 @@ export interface FileRoutesById {
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
-    '/' | '/contratacao' | '/diagnostico' | '/cliente/painel' | '/cliente/'
+    | '/'
+    | '/admin'
+    | '/contratacao'
+    | '/diagnostico'
+    | '/cliente/painel'
+    | '/cliente/'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/contratacao' | '/diagnostico' | '/cliente/painel' | '/cliente'
+  to:
+    | '/'
+    | '/admin'
+    | '/contratacao'
+    | '/diagnostico'
+    | '/cliente/painel'
+    | '/cliente'
   id:
     | '__root__'
     | '/'
+    | '/admin'
     | '/contratacao'
     | '/diagnostico'
     | '/cliente/painel'
@@ -80,6 +101,7 @@ export interface FileRouteTypes {
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  AdminRoute: typeof AdminRoute
   ContratacaoRoute: typeof ContratacaoRoute
   DiagnosticoRoute: typeof DiagnosticoRoute
   ClientePainelRoute: typeof ClientePainelRoute
@@ -93,6 +115,13 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/admin': {
+      id: '/admin'
+      path: '/admin'
+      fullPath: '/admin'
+      preLoaderRoute: typeof AdminRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/contratacao': {
@@ -128,6 +157,7 @@ declare module '@tanstack/react-router' {
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  AdminRoute: AdminRoute,
   ContratacaoRoute: ContratacaoRoute,
   DiagnosticoRoute: DiagnosticoRoute,
   ClientePainelRoute: ClientePainelRoute,
