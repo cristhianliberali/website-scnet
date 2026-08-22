@@ -80,6 +80,16 @@ const COLUNAS_PAINEL = [
   "status_cliente",
 ];
 
+/** As tabelas que o site usa, pelo nome padrão — para procurá-las pelo servidor. */
+const CONHECIDAS = [
+  "clientes_web",
+  "contratos_web",
+  "faturas_web",
+  "planos_web",
+  "planos_upgrade",
+  "indicacoes_web",
+];
+
 function ambiente(): Record<string, string> {
   const url = env("POSTGRES_URL");
   const segredo = (v: string | undefined) => (v ? "(definida)" : "(vazia)");
@@ -98,6 +108,9 @@ function ambiente(): Record<string, string> {
     POSTGRES_CLIENTES_TABLE: env("POSTGRES_CLIENTES_TABLE") ?? "(vazia → clientes_web)",
     POSTGRES_CONTRATOS_TABLE: env("POSTGRES_CONTRATOS_TABLE") ?? "(vazia → contratos_web)",
     POSTGRES_FATURAS_TABLE: env("POSTGRES_FATURAS_TABLE") ?? "(vazia → faturas_web)",
+    POSTGRES_PLANOS_UPGRADE_TABLE:
+      env("POSTGRES_PLANOS_UPGRADE_TABLE") ?? "(vazia → planos_upgrade)",
+    POSTGRES_INDICACOES_TABLE: env("POSTGRES_INDICACOES_TABLE") ?? "(vazia → indicacoes_web)",
     PAINEL_EVENTOS: env("PAINEL_EVENTOS") ?? "(vazia → auto)",
     PAINEL_CACHE_SECONDS: env("PAINEL_CACHE_SECONDS") ?? "(vazia → 60)",
     WEBHOOK_LOGIN_URL: env("WEBHOOK_LOGIN_URL") ? "(definida)" : "(vazia)",
@@ -162,6 +175,17 @@ export async function coletarDiagnostico(): Promise<Diagnostico> {
     identifier(env("POSTGRES_CONTRATOS_TABLE"), "contratos_web", "POSTGRES_CONTRATOS_TABLE"),
     identifier(env("POSTGRES_FATURAS_TABLE"), "faturas_web", "POSTGRES_FATURAS_TABLE"),
     tabelaPlanos,
+    /*
+     * As duas do painel novo. Elas entram na lista porque a pergunta que traz
+     * alguém a esta página é sempre "por que a tela está vazia?", e uma tabela
+     * que não existe é a resposta mais comum.
+     */
+    identifier(
+      env("POSTGRES_PLANOS_UPGRADE_TABLE"),
+      "planos_upgrade",
+      "POSTGRES_PLANOS_UPGRADE_TABLE",
+    ),
+    identifier(env("POSTGRES_INDICACOES_TABLE"), "indicacoes_web", "POSTGRES_INDICACOES_TABLE"),
   ];
 
   for (const nome of nomes) {
@@ -212,7 +236,7 @@ export async function coletarDiagnostico(): Promise<Diagnostico> {
     const achadas = (await sql`
       select table_name::text as tabela, table_schema::text as schema
         from information_schema.tables
-       where table_name = any(${["clientes_web", "contratos_web", "faturas_web", "planos_web"]})
+       where table_name = any(${CONHECIDAS})
        order by table_name, table_schema
     `) as unknown as { tabela: string; schema: string }[];
 
@@ -220,9 +244,10 @@ export async function coletarDiagnostico(): Promise<Diagnostico> {
     for (const a of achadas) {
       porTabela.set(a.tabela, [...(porTabela.get(a.tabela) ?? []), a.schema]);
     }
-    base.onde_estao_as_tabelas = ["clientes_web", "contratos_web", "faturas_web", "planos_web"].map(
-      (tabela) => ({ tabela, schemas: porTabela.get(tabela) ?? [] }),
-    );
+    base.onde_estao_as_tabelas = CONHECIDAS.map((tabela) => ({
+      tabela,
+      schemas: porTabela.get(tabela) ?? [],
+    }));
   } catch {
     // catálogo indisponível é detalhe — o resto do relatório continua valendo
   }

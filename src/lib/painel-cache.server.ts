@@ -3,7 +3,7 @@
  *
  * Existe por um motivo concreto: cada consulta atravessa o n8n, que atravessa o
  * cadastro do provedor. Sem cache, um F5 na página, um segundo componente
- * pedindo a mesma coisa ou um cliente clicando entre modais viram outras tantas
+ * pedindo a mesma coisa ou um cliente clicando entre serviços viram outras tantas
  * idas ao webhook — lentas para quem está na tela e caras para o n8n.
  *
  * O que vale saber antes de mexer:

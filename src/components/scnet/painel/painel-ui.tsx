@@ -1,42 +1,39 @@
 /**
  * As peças que todas as telas do painel usam: formatação, selos de status,
- * a moldura dos modais e os campos de formulário.
+ * a moldura das telas de serviço e os campos de formulário.
  *
  * Tudo aqui é apresentação. Nenhuma peça deste arquivo fala com o webhook —
  * quem faz isso é `use-painel.ts`.
  */
 
 import { useState, type ReactNode } from "react";
-import { Check, Copy, Loader2, type LucideIcon } from "lucide-react";
+import { Check, Copy, Loader2, MessageCircle, type LucideIcon } from "lucide-react";
 import { toast } from "sonner";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { data, moeda } from "@/lib/painel-formato";
+import { maskPhone } from "@/lib/form-utils";
 import { cn } from "@/lib/utils";
+import { waLink } from "@/lib/whatsapp";
 import type {
   StatusChamado,
-  StatusConexao,
   StatusFatura,
   StatusFinanceiro,
   StatusIndicacao,
 } from "@/lib/painel-tipos";
 
 /**
- * Qual modal está aberto. Um por serviço da grade, mais os que abrem a partir
- * do banner financeiro e dos cards de contrato.
+ * Qual serviço está aberto. Um por item da grade, mais o desbloqueio, que abre
+ * a partir do banner financeiro.
+ *
+ * O valor viaja na URL (`/cliente/painel?servico=...`), então ele é a chave
+ * pública da tela: mudar um nome daqui muda um link que alguém pode ter
+ * guardado.
  */
-export type ModalPainelId =
+export type ServicoPainelId =
   | "trocar_plano"
   | "indicacoes"
   | "pix_debito"
@@ -45,8 +42,26 @@ export type ModalPainelId =
   | "segunda_via"
   | "notas_fiscais"
   | "suporte"
-  | "desbloqueio"
-  | "teste_velocidade";
+  | "desbloqueio";
+
+export const SERVICOS_PAINEL: readonly ServicoPainelId[] = [
+  "trocar_plano",
+  "indicacoes",
+  "pix_debito",
+  "mudanca_endereco",
+  "trocar_titular",
+  "segunda_via",
+  "notas_fiscais",
+  "suporte",
+  "desbloqueio",
+];
+
+/** O `servico` da URL é texto livre até passar por aqui. */
+export function servicoValido(valor: unknown): ServicoPainelId | undefined {
+  return typeof valor === "string" && SERVICOS_PAINEL.includes(valor as ServicoPainelId)
+    ? (valor as ServicoPainelId)
+    : undefined;
+}
 
 /* ---------------- selos de status ---------------- */
 
@@ -56,12 +71,6 @@ const SELO_FINANCEIRO: Record<StatusFinanceiro, Selo> = {
   em_dia: { texto: "Em dia", classe: "bg-emerald-100 text-emerald-800 border-emerald-200" },
   em_aberto: { texto: "Em aberto", classe: "bg-amber-100 text-amber-900 border-amber-200" },
   vencido: { texto: "Vencido", classe: "bg-red-100 text-red-800 border-red-200" },
-};
-
-const SELO_CONEXAO: Record<StatusConexao, Selo> = {
-  online: { texto: "Conectado", classe: "bg-emerald-100 text-emerald-800 border-emerald-200" },
-  alerta: { texto: "Instável", classe: "bg-amber-100 text-amber-900 border-amber-200" },
-  offline: { texto: "Sem sinal", classe: "bg-red-100 text-red-800 border-red-200" },
 };
 
 const SELO_FATURA: Record<StatusFatura, Selo> = {
@@ -86,9 +95,14 @@ const SELO_CHAMADO: Record<StatusChamado, Selo> = {
   cancelado: { texto: "Cancelado", classe: "bg-slate-100 text-slate-500 border-slate-200" },
 };
 
+/*
+ * Não há selo de conexão. O cadastro guarda `status_contrato`, que diz se o
+ * contrato está ativo ou bloqueado — e não se o equipamento do cliente está
+ * online neste instante. Um "Conectado" verde tirado dali seria uma afirmação
+ * que ninguém mediu, e a primeira queda de sinal a desmentiria.
+ */
 const SELOS = {
   financeiro: SELO_FINANCEIRO,
-  conexao: SELO_CONEXAO,
   fatura: SELO_FATURA,
   indicacao: SELO_INDICACAO,
   chamado: SELO_CHAMADO,
@@ -115,45 +129,44 @@ export function SeloStatus({
   );
 }
 
-/* ---------------- moldura dos modais ---------------- */
+/* ---------------- moldura das telas de serviço ---------------- */
 
-export function ModalPainel({
-  aberto,
-  aoFechar,
+/**
+ * A moldura de um serviço aberto.
+ *
+ * Antes cada serviço era um `Dialog`. Um formulário de mudança de endereço
+ * dentro de uma caixa que rola por dentro, com o resto da página escurecido
+ * atrás, é o pior lugar para preencher oito campos no celular — e um modal não
+ * tem endereço próprio: não dá para voltar, recarregar nem mandar o link. Aqui
+ * o serviço é a página, e quem escolhe qual é a URL.
+ */
+export function MolduraServico({
   titulo,
   descricao,
   icone: Icone,
   children,
-  largura = "max-w-2xl",
 }: {
-  aberto: boolean;
-  aoFechar: () => void;
   titulo: string;
   descricao: string;
   icone: LucideIcon;
   children: ReactNode;
-  largura?: string;
 }) {
   return (
-    <Dialog open={aberto} onOpenChange={(estado) => !estado && aoFechar()}>
-      <DialogContent className={cn("max-h-[92vh] overflow-y-auto p-0 sm:rounded-2xl", largura)}>
-        <DialogHeader className="gradient-brand space-y-1 rounded-t-2xl px-6 py-5 text-left">
-          <DialogTitle className="flex items-center gap-2 font-display text-lg font-extrabold text-primary-foreground">
-            <Icone className="size-5 shrink-0" />
-            {titulo}
-          </DialogTitle>
-          <DialogDescription className="font-body text-sm text-primary-foreground/85">
-            {descricao}
-          </DialogDescription>
-        </DialogHeader>
-        <div className="px-6 pb-6">{children}</div>
-      </DialogContent>
-    </Dialog>
+    <section className="overflow-hidden rounded-2xl border border-border bg-card shadow-sm">
+      <header className="gradient-brand px-5 py-5 sm:px-6">
+        <h2 className="flex items-center gap-2 font-display text-lg font-extrabold text-primary-foreground">
+          <Icone className="size-5 shrink-0" />
+          {titulo}
+        </h2>
+        <p className="mt-1 font-body text-sm text-primary-foreground/85">{descricao}</p>
+      </header>
+      <div className="px-5 pb-6 sm:px-6">{children}</div>
+    </section>
   );
 }
 
-/** Rodapé de modal: cancelar à esquerda, ação à direita, empilhado no celular. */
-export function AcoesModal({
+/** Rodapé de formulário: cancelar à esquerda, ação à direita, empilhado no celular. */
+export function AcoesFormulario({
   aoCancelar,
   rotuloConfirmar,
   enviando,
@@ -224,6 +237,51 @@ export function CampoTexto({
   return (
     <Campo rotulo={rotulo} dica={dica} className={className}>
       <Input id={id} value={valor} onChange={(e) => aoMudar(e.target.value)} {...props} />
+    </Campo>
+  );
+}
+
+/**
+ * Telefone com o DDI colado na frente.
+ *
+ * O `+55` é fixo e não é editável: o cliente digita o que ele fala ao telefone
+ * — DDD e número —, e quem monta o formato internacional é a tela. Antes o
+ * campo era texto livre, e o que chegava ao banco ia de `49 99999-8888` a
+ * `+55 (49) 9 9999-8888`; nenhum dos dois casa com o outro numa busca, e a
+ * indicação virava uma linha que ninguém consegue reencontrar.
+ *
+ * `valor` guarda só os dígitos nacionais (DDD + 8 ou 9). O DDI entra no envio.
+ */
+export function CampoTelefone({
+  rotulo,
+  valor,
+  aoMudar,
+  dica,
+  className,
+}: {
+  rotulo: string;
+  valor: string;
+  aoMudar: (digitos: string) => void;
+  dica?: string | undefined;
+  className?: string | undefined;
+}) {
+  const [id] = useState(proximoId);
+  return (
+    <Campo rotulo={rotulo} dica={dica} className={className}>
+      <div className="flex">
+        <span className="inline-flex items-center rounded-l-md border border-r-0 border-input bg-secondary px-3 font-ui text-sm font-semibold text-muted-foreground">
+          +55
+        </span>
+        <Input
+          id={id}
+          value={maskPhone(valor)}
+          onChange={(e) => aoMudar(e.target.value.replace(/\D/g, "").slice(0, 11))}
+          inputMode="tel"
+          autoComplete="tel-national"
+          placeholder="(49) 99999-8888"
+          className="rounded-l-none"
+        />
+      </div>
     </Campo>
   );
 }
@@ -335,14 +393,8 @@ export function SucessoEnvio({
   );
 }
 
-/** Aviso curto dentro de um modal — o que o cliente precisa saber antes de enviar. */
-export function NotaModal({
-  children,
-  tom = "info",
-}: {
-  children: ReactNode;
-  tom?: "info" | "alerta";
-}) {
+/** Aviso curto dentro de uma tela — o que o cliente precisa saber antes de enviar. */
+export function Nota({ children, tom = "info" }: { children: ReactNode; tom?: "info" | "alerta" }) {
   return (
     <p
       className={cn(
@@ -354,6 +406,27 @@ export function NotaModal({
     >
       {children}
     </p>
+  );
+}
+
+/**
+ * A saída para o comercial.
+ *
+ * Existe porque nem tudo cabe num formulário: o que o painel não resolve
+ * sozinho — um plano menor, uma dúvida de fidelidade — precisa de um lugar
+ * para ir que não seja "tente de novo".
+ */
+export function FalarComComercial({ mensagem, texto }: { mensagem: string; texto: string }) {
+  return (
+    <div className="flex flex-col gap-3 rounded-xl border border-dashed border-border bg-secondary/40 p-4 sm:flex-row sm:items-center sm:justify-between">
+      <p className="font-body text-xs text-muted-foreground">{texto}</p>
+      <Button type="button" variant="outline" size="sm" className="shrink-0" asChild>
+        <a href={waLink(mensagem)} target="_blank" rel="noopener">
+          <MessageCircle className="size-4" />
+          Falar com o comercial
+        </a>
+      </Button>
+    </div>
   );
 }
 

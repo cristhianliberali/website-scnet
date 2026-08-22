@@ -9,9 +9,9 @@
  *
  * **Onde o resultado fica.** Em dois lugares, de propósito:
  *
- * 1. No TanStack Query, aqui no navegador, por 5 minutos. É o que faz abrir e
- *    fechar modais, navegar entre abas e voltar de outra página não custarem
- *    nada.
+ * 1. No TanStack Query, aqui no navegador, por 5 minutos. É o que faz entrar e
+ *    sair de um serviço, navegar entre abas e voltar de outra página não
+ *    custarem nada.
  * 2. Na memória do servidor (`painel-cache.server.ts`), por 60 segundos. É o
  *    que faz um F5 — que joga fora o cache do navegador inteiro — não virar
  *    outra ida ao n8n.
@@ -147,8 +147,8 @@ export function useFormularioPainel() {
       }
 
       /*
-       * Formulário que não muda nada — diagnóstico, viabilidade, medição de
-       * velocidade — não desatualiza o painel. Recarregar depois dele seria
+       * Formulário que não muda nada — diagnóstico, viabilidade — não
+       * desatualiza o painel. Recarregar depois dele seria
        * uma ida ao n8n para receber de volta exatamente o que já está na tela.
        */
       if (SECOES_AFETADAS[formulario].length === 0) return;

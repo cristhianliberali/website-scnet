@@ -836,7 +836,7 @@ async function lerPainel(forcar: boolean): Promise<PainelOk | PainelErro> {
   if (!sessao) return erroPainel(ERRO_SESSAO_EXPIRADA, true);
 
   /*
-   * O retrato guardado responde na hora. É o que faz abrir e fechar modais, e
+   * O retrato guardado responde na hora. É o que faz abrir e fechar um serviço,
    * um F5, não custarem uma ida ao banco.
    */
   if (!forcar) {

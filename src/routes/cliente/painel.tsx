@@ -8,10 +8,16 @@
  * entra no cache do TanStack Query como `initialData`: a hidratação não
  * dispara uma segunda ida ao n8n.
  *
- * Daí em diante o cache manda. Abrir e fechar modais não custa nada; um F5
+ * Daí em diante o cache manda. Abrir e fechar um serviço não custa nada; um F5
  * pega o retrato guardado na memória do servidor (60s); e todo formulário que
  * muda alguma coisa derruba as seções que ele afeta. O botão "Atualizar" passa
  * por cima dos dois caches.
+ *
+ * **Onde os serviços abrem.** Na própria página, e não num pop-up: o serviço
+ * escolhido vira `?servico=` na URL, ocupa o lugar da visão geral e leva junto
+ * a navegação com os outros. Isso dá ao serviço um endereço — dá para voltar
+ * pelo botão do navegador, recarregar sem perder o lugar e mandar o link — e
+ * tira o formulário de dentro de uma caixa que rola por dentro no celular.
  *
  * **Como as ações chegam ao n8n.** Cada formulário é um evento próprio
  * (`FORMULARIOS_PAINEL`), enviado pelo servidor com o token da sessão junto —
@@ -19,7 +25,6 @@
  */
 
 import { createFileRoute, redirect, useNavigate } from "@tanstack/react-router";
-import { useState } from "react";
 import { LogOut, Power, RefreshCw, ShieldCheck, TriangleAlert } from "lucide-react";
 import { toast } from "sonner";
 
@@ -39,27 +44,26 @@ import {
   SecaoContratos,
 } from "@/components/scnet/painel/painel-visao-geral";
 import {
-  ModalDesbloqueio,
-  ModalNotasFiscais,
-  ModalPixDebito,
-  ModalSegundaVia,
-} from "@/components/scnet/painel/painel-modais-financeiro";
+  TelaDesbloqueio,
+  TelaNotasFiscais,
+  TelaPixDebito,
+  TelaSegundaVia,
+} from "@/components/scnet/painel/painel-telas-financeiro";
 import {
-  ModalIndicacoes,
-  ModalMudancaEndereco,
-  ModalSuporte,
-  ModalTesteVelocidade,
-  ModalTrocarPlano,
-  ModalTrocarTitular,
-} from "@/components/scnet/painel/painel-modais-servicos";
-import type { ModalPainelId } from "@/components/scnet/painel/painel-ui";
-import { CartaoPainel } from "@/components/scnet/painel/painel-ui";
+  TelaIndicacoes,
+  TelaMudancaEndereco,
+  TelaSuporte,
+  TelaTrocarPlano,
+  TelaTrocarTitular,
+} from "@/components/scnet/painel/painel-telas-servicos";
+import type { ServicoPainelId } from "@/components/scnet/painel/painel-ui";
+import { CartaoPainel, servicoValido } from "@/components/scnet/painel/painel-ui";
+import { TelaServico } from "@/components/scnet/painel/painel-servico";
 import {
   CHAVE_PAINEL,
   painelQueryOptions,
   useAtualizarPainel,
   useErroPainel,
-  useFormularioPainel,
 } from "@/hooks/use-painel";
 import { consultarPainel, getSessaoCliente, logoutCliente } from "@/lib/cliente-auth";
 import { faturaEmAberto } from "@/lib/painel-formato";
@@ -68,6 +72,9 @@ import type { PainelSnapshot } from "@/lib/painel-tipos";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 
 const title = "Painel do cliente — SCNET";
+
+/** O que a URL do painel carrega: qual serviço está aberto e sobre qual contrato. */
+type BuscaPainel = { servico?: ServicoPainelId; contrato?: string };
 
 export const Route = createFileRoute("/cliente/painel")({
   /*
@@ -85,6 +92,17 @@ export const Route = createFileRoute("/cliente/painel")({
 
     return { sessao, inicial };
   },
+  /*
+   * A URL é digitável, então nada dela entra na tela sem passar por aqui:
+   * `servico` só vale se for um dos serviços conhecidos, e `contrato` é um
+   * identificador curto que ainda vai ser procurado na lista do cliente — o
+   * painel só mostra os contratos que a sessão dele carrega.
+   */
+  validateSearch: (busca: Record<string, unknown>): BuscaPainel => {
+    const servico = servicoValido(busca["servico"]);
+    const contrato = typeof busca["contrato"] === "string" ? busca["contrato"].slice(0, 60) : "";
+    return { ...(servico ? { servico } : {}), ...(contrato ? { contrato } : {}) };
+  },
   head: () => ({
     meta: [{ title }, { name: "robots", content: "noindex" }],
   }),
@@ -93,7 +111,15 @@ export const Route = createFileRoute("/cliente/painel")({
 
 function PainelCliente() {
   const { sessao, inicial } = Route.useLoaderData();
-  const navigate = useNavigate();
+  const { servico: naBusca, contrato: contratoSelecionado = "" } = Route.useSearch();
+  /*
+   * Confere de novo o que veio da URL. `validateSearch` já limpa o valor, mas o
+   * roteador entrega aqui o que está escrito no endereço quando ele não casa com
+   * nada conhecido — e um `?servico=qualquercoisa` cairia numa tela sem
+   * conteúdo. Passando pelo mesmo filtro, ele cai na visão geral.
+   */
+  const servico = servicoValido(naBusca);
+  const navigate = useNavigate({ from: Route.fullPath });
   const queryClient = useQueryClient();
 
   const painel = useQuery({
@@ -104,34 +130,25 @@ function PainelCliente() {
   });
 
   const atualizar = useAtualizarPainel();
-  const envio = useFormularioPainel();
   const tratarErro = useErroPainel();
 
-  const [modal, setModal] = useState<ModalPainelId | null>(null);
-  const [contratoSelecionado, setContratoSelecionado] = useState("");
-  const [reiniciando, setReiniciando] = useState<string | null>(null);
+  /*
+   * Abrir um serviço é navegar. `replace` não: cada serviço vira um passo no
+   * histórico, e é o botão "voltar" do celular que fecha o que está aberto.
+   */
+  const abrirServico = (id: ServicoPainelId) =>
+    void navigate({ search: (atual: BuscaPainel) => ({ ...atual, servico: id }) });
+
+  const selecionarContrato = (id: string) =>
+    void navigate({ search: (atual: BuscaPainel) => ({ ...atual, contrato: id }) });
+
+  const voltarAoPainel = () =>
+    void navigate({ search: ({ contrato }: BuscaPainel) => (contrato ? { contrato } : {}) });
 
   async function sair() {
     await logoutCliente();
     queryClient.removeQueries({ queryKey: CHAVE_PAINEL });
-    void navigate({ to: "/cliente" });
-  }
-
-  async function reiniciarConexao(idContrato: string) {
-    setReiniciando(idContrato);
-    try {
-      const resposta = await envio.mutateAsync({
-        formulario: "reiniciar_conexao",
-        dados: { id_contrato: idContrato },
-      });
-      toast.success(
-        resposta.mensagem ?? "Comando enviado. Seu equipamento reinicia em alguns segundos.",
-      );
-    } catch (erro) {
-      tratarErro(erro, "Não foi possível reiniciar a conexão agora.");
-    } finally {
-      setReiniciando(null);
-    }
+    void navigate({ to: "/cliente", search: {} });
   }
 
   const primeiroNome = (painel.data?.cliente.nome || sessao.nome).split(" ")[0] ?? sessao.nome;
@@ -196,81 +213,25 @@ function PainelCliente() {
                 recarregando={painel.isFetching}
                 aoTentarDeNovo={() => void painel.refetch()}
               />
+            ) : servico ? (
+              <TelaServico servico={servico} aoAbrir={abrirServico} aoVoltar={voltarAoPainel}>
+                <ConteudoServico
+                  servico={servico}
+                  painel={painel.data}
+                  contratoSelecionado={contratoSelecionado}
+                  aoVoltar={voltarAoPainel}
+                />
+              </TelaServico>
             ) : (
               <ConteudoPainel
                 painel={painel.data}
-                aoAbrir={setModal}
-                aoSelecionarContrato={setContratoSelecionado}
-                aoReiniciar={(contrato) => void reiniciarConexao(contrato.id)}
-                reiniciando={reiniciando}
+                aoAbrir={abrirServico}
+                aoSelecionarContrato={selecionarContrato}
               />
             )}
           </div>
         </section>
       </main>
-
-      {painel.data && (
-        <>
-          <ModalSegundaVia
-            aberto={modal === "segunda_via"}
-            aoFechar={() => setModal(null)}
-            faturas={painel.data.faturas}
-          />
-          <ModalNotasFiscais
-            aberto={modal === "notas_fiscais"}
-            aoFechar={() => setModal(null)}
-            notas={painel.data.notasFiscais}
-          />
-          <ModalPixDebito aberto={modal === "pix_debito"} aoFechar={() => setModal(null)} />
-          <ModalDesbloqueio
-            aberto={modal === "desbloqueio"}
-            aoFechar={() => setModal(null)}
-            faturas={painel.data.faturas}
-          />
-          <ModalTrocarPlano
-            aberto={modal === "trocar_plano"}
-            aoFechar={() => setModal(null)}
-            contratos={painel.data.contratos}
-            planos={painel.data.planos}
-            adicionais={painel.data.adicionais}
-            contratoInicial={contratoSelecionado}
-          />
-          <ModalIndicacoes
-            aberto={modal === "indicacoes"}
-            aoFechar={() => setModal(null)}
-            cliente={painel.data.cliente}
-            indicacoes={painel.data.indicacoes}
-          />
-          <ModalMudancaEndereco
-            aberto={modal === "mudanca_endereco"}
-            aoFechar={() => setModal(null)}
-            contratos={painel.data.contratos}
-            contratoInicial={contratoSelecionado}
-          />
-          <ModalTrocarTitular
-            aberto={modal === "trocar_titular"}
-            aoFechar={() => setModal(null)}
-            contratos={painel.data.contratos}
-            cliente={painel.data.cliente}
-            contratoInicial={contratoSelecionado}
-          />
-          <ModalSuporte
-            aberto={modal === "suporte"}
-            aoFechar={() => setModal(null)}
-            contratos={painel.data.contratos}
-            contratoInicial={contratoSelecionado}
-          />
-          <ModalTesteVelocidade
-            aberto={modal === "teste_velocidade"}
-            aoFechar={() => setModal(null)}
-            contrato={
-              painel.data.contratos.find((c) => c.id === contratoSelecionado) ??
-              painel.data.contratos[0] ??
-              null
-            }
-          />
-        </>
-      )}
 
       <Footer />
       <WhatsFloat />
@@ -291,18 +252,86 @@ function identificacao(
   return contato ?? "";
 }
 
+/**
+ * O serviço aberto.
+ *
+ * Só um por vez está montado — quem não está na tela não está na árvore, e é
+ * por isso que cada formulário começa limpo sem precisar se limpar.
+ */
+function ConteudoServico({
+  servico,
+  painel,
+  contratoSelecionado,
+  aoVoltar,
+}: {
+  servico: ServicoPainelId;
+  painel: PainelSnapshot;
+  contratoSelecionado: string;
+  aoVoltar: () => void;
+}) {
+  switch (servico) {
+    case "trocar_plano":
+      return (
+        <TelaTrocarPlano
+          aoVoltar={aoVoltar}
+          contratos={painel.contratos}
+          planos={painel.planos}
+          adicionais={painel.adicionais}
+          contratoInicial={contratoSelecionado}
+        />
+      );
+    case "indicacoes":
+      return (
+        <TelaIndicacoes
+          aoVoltar={aoVoltar}
+          cliente={painel.cliente}
+          indicacoes={painel.indicacoes}
+        />
+      );
+    case "pix_debito":
+      return <TelaPixDebito aoVoltar={aoVoltar} />;
+    case "mudanca_endereco":
+      return (
+        <TelaMudancaEndereco
+          aoVoltar={aoVoltar}
+          contratos={painel.contratos}
+          contratoInicial={contratoSelecionado}
+        />
+      );
+    case "trocar_titular":
+      return (
+        <TelaTrocarTitular
+          aoVoltar={aoVoltar}
+          contratos={painel.contratos}
+          cliente={painel.cliente}
+          contratoInicial={contratoSelecionado}
+        />
+      );
+    case "segunda_via":
+      return <TelaSegundaVia aoVoltar={aoVoltar} faturas={painel.faturas} />;
+    case "notas_fiscais":
+      return <TelaNotasFiscais aoVoltar={aoVoltar} notas={painel.notasFiscais} />;
+    case "suporte":
+      return (
+        <TelaSuporte
+          aoVoltar={aoVoltar}
+          contratos={painel.contratos}
+          contratoInicial={contratoSelecionado}
+        />
+      );
+    case "desbloqueio":
+      return <TelaDesbloqueio aoVoltar={aoVoltar} faturas={painel.faturas} />;
+  }
+}
+
 function ConteudoPainel({
   painel,
   aoAbrir,
   aoSelecionarContrato,
-  aoReiniciar,
-  reiniciando,
 }: {
   painel: PainelSnapshot;
-  aoAbrir: (modal: ModalPainelId) => void;
+  aoAbrir: (servico: ServicoPainelId) => void;
   aoSelecionarContrato: (id: string) => void;
-  aoReiniciar: (contrato: PainelSnapshot["contratos"][number]) => void;
-  reiniciando: string | null;
 }) {
   const emAberto = painel.faturas.filter(faturaEmAberto).length;
 
@@ -342,8 +371,6 @@ function ConteudoPainel({
             contratos={painel.contratos}
             aoAbrir={aoAbrir}
             aoSelecionarContrato={aoSelecionarContrato}
-            aoReiniciar={aoReiniciar}
-            reiniciando={reiniciando}
           />
         </div>
         <div className="space-y-6 lg:col-span-5">

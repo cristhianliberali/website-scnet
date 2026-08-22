@@ -180,7 +180,14 @@ const STATUS_FATURA: Record<string, StatusFatura> = {
   cancelada: "cancelado",
 };
 
+/*
+ * Os quatro primeiros à direita são os valores de `indicacoes_web.status`.
+ * "Sem sucesso" e "dados inválidos" caem os dois em `cancelado`: para o
+ * cliente, o que interessa é que aquela indicação não vai render bônus — o
+ * motivo é assunto de quem opera.
+ */
 const STATUS_INDICACAO: Record<string, StatusIndicacao> = {
+  em_aberto: "pendente",
   pendente: "pendente",
   aguardando: "pendente",
   em_instalacao: "em_instalacao",
@@ -188,6 +195,8 @@ const STATUS_INDICACAO: Record<string, StatusIndicacao> = {
   instalado: "instalado",
   concluido: "instalado",
   ativo: "instalado",
+  sem_sucesso: "cancelado",
+  dados_invalidos: "cancelado",
   cancelado: "cancelado",
   recusado: "cancelado",
 };
@@ -369,13 +378,24 @@ function normalizarNotaFiscal(fonte: Bruto, indice: number): NotaFiscal {
 }
 
 function normalizarIndicacao(fonte: Bruto, indice: number): Indicacao {
+  const protocolo = texto(fonte, "protocolo", "protocol", "numero_protocolo");
   return {
-    id: texto(fonte, "id", "id_indicacao") || `indicacao_${indice + 1}`,
-    nome: texto(fonte, "nome", "name", "indicado"),
-    telefone: texto(fonte, "telefone", "celular", "phone"),
+    id: texto(fonte, "id", "id_indicacao") || protocolo || `indicacao_${indice + 1}`,
+    protocolo,
+    nome: texto(fonte, "nome", "nome_indicacao", "name", "indicado"),
+    telefone: texto(fonte, "telefone", "telefone_indicacao", "celular", "phone"),
+    cidade: texto(fonte, "cidade", "city", "municipio"),
     data: texto(fonte, "data", "criado_em", "date", "createdAt"),
     status: opcao(texto(fonte, "status", "situacao"), STATUS_INDICACAO, "pendente"),
-    desconto: numero(fonte, "desconto", "valor_desconto", "discountAmount"),
+    bonus: texto(fonte, "bonus", "descricao_bonus", "descricaoBonus", "tipo_bonus"),
+    desconto: numero(
+      fonte,
+      "desconto",
+      "valor_indicacao",
+      "valor_desconto",
+      "valorIndicacao",
+      "discountAmount",
+    ),
   };
 }
 
@@ -403,6 +423,7 @@ function normalizarPlano(fonte: Bruto, indice: number): PlanoDisponivel {
     vantagens: listaDeTextos(fonte, "vantagens", "beneficios", "composicao", "features"),
     destaque: booleano(fonte, "destaque", "recomendado", "recommended"),
     selo: texto(fonte, "selo", "badge", "nome_destaque"),
+    codigoOfertaMk: texto(fonte, "codigo_oferta_mk", "codigoOfertaMk"),
   };
 }
 
