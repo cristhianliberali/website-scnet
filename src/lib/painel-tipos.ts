@@ -48,10 +48,15 @@ export const FORMULARIOS_PAINEL = {
   nota_fiscal: "painel_nota_fiscal",
   abrir_chamado: "painel_abrir_chamado",
   diagnostico_conexao: "painel_diagnostico_conexao",
-  reiniciar_conexao: "painel_reiniciar_conexao",
   desbloqueio_confianca: "painel_desbloqueio_confianca",
-  teste_velocidade: "painel_teste_velocidade",
 } as const;
+
+/*
+ * `painel_reiniciar_conexao` e `painel_teste_velocidade` saíram daqui junto com
+ * os botões que os disparavam: os dois precisavam de um comando e de uma
+ * medição no equipamento do cliente, que nenhuma tabela nossa alcança hoje. Os
+ * ramos podem continuar no workflow — o site simplesmente não os chama mais.
+ */
 
 export type FormularioPainel = keyof typeof FORMULARIOS_PAINEL;
 
@@ -68,9 +73,7 @@ export const SECOES_AFETADAS: Record<FormularioPainel, readonly SecaoPainel[]> =
   nota_fiscal: ["notas_fiscais"],
   abrir_chamado: ["chamados"],
   diagnostico_conexao: [],
-  reiniciar_conexao: ["contratos"],
   desbloqueio_confianca: ["contratos", "faturas"],
-  teste_velocidade: [],
 };
 
 /* ---------------- domínio ---------------- */
@@ -183,10 +186,19 @@ export type NotaFiscal = {
 
 export type Indicacao = {
   id: string;
+  /** O número que o cliente cita ao perguntar pela indicação. */
+  protocolo: string;
   nome: string;
   telefone: string;
+  cidade: string;
   data: string;
   status: StatusIndicacao;
+  /**
+   * O bônus já escrito para ler ("Desconto na fatura", "PIX de R$ 50,00").
+   * O que a tabela guarda é o par tipo + descrição; a frase sai da leitura.
+   */
+  bonus: string;
+  /** Quanto a indicação vale, quando o bônus é em dinheiro. */
   desconto: number;
 };
 
@@ -211,6 +223,12 @@ export type PlanoDisponivel = {
   vantagens: string[];
   destaque: boolean;
   selo: string;
+  /**
+   * O número da oferta no MK (`planos_upgrade.codigo_oferta_mk`). Vazio quando
+   * a linha não tem um. Vai junto no pedido de troca: é por ele que o fluxo
+   * acha a oferta do outro lado, sem depender do nome do plano.
+   */
+  codigoOfertaMk: string;
 };
 
 /** Um adicional contratável junto com a troca de plano (mesh, streaming...). */

@@ -1,5 +1,5 @@
 /**
- * Os modais do dinheiro: segunda via, notas fiscais, PIX/débito automático e
+ * As telas do dinheiro: segunda via, notas fiscais, PIX/débito automático e
  * desbloqueio em confiança.
  *
  * Todos seguem a mesma regra: o que aparece depois do envio é o que o n8n
@@ -7,7 +7,7 @@
  * concedido — se o fluxo do outro lado não mandou, a tela não mostra.
  */
 
-import { useEffect, useMemo, useState, type FormEvent } from "react";
+import { useMemo, useState, type FormEvent } from "react";
 import {
   Building2,
   FileSpreadsheet,
@@ -36,13 +36,13 @@ import type { Fatura, NotaFiscal } from "@/lib/painel-tipos";
 import { data, faturaEmAberto, moeda } from "@/lib/painel-formato";
 import { cn } from "@/lib/utils";
 import {
-  AcoesModal,
+  AcoesFormulario,
   BotaoCopiar,
   Campo,
   CampoTexto,
   EstadoVazio,
-  ModalPainel,
-  NotaModal,
+  MolduraServico,
+  Nota,
   SeloStatus,
   SucessoEnvio,
 } from "./painel-ui";
@@ -51,17 +51,12 @@ import {
 
 type DadosPagamento = { pix: string; linhaDigitavel: string; urlBoleto: string; mensagem: string };
 
-export function ModalSegundaVia({
-  aberto,
-  aoFechar,
-  faturas,
-}: {
-  aberto: boolean;
-  aoFechar: () => void;
-  faturas: Fatura[];
-}) {
+export function TelaSegundaVia({ aoVoltar, faturas }: { aoVoltar: () => void; faturas: Fatura[] }) {
   const [filtro, setFiltro] = useState<"todas" | "pendentes" | "pagas">("pendentes");
-  const [selecionada, setSelecionada] = useState<string>("");
+  // a primeira pendente já vem escolhida: é dela que o cliente veio atrás
+  const [selecionada, setSelecionada] = useState<string>(
+    () => faturas.find(faturaEmAberto)?.id ?? faturas[0]?.id ?? "",
+  );
   const [pagamento, setPagamento] = useState<DadosPagamento | null>(null);
 
   const envio = useFormularioPainel();
@@ -72,15 +67,6 @@ export function ModalSegundaVia({
     if (filtro === "pagas") return faturas.filter((f) => f.status === "pago");
     return faturas;
   }, [faturas, filtro]);
-
-  // a primeira pendente já vem escolhida: é dela que o cliente veio atrás
-  useEffect(() => {
-    if (!aberto) return;
-    const pendente = faturas.find(faturaEmAberto);
-    setSelecionada(pendente?.id ?? faturas[0]?.id ?? "");
-    setPagamento(null);
-    setFiltro("pendentes");
-  }, [aberto, faturas]);
 
   const fatura = faturas.find((f) => f.id === selecionada) ?? null;
 
@@ -125,13 +111,10 @@ export function ModalSegundaVia({
   const boleto = pagamento?.urlBoleto || fatura?.urlBoleto || "";
 
   return (
-    <ModalPainel
-      aberto={aberto}
-      aoFechar={aoFechar}
+    <MolduraServico
       titulo="2ª via de fatura"
       descricao="Escolha a fatura e gere o PIX ou a linha digitável para pagar."
       icone={Receipt}
-      largura="max-w-3xl"
     >
       {faturas.length === 0 ? (
         <EstadoVazio
@@ -234,7 +217,7 @@ export function ModalSegundaVia({
 
               {pagamento?.mensagem && (
                 <div className="mt-3">
-                  <NotaModal>{pagamento.mensagem}</NotaModal>
+                  <Nota>{pagamento.mensagem}</Nota>
                 </div>
               )}
 
@@ -281,19 +264,17 @@ export function ModalSegundaVia({
           )}
         </div>
       )}
-    </ModalPainel>
+    </MolduraServico>
   );
 }
 
 /* ---------------- notas fiscais ---------------- */
 
-export function ModalNotasFiscais({
-  aberto,
-  aoFechar,
+export function TelaNotasFiscais({
+  aoVoltar,
   notas,
 }: {
-  aberto: boolean;
-  aoFechar: () => void;
+  aoVoltar: () => void;
   notas: NotaFiscal[];
 }) {
   const [busca, setBusca] = useState("");
@@ -332,13 +313,10 @@ export function ModalNotasFiscais({
   }
 
   return (
-    <ModalPainel
-      aberto={aberto}
-      aoFechar={aoFechar}
+    <MolduraServico
       titulo="Minhas notas fiscais"
       descricao="As notas emitidas para os seus contratos."
       icone={FileSpreadsheet}
-      largura="max-w-3xl"
     >
       <div className="space-y-4 pt-4">
         {notas.length > 0 && (
@@ -404,7 +382,7 @@ export function ModalNotasFiscais({
           </div>
         )}
       </div>
-    </ModalPainel>
+    </MolduraServico>
   );
 }
 
@@ -422,7 +400,7 @@ const BANCOS = [
   { codigo: "260", nome: "Nu Pagamentos (Nubank)" },
 ];
 
-export function ModalPixDebito({ aberto, aoFechar }: { aberto: boolean; aoFechar: () => void }) {
+export function TelaPixDebito({ aoVoltar }: { aoVoltar: () => void }) {
   const [aba, setAba] = useState<"pix" | "debito">("pix");
   const [tipoChave, setTipoChave] = useState("cpf");
   const [chave, setChave] = useState("");
@@ -435,10 +413,6 @@ export function ModalPixDebito({ aberto, aoFechar }: { aberto: boolean; aoFechar
 
   const envio = useFormularioPainel();
   const tratarErro = useErroPainel();
-
-  useEffect(() => {
-    if (aberto) setConcluido(null);
-  }, [aberto]);
 
   async function submeter(e: FormEvent) {
     e.preventDefault();
@@ -480,17 +454,15 @@ export function ModalPixDebito({ aberto, aoFechar }: { aberto: boolean; aoFechar
   }
 
   return (
-    <ModalPainel
-      aberto={aberto}
-      aoFechar={aoFechar}
+    <MolduraServico
       titulo="PIX automático e débito em conta"
       descricao="Deixe a fatura ser paga sozinha todo mês, sem precisar lembrar."
       icone={QrCode}
     >
       {concluido ? (
         <SucessoEnvio titulo={concluido.titulo} mensagem={concluido.mensagem}>
-          <Button type="button" variant="outline" onClick={aoFechar}>
-            Fechar
+          <Button type="button" variant="outline" onClick={aoVoltar}>
+            Voltar ao painel
           </Button>
         </SucessoEnvio>
       ) : (
@@ -584,40 +556,34 @@ export function ModalPixDebito({ aberto, aoFechar }: { aberto: boolean; aoFechar
             </TabsContent>
           </Tabs>
 
-          <NotaModal>
+          <Nota>
             O débito passa a valer a partir da próxima fatura em aberto. As faturas já emitidas
             seguem para pagamento normal.
-          </NotaModal>
+          </Nota>
 
-          <AcoesModal
-            aoCancelar={aoFechar}
+          <AcoesFormulario
+            aoCancelar={aoVoltar}
             rotuloConfirmar="Ativar cobrança automática"
             enviando={envio.isPending}
           />
         </form>
       )}
-    </ModalPainel>
+    </MolduraServico>
   );
 }
 
 /* ---------------- desbloqueio em confiança ---------------- */
 
-export function ModalDesbloqueio({
-  aberto,
-  aoFechar,
+export function TelaDesbloqueio({
+  aoVoltar,
   faturas,
 }: {
-  aberto: boolean;
-  aoFechar: () => void;
+  aoVoltar: () => void;
   faturas: Fatura[];
 }) {
   const [concluido, setConcluido] = useState<{ mensagem: string; prazo: string } | null>(null);
   const envio = useFormularioPainel();
   const tratarErro = useErroPainel();
-
-  useEffect(() => {
-    if (aberto) setConcluido(null);
-  }, [aberto]);
 
   const vencidas = faturas.filter((f) => f.status === "vencido");
   const total = vencidas.reduce((soma, f) => soma + f.valor, 0);
@@ -643,13 +609,10 @@ export function ModalDesbloqueio({
   }
 
   return (
-    <ModalPainel
-      aberto={aberto}
-      aoFechar={aoFechar}
+    <MolduraServico
       titulo="Desbloqueio em confiança"
       descricao="Libere a conexão agora e regularize as faturas em seguida."
       icone={ShieldCheck}
-      largura="max-w-lg"
     >
       {concluido ? (
         <SucessoEnvio titulo="Conexão liberada" mensagem={concluido.mensagem}>
@@ -658,8 +621,8 @@ export function ModalDesbloqueio({
               Válido até {data(concluido.prazo)}.
             </p>
           )}
-          <Button type="button" variant="outline" onClick={aoFechar}>
-            Fechar
+          <Button type="button" variant="outline" onClick={aoVoltar}>
+            Voltar ao painel
           </Button>
         </SucessoEnvio>
       ) : (
@@ -678,13 +641,13 @@ export function ModalDesbloqueio({
             </div>
           </div>
 
-          <NotaModal tom="alerta">
+          <Nota tom="alerta">
             O desbloqueio em confiança é liberado uma vez por período e depende da análise do
             provedor. A conexão volta a ser bloqueada se as faturas não forem pagas dentro do prazo.
-          </NotaModal>
+          </Nota>
 
           <div className="flex flex-col-reverse gap-2 border-t border-border pt-4 sm:flex-row sm:justify-end">
-            <Button type="button" variant="outline" onClick={aoFechar} disabled={envio.isPending}>
+            <Button type="button" variant="outline" onClick={aoVoltar} disabled={envio.isPending}>
               Agora não
             </Button>
             <Button
@@ -699,6 +662,6 @@ export function ModalDesbloqueio({
           </div>
         </div>
       )}
-    </ModalPainel>
+    </MolduraServico>
   );
 }

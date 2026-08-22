@@ -39,7 +39,7 @@ motivo no log. Antes ela caía para o n8n em silêncio, e a tela carregava vazia
 é melhor que suceder errado.
 
 Na prática isso quer dizer que **o site não manda mais nenhum evento de
-consulta**. Os únicos eventos que chegam ao n8n são os de login e os catorze de
+consulta**. Os únicos eventos que chegam ao n8n são os de login e os doze de
 formulário.
 
 **O que autoriza a consulta ao banco.** O `id_cliente` sai do cookie de sessão,
@@ -48,11 +48,13 @@ e nenhuma função aceita um id vindo do formulário — daí um `WHERE cod_clie
 $1` bastar para ninguém enxergar o cliente do vizinho.
 
 **O que o banco ainda não tem.** As tabelas de hoje cobrem cadastro, contratos,
-faturas e o catálogo de planos. Notas fiscais, indicações e chamados voltam
+faturas, o catálogo de upgrade e as indicações. Notas fiscais e chamados voltam
 vazios, e a tela mostra o estado vazio de cada um — até existirem as tabelas
 correspondentes.
 
-O schema está em [`schema-painel.sql`](./schema-painel.sql).
+O schema está em [`schema-painel.sql`](./schema-painel.sql) e, para
+`planos_upgrade` e `indicacoes_web`, em
+[`schema-upgrade-indicacoes.sql`](./schema-upgrade-indicacoes.sql).
 
 ---
 
@@ -108,12 +110,12 @@ Onde o resultado fica guardado, e por quanto tempo:
 
 Na prática:
 
-- **Abrir e fechar modais não custa nada.** A tela lê do cache da aba.
+- **Abrir e fechar um serviço não custa nada.** A tela lê do cache da aba.
 - **Um F5 costuma não chegar ao n8n.** O cache do servidor responde.
 - **Todo formulário que muda algo derruba o que ele afeta.** Quem trocou de
   plano não fica um minuto vendo o plano antigo.
 - **Formulário que não muda nada não recarrega nada** — diagnóstico,
-  viabilidade e teste de velocidade não disparam consulta nenhuma depois.
+  viabilidade não disparam consulta nenhuma depois.
 - **O botão "Atualizar" passa por cima dos dois caches** (`forcar: true` no
   corpo do `painel_bootstrap`).
 
@@ -308,13 +310,15 @@ comuns funcionam. O que ele não reconhecer cai no padrão da coluna.
 | `cliente.codigo`                | `clientes_web.id_cliente`                      |
 | `contratos[].id` / `.numero`    | `contratos_web.cod_contrato`                   |
 | `contratos[].apelido`           | o primeiro trecho de `contratos_web.endereco`  |
-| `contratos[].status_conexao`    | `contratos_web.status_contrato`                |
+| `contratos[].status_conexao`    | `contratos_web.status_contrato` (não exibido)  |
 | `contratos[].status_financeiro` | `contratos_web.status_fatura`                  |
 | `contratos[].download`          | `contratos_web.velocidade`                     |
 | `faturas[].valor`               | `faturas_web.valor_atual` (com juros e multa)  |
 | `faturas[].valor_original`      | `faturas_web.valor_original`                   |
 | `faturas[].referencia`          | `faturas_web.descricao`                        |
-| `planos[]`                      | `planos_web` — a mesma tabela da home          |
+| `planos[]`                      | `planos_upgrade` — **não** `planos_web`        |
+| `indicacoes[]`                  | `indicacoes_web`                               |
+| `cliente.desconto_acumulado`    | soma de `valor_indicacao` das concluídas       |
 
 Contratos com `status_contrato = 'cancelado'` e faturas com
 `status_fatura = 'cancelada'` ficam de fora da consulta: não há mais nada a
@@ -411,11 +415,19 @@ análise em vez de ser concluído na hora.
   "id_contrato": "ctr_01",
   "id_plano": "plano_1000",
   "plano": "Gamer Master 1 Giga",
+  "codigo_oferta_mk": "4412",
   "valor_plano": 179.9,
   "adicionais": [{ "id": "mesh", "nome": "Ponto Wi-Fi Mesh extra", "valor": 19.9 }],
   "valor_total": 199.8
 }
 ```
+
+Os planos vêm de `planos_upgrade` (e **não** de `planos_web`), e a tela só
+oferece os de valor **igual ou maior** que o do contrato — quem quer descer de
+plano cai no botão "Falar com o comercial", que abre o WhatsApp. Ou seja:
+nenhum `valor_plano` menor que a mensalidade atual chega por este evento.
+`codigo_oferta_mk` é a coluna de mesmo nome da tabela, e vem vazia quando a
+linha não tem uma.
 
 **Resposta**
 
@@ -433,8 +445,27 @@ mostra só a mensagem.
 ### 2. `painel_indicar_amigo`
 
 ```json
-{ "nome": "Pedro Henrique", "telefone": "(49) 99999-8888", "codigo_indicacao": "LUCAS50FIBRA" }
+{
+  "nome_cliente": "Mariana Duarte Fontana",
+  "nome_indicacao": "Pedro Henrique",
+  "telefone_indicacao": "5549999998888",
+  "cidade": "Chapecó",
+  "observacoes": "Prefere ser chamado depois das 18h.",
+  "codigo_indicacao": "LUCAS50FIBRA",
+  "nome": "Pedro Henrique",
+  "telefone": "5549999998888"
+}
 ```
+
+Os campos têm o nome das colunas de `indicacoes_web`, para o `INSERT` sair sem
+renomeação no meio. `nome` e `telefone` vão junto, repetidos, só para não
+quebrar um fluxo que ainda espera os nomes antigos.
+
+O **telefone chega sempre com DDI e só com dígitos** (`55` + DDD + 8 ou 9): o
+campo do formulário tem o `+55` fixo na frente e a tela recusa o envio antes de
+chamar o webhook se o número não tiver o tamanho certo. `protocolo`, `status`,
+`tipo_bonus` e o valor **não** vêm do site — o protocolo tem `DEFAULT` no banco
+e o resto é preenchido por quem opera, depois.
 
 **Resposta**
 
@@ -443,22 +474,25 @@ mostra só a mensagem.
   "status": "ok",
   "mensagem": "Indicação enviada! Vamos falar com o Pedro.",
   "dados": {
+    "protocolo": "IND-202608-000042",
     "indicacoes": [
       {
-        "id": "ref_09",
+        "protocolo": "IND-202608-000042",
         "nome": "Pedro Henrique",
-        "telefone": "(49) 99999-8888",
+        "telefone": "5549999998888",
+        "cidade": "Chapecó",
         "data": "2026-08-19",
-        "status": "pendente",
-        "desconto": 50.0
+        "status": "em_aberto",
+        "tipo_bonus": "pix",
+        "valor_indicacao": 50.0
       }
     ]
   }
 }
 ```
 
-Devolver a lista atualizada em `dados.indicacoes` faz o novo nome aparecer na
-hora, sem uma segunda chamada.
+O `protocolo` aparece junto do aviso de envio. Devolver a lista atualizada em
+`dados.indicacoes` faz o novo nome aparecer na hora, sem uma segunda chamada.
 
 ### 3. `painel_pix_automatico`
 
@@ -698,21 +732,7 @@ O botão "Rodar diagnóstico" dentro do suporte. **Não muda nada.**
 O texto de `diagnostico` (ou `resultado`, ou `resumo`) aparece na tela e segue
 junto no chamado, se o cliente abrir um.
 
-### 12. `painel_reiniciar_conexao`
-
-O botão "Reiniciar conexão" no card do contrato.
-
-```json
-{ "id_contrato": "ctr_01" }
-```
-
-**Resposta**
-
-```json
-{ "status": "ok", "mensagem": "Comando enviado. O equipamento reinicia em cerca de 40 segundos." }
-```
-
-### 13. `painel_desbloqueio_confianca`
+### 12. `painel_desbloqueio_confianca`
 
 ```json
 { "faturas": ["inv_02"], "valor_total": 219.9 }
@@ -735,26 +755,12 @@ como está.
 Para **esconder o botão** de quem não tem direito a ele, mande
 `"desbloqueio_disponivel": false` no `painel_bootstrap`.
 
-### 14. `painel_teste_velocidade`
-
-**Não muda nada.**
-
-```json
-{ "id_contrato": "ctr_01" }
-```
-
-**Resposta**
-
-```json
-{
-  "status": "ok",
-  "mensagem": "Medição feita a partir da nossa borda até o seu equipamento.",
-  "dados": { "download": 582.4, "upload": 291.7, "ping": 8 }
-}
-```
-
-Os números são em Mbps (`download`, `upload`) e milissegundos (`ping`). A tela
-compara o download medido com a velocidade contratada e mostra a proporção.
+> **Saíram da tela:** `painel_reiniciar_conexao` e `painel_teste_velocidade`.
+> Os dois dependiam de um comando e de uma medição no equipamento do cliente,
+> que nada no banco alcança hoje — e um botão que responde sempre a mesma coisa
+> é pior que botão nenhum. Junto com eles saiu o selo "Conectado" do card do
+> contrato, que era `status_contrato` (ativo/bloqueado) fantasiado de estado da
+> conexão. Os ramos podem continuar no workflow; o site não os chama mais.
 
 ---
 

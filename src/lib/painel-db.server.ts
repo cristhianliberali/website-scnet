@@ -22,11 +22,14 @@
  *
  * Variáveis próprias deste módulo:
  *
- *   POSTGRES_CLIENTES_TABLE    padrão "clientes_web"
- *   POSTGRES_CONTRATOS_TABLE   padrão "contratos_web"
- *   POSTGRES_FATURAS_TABLE     padrão "faturas_web"
+ *   POSTGRES_CLIENTES_TABLE         padrão "clientes_web"
+ *   POSTGRES_CONTRATOS_TABLE        padrão "contratos_web"
+ *   POSTGRES_FATURAS_TABLE          padrão "faturas_web"
+ *   POSTGRES_PLANOS_UPGRADE_TABLE   padrão "planos_upgrade"
+ *   POSTGRES_INDICACOES_TABLE       padrão "indicacoes_web"
  *
- * O schema está em `docs/n8n/schema-painel.sql`.
+ * O schema está em `docs/n8n/schema-painel.sql` e, para as duas últimas, em
+ * `docs/n8n/schema-upgrade-indicacoes.sql`.
  */
 
 import { env, getClient, identifier, type Sql } from "./postgres.server";
@@ -36,7 +39,14 @@ const DEFAULT_SCHEMA = "public";
 const DEFAULT_CLIENTES = "clientes_web";
 const DEFAULT_CONTRATOS = "contratos_web";
 const DEFAULT_FATURAS = "faturas_web";
-const DEFAULT_PLANOS = "planos_web";
+/*
+ * A troca de plano NÃO lê `planos_web`. Aquela é a tabela da vitrine — preço de
+ * campanha, primeira fatura promocional, oferta amarrada a um código que só
+ * existe na URL de quem chegou pela home. Oferecer isso a quem já é cliente é
+ * prometer uma condição de venda nova para um contrato antigo.
+ */
+const DEFAULT_PLANOS_UPGRADE = "planos_upgrade";
+const DEFAULT_INDICACOES = "indicacoes_web";
 
 /**
  * O que a leitura do painel devolve.
@@ -107,6 +117,19 @@ type PlanoRow = {
   composicao: Texto;
   destaque: boolean | null;
   nome_destaque: Texto;
+  codigo_oferta_mk: Texto;
+};
+
+type IndicacaoRow = {
+  protocolo: Texto;
+  nome_indicacao: Texto;
+  telefone_indicacao: Texto;
+  cidade: Texto;
+  data: Texto;
+  status: Texto;
+  tipo_bonus: Texto;
+  descricao_bonus: Texto;
+  valor_indicacao: Texto;
 };
 
 const txt = (v: Texto) => v?.trim() ?? "";
@@ -117,7 +140,11 @@ const num = (v: Texto) => {
 
 /* ---------------- montagem do payload ---------------- */
 
-function montarCliente(row: ClienteRow, contratos: ContratoRow[]): ValorJson {
+function montarCliente(
+  row: ClienteRow,
+  contratos: ContratoRow[],
+  indicacoes: IndicacaoRow[],
+): ValorJson {
   /*
    * "Cliente desde" não é uma coluna: é a adesão do contrato mais antigo. Um
    * campo separado para isso seria uma segunda verdade sobre o mesmo fato, e as
@@ -139,6 +166,7 @@ function montarCliente(row: ClienteRow, contratos: ContratoRow[]): ValorJson {
     tipo_cadastro: txt(row.tipo_cadastro),
     status_cliente: txt(row.status_cliente) || "ativo",
     cliente_desde: adesoes[0] ?? "",
+    desconto_acumulado: descontoAcumulado(indicacoes),
     endereco: {
       cep: txt(row.cep),
       logradouro: txt(row.logradouro),
@@ -212,7 +240,46 @@ function montarPlano(row: PlanoRow): ValorJson {
     vantagens: txt(row.composicao),
     destaque: Boolean(row.destaque),
     selo: txt(row.nome_destaque),
+    // vai junto no pedido de troca: é por ele que o n8n acha a oferta no MK
+    codigo_oferta_mk: txt(row.codigo_oferta_mk),
   };
+}
+
+/** Como o bônus da indicação é escrito na tela. */
+const BONUS: Record<string, string> = {
+  desconto_fatura: "Desconto na fatura",
+  premio: "Prêmio",
+  pix: "PIX",
+};
+
+function montarIndicacao(row: IndicacaoRow): ValorJson {
+  const tipo = txt(row.tipo_bonus);
+  const descricao = txt(row.descricao_bonus);
+  return {
+    id: txt(row.protocolo),
+    protocolo: txt(row.protocolo),
+    nome: txt(row.nome_indicacao),
+    telefone: txt(row.telefone_indicacao),
+    cidade: txt(row.cidade),
+    data: txt(row.data),
+    status: txt(row.status),
+    // a descrição escrita à mão manda; sem ela, o rótulo do tipo serve
+    bonus: descricao || (tipo ? (BONUS[tipo] ?? tipo) : ""),
+    valor_indicacao: num(row.valor_indicacao),
+  };
+}
+
+/**
+ * Quanto o cliente já ganhou indicando.
+ *
+ * Sai da soma das indicações concluídas, e não de uma coluna de saldo: um total
+ * guardado à parte é uma segunda verdade sobre o mesmo fato, e as duas
+ * divergem no primeiro estorno.
+ */
+function descontoAcumulado(indicacoes: IndicacaoRow[]): number {
+  return indicacoes
+    .filter((i) => txt(i.status) === "concluido")
+    .reduce((soma, i) => soma + num(i.valor_indicacao), 0);
 }
 
 /* ---------------- a consulta ---------------- */
@@ -248,15 +315,22 @@ export async function carregarPainelDoBanco(idCliente: string): Promise<LeituraP
     : tabela(DEFAULT_CLIENTES, DEFAULT_CLIENTES, "POSTGRES_CLIENTES_VIEW");
   const contratos = tabela(DEFAULT_CONTRATOS, DEFAULT_CONTRATOS, "POSTGRES_CONTRATOS_TABLE");
   const faturas = tabela(DEFAULT_FATURAS, DEFAULT_FATURAS, "POSTGRES_FATURAS_TABLE");
-  const planos = tabela(DEFAULT_PLANOS, DEFAULT_PLANOS, "POSTGRES_PLANOS_TABLE");
+  const planos = tabela(
+    DEFAULT_PLANOS_UPGRADE,
+    DEFAULT_PLANOS_UPGRADE,
+    "POSTGRES_PLANOS_UPGRADE_TABLE",
+  );
+  const indicacoes = tabela(DEFAULT_INDICACOES, DEFAULT_INDICACOES, "POSTGRES_INDICACOES_TABLE");
 
   try {
-    const [linhasCliente, linhasContratos, linhasFaturas, linhasPlanos] = await Promise.all([
-      consultarCliente(sql, schema, clientes, idCliente),
-      consultarContratos(sql, schema, contratos, idCliente),
-      consultarFaturas(sql, schema, faturas, idCliente),
-      consultarPlanos(sql, schema, planos),
-    ]);
+    const [linhasCliente, linhasContratos, linhasFaturas, linhasPlanos, linhasIndicacoes] =
+      await Promise.all([
+        consultarCliente(sql, schema, clientes, idCliente),
+        consultarContratos(sql, schema, contratos, idCliente),
+        consultarFaturas(sql, schema, faturas, idCliente),
+        consultarPlanos(sql, schema, planos),
+        consultarIndicacoes(sql, schema, indicacoes, idCliente),
+      ]);
 
     const cliente = linhasCliente[0];
     if (!cliente) {
@@ -275,16 +349,16 @@ export async function carregarPainelDoBanco(idCliente: string): Promise<LeituraP
     }
 
     const dados: DadosPainel = {
-      cliente: montarCliente(cliente, linhasContratos),
+      cliente: montarCliente(cliente, linhasContratos, linhasIndicacoes),
       contratos: linhasContratos.map(montarContrato),
       faturas: linhasFaturas.map(montarFatura),
       planos: linhasPlanos.map(montarPlano),
+      indicacoes: linhasIndicacoes.map(montarIndicacao),
       /*
        * Sem tabela ainda: a tela mostra o estado vazio de cada uma. Quando
        * existirem, é aqui que entram — nada mais precisa mudar.
        */
       notas_fiscais: [],
-      indicacoes: [],
       chamados: [],
       adicionais: [],
       avisos: [],
@@ -369,23 +443,75 @@ function consultarFaturas(sql: Sql, schema: string, tab: string, idCliente: stri
 }
 
 /**
- * Os planos oferecidos na troca de plano — a mesma tabela que alimenta a home.
+ * Os planos oferecidos na troca de plano — `planos_upgrade`, não `planos_web`.
  *
- * Uma falha aqui não derruba o painel: sem catálogo, o modal de troca mostra o
- * estado vazio e o resto da página continua de pé.
+ * A tela ainda filtra por cima disto: só aparece plano de valor igual ou maior
+ * que o do contrato aberto. O corte fica lá porque depende de qual contrato o
+ * cliente está olhando, e um cliente pode ter mais de um.
+ *
+ * Uma falha aqui não derruba o painel: sem catálogo, a troca mostra o estado
+ * vazio e o resto da página continua de pé.
+ *
+ * A ordem é do mais barato ao mais caro — a tela é uma escada de upgrade, e ela
+ * começa onde o cliente está. O nome da tabela na frente de "valor" no
+ * `order by` não é enfeite: sem ele o Postgres casa o nome com a coluna de
+ * saída, que é o valor já convertido em texto, e a ordenação vira alfabética —
+ * "149,90" antes de "89,90".
  */
 async function consultarPlanos(sql: Sql, schema: string, tab: string): Promise<PlanoRow[]> {
   try {
     return (await sql<PlanoRow[]>`
       select
         id_plano::text as id_plano,
-        nome, valor::text as valor, composicao, destaque, nome_destaque
+        nome, valor::text as valor, composicao, destaque, nome_destaque,
+        codigo_oferta_mk::text as codigo_oferta_mk
       from ${sql(schema)}.${sql(tab)}
       where ativo is true
-      order by ordem_grade asc, id_plano asc
+      order by ${sql(tab)}.valor asc, ordem_grade asc, id_plano asc
     `) as unknown as PlanoRow[];
   } catch (err) {
-    console.error("Falha ao carregar os planos para a troca de plano", err);
+    console.error(
+      `Falha ao carregar os planos de upgrade em ${schema}.${tab} — rode ` +
+        "docs/n8n/schema-upgrade-indicacoes.sql se a tabela ainda não existe",
+      err,
+    );
+    return [];
+  }
+}
+
+/**
+ * As indicações feitas por este cliente.
+ *
+ * Como os planos, uma falha aqui não derruba a página: a seção de indicações
+ * aparece vazia e o formulário continua funcionando — quem grava a indicação é
+ * o n8n, não esta consulta.
+ */
+async function consultarIndicacoes(
+  sql: Sql,
+  schema: string,
+  tab: string,
+  idCliente: string,
+): Promise<IndicacaoRow[]> {
+  try {
+    return (await sql<IndicacaoRow[]>`
+      select
+        protocolo, nome_indicacao, telefone_indicacao, cidade,
+        data::text            as data,
+        status::text          as status,
+        tipo_bonus::text      as tipo_bonus,
+        descricao_bonus,
+        valor_indicacao::text as valor_indicacao
+      from ${sql(schema)}.${sql(tab)}
+      where id_cliente = ${idCliente}
+      order by data desc nulls last, id desc
+      limit 50
+    `) as unknown as IndicacaoRow[];
+  } catch (err) {
+    console.error(
+      `Falha ao carregar as indicações em ${schema}.${tab} — rode ` +
+        "docs/n8n/schema-upgrade-indicacoes.sql se a tabela ainda não existe",
+      err,
+    );
     return [];
   }
 }

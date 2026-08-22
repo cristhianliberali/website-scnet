@@ -374,13 +374,35 @@ Rota protegida: sem sessão válida, volta ao login. Ela reúne o que o cliente
 costuma vir buscar — status financeiro com PIX à mão, indicação, contratos e
 oito serviços de autoatendimento.
 
-**De onde vêm os dados.** Cadastro, contratos, faturas e o catálogo de planos
-saem do **Postgres**, direto — dado que já está numa tabela nossa não precisa
-de um salto até o n8n para voltar. Os **formulários** continuam indo ao n8n:
-são ações, e quem fala com o ERP, o gateway e o WhatsApp é o fluxo. As tabelas
-estão em `docs/n8n/schema-painel.sql` (`clientes_web` com o cadastro completo,
-`contratos_web`, `faturas_web`), e o SQL traz um cliente fake para conferir a
-tela antes de plugar a base de verdade.
+O que o banco não sustenta não fica na tela: o selo "Conectado", o teste de
+velocidade e o "Reiniciar conexão" saíram do card do contrato. Os dois botões
+dependiam de um comando e de uma medição no equipamento do cliente, e o selo era
+`status_contrato` (ativo/bloqueado) fantasiado de estado da conexão.
+
+**Cada serviço é uma tela, não um pop-up.** Clicar em "Trocar de plano" ou em
+"Mudança de endereço" leva a `/cliente/painel?servico=...`: o serviço ocupa a
+página e leva junto os outros — numa coluna à esquerda no desktop, numa faixa
+que rola acima no celular. Isso dá endereço ao serviço (dá para voltar pelo
+botão do navegador, recarregar e mandar o link) e tira o formulário de dentro de
+uma caixa que rola por dentro, que era onde a mudança de endereço pedia oito
+campos no celular.
+
+**De onde vêm os dados.** Cadastro, contratos, faturas, indicações e o catálogo
+de upgrade saem do **Postgres**, direto — dado que já está numa tabela nossa não
+precisa de um salto até o n8n para voltar. Os **formulários** continuam indo ao
+n8n: são ações, e quem fala com o ERP, o gateway e o WhatsApp é o fluxo. As
+tabelas estão em `docs/n8n/schema-painel.sql` (`clientes_web` com o cadastro
+completo, `contratos_web`, `faturas_web`) e em
+`docs/n8n/schema-upgrade-indicacoes.sql` (`planos_upgrade`, `indicacoes_web`), e
+o SQL traz um cliente fake para conferir a tela antes de plugar a base de
+verdade.
+
+**A troca de plano tem catálogo próprio.** Ela lê `planos_upgrade`, e não
+`planos_web` — a tabela da home carrega preço de campanha e oferta amarrada a um
+`?codigo_oferta=` que não existe para quem já entrou com login. Por cima disso, a
+tela só oferece plano de valor **igual ou maior** que o do contrato aberto:
+descer de plano mexe com fidelidade e prazo, e é conversa de comercial, não caixa
+de seleção — daí o botão "Falar com o comercial" no rodapé do formulário.
 
 **Leitura é sempre do banco, sem reserva.** Não há mais queda para o webhook
 quando a consulta falha. Ela existia, e foi ela que escondeu um banco mal
@@ -403,7 +425,7 @@ modo que a hidratação não repete a chamada.
 | TanStack Query (aba) | 5 min                        | recarregar a página, fechar a aba, clicar em "Atualizar" |
 | Memória do servidor | 60 s (`PAINEL_CACHE_SECONDS`) | formulário que muda algo, logout, reinício do container  |
 
-O primeiro faz abrir e fechar modais não custar nada; o segundo faz um F5 — que
+O primeiro faz abrir e fechar um serviço não custar nada; o segundo faz um F5 — que
 joga fora o cache do navegador inteiro — não virar outra ida ao n8n. Nenhum dos
 dois é fonte de verdade: são atalhos, e o cache do servidor mora na memória do
 processo justamente para sumir sozinho quando o container do EasyPanel é
@@ -412,7 +434,7 @@ reciclado.
 **Um evento por formulário.** Cada ação da tela vai ao n8n com o seu próprio
 `evento` — `painel_trocar_plano`, `painel_abrir_chamado`, `painel_segunda_via`,
 `painel_mudanca_endereco`... — de modo que o Switch do n8n roteie direto, sem
-abrir `dados` para descobrir do que a chamada trata. São 14 formulários e 7
+abrir `dados` para descobrir do que a chamada trata. São 12 formulários e 7
 consultas, todos em `docs/n8n/painel-cliente.md` com o JSON de envio e o de
 resposta. Os nomes genéricos `consulta_painel` e `formulario_painel` continuam
 aceitos: uma seção ou formulário fora do registro cai neles.
@@ -421,7 +443,7 @@ Quando um formulário muda algo, as seções que ele afeta saem do cache na hora
 quem acaba de trocar de plano não fica um minuto olhando para o plano antigo. E
 se a resposta do formulário já trouxer as listas atualizadas, elas entram direto
 no cache e não há nem a consulta seguinte. Formulários que não mudam nada
-(diagnóstico, viabilidade, teste de velocidade) não recarregam nada.
+(diagnóstico, viabilidade) não recarregam nada.
 
 **Quando algo não bate, dá para ver.** `/diagnostico?token=...` responde o que o
 servidor enxerga do Postgres: **qual banco** ele abriu (nome, host e porta),
@@ -441,8 +463,8 @@ específico, e se o workflow responder "Evento não reconhecido", refaz com
 `PAINEL_EVENTOS=auto`, o padrão. Sem isso, um workflow desatualizado derruba o
 painel inteiro, formulários incluídos.
 
-**A tela não inventa resultado.** O protocolo do chamado, o PIX copia e cola, a
-data agendada e a medição de velocidade são o que voltou do n8n. Quando um campo
+**A tela não inventa resultado.** O protocolo do chamado, o PIX copia e cola e a
+data agendada são o que voltou do n8n. Quando um campo
 não vem, a linha correspondente simplesmente não aparece — em vez de um valor
 plausível que ninguém apurou.
 

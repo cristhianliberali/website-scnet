@@ -1,19 +1,22 @@
 /**
- * Os modais de serviço: troca de plano, indicações, mudança de endereço, troca
- * de titular, suporte técnico e teste de velocidade.
+ * As telas de serviço: troca de plano, indicações, mudança de endereço, troca
+ * de titular e suporte técnico.
  *
  * Um formulário, um evento, uma resposta. Nenhum deles simula o resultado: o
- * protocolo, a data da visita e a medição vêm do n8n — se não vierem, a tela
- * mostra só a confirmação de que o pedido foi registrado.
+ * protocolo e a data da visita vêm do n8n — se não vierem, a tela mostra só a
+ * confirmação de que o pedido foi registrado.
+ *
+ * Cada uma monta a si mesma quando é escolhida e sai da árvore quando o cliente
+ * vai para outra: não há `aberto`, e por isso também não há efeito de "limpar
+ * os campos ao abrir" — o estado inicial já é o estado de abertura.
  */
 
-import { useEffect, useMemo, useState, type FormEvent } from "react";
+import { useMemo, useState, type FormEvent } from "react";
 import {
   Activity,
   ArrowDown,
   ArrowUp,
   Check,
-  Gauge,
   Headphones,
   Search,
   Sparkles,
@@ -34,7 +37,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useErroPainel, useFormularioPainel } from "@/hooks/use-painel";
-import { numeroDaResposta, textoDaResposta } from "@/lib/painel-normalizar";
+import { isValidPhone } from "@/lib/form-utils";
+import { textoDaResposta } from "@/lib/painel-normalizar";
 import type {
   AdicionalPlano,
   ClientePainel,
@@ -42,17 +46,19 @@ import type {
   Indicacao,
   PlanoDisponivel,
 } from "@/lib/painel-tipos";
-import { data, moeda } from "@/lib/painel-formato";
+import { data, moeda, telefone as telefoneFormatado } from "@/lib/painel-formato";
 import { cn } from "@/lib/utils";
 import {
-  AcoesModal,
+  AcoesFormulario,
   BotaoCopiar,
   Campo,
+  CampoTelefone,
   CampoTexto,
   CampoTextoLongo,
   EstadoVazio,
-  ModalPainel,
-  NotaModal,
+  FalarComComercial,
+  MolduraServico,
+  Nota,
   SeloStatus,
   SucessoEnvio,
 } from "./painel-ui";
@@ -89,42 +95,56 @@ function SeletorContrato({
 
 /* ---------------- trocar de plano ---------------- */
 
-export function ModalTrocarPlano({
-  aberto,
-  aoFechar,
+export function TelaTrocarPlano({
+  aoVoltar,
   contratos,
   planos,
   adicionais,
   contratoInicial,
 }: {
-  aberto: boolean;
-  aoFechar: () => void;
+  aoVoltar: () => void;
   contratos: Contrato[];
   planos: PlanoDisponivel[];
   adicionais: AdicionalPlano[];
   contratoInicial: string;
 }) {
-  const [contratoId, setContratoId] = useState(contratoInicial);
-  const [planoId, setPlanoId] = useState("");
+  const [contratoId, setContratoId] = useState(contratoInicial || contratos[0]?.id || "");
+  const [escolhido, setEscolhido] = useState("");
   const [escolhidos, setEscolhidos] = useState<string[]>([]);
   const [concluido, setConcluido] = useState<{ mensagem: string; protocolo: string } | null>(null);
 
   const envio = useFormularioPainel();
   const tratarErro = useErroPainel();
 
-  useEffect(() => {
-    if (!aberto) return;
-    setContratoId(contratoInicial || contratos[0]?.id || "");
-    setPlanoId(planos.find((p) => p.destaque)?.id ?? planos[0]?.id ?? "");
-    setEscolhidos([]);
-    setConcluido(null);
-  }, [aberto, contratoInicial, contratos, planos]);
-
   const contrato = contratos.find((c) => c.id === contratoId);
-  const plano = planos.find((p) => p.id === planoId);
+  const valorAtual = contrato?.valorMensal ?? 0;
+
+  /*
+   * A regra de exibição: só plano de valor igual ou maior que o do contrato.
+   *
+   * Downgrade não é uma caixa de seleção — costuma envolver fidelidade, prazo e
+   * um desconto que o comercial pode oferecer para segurar o cliente. Um
+   * formulário que reduz a mensalidade em dois cliques atropela essa conversa,
+   * então quem quer descer fala com o comercial, pelo botão do rodapé.
+   */
+  const elegiveis = useMemo(
+    () => planos.filter((p) => p.valor >= valorAtual),
+    [planos, valorAtual],
+  );
+
+  /*
+   * O plano escolhido é derivado, não guardado: trocar o contrato muda a lista
+   * de elegíveis, e uma seleção presa no estado poderia apontar para um plano
+   * que sumiu da tela — e ir junto no envio.
+   */
+  const planoId = elegiveis.some((p) => p.id === escolhido)
+    ? escolhido
+    : (elegiveis.find((p) => p.destaque)?.id ?? elegiveis[0]?.id ?? "");
+
+  const plano = elegiveis.find((p) => p.id === planoId);
   const extras = adicionais.filter((a) => escolhidos.includes(a.id));
   const total = (plano?.valor ?? 0) + extras.reduce((soma, a) => soma + a.valor, 0);
-  const diferenca = total - (contrato?.valorMensal ?? 0);
+  const diferenca = total - valorAtual;
 
   async function submeter(e: FormEvent) {
     e.preventDefault();
@@ -140,6 +160,7 @@ export function ModalTrocarPlano({
           id_contrato: contratoId,
           id_plano: plano.id,
           plano: plano.nome,
+          codigo_oferta_mk: plano.codigoOfertaMk,
           valor_plano: plano.valor,
           adicionais: extras.map((a) => ({ id: a.id, nome: a.nome, valor: a.valor })),
           valor_total: total,
@@ -156,13 +177,10 @@ export function ModalTrocarPlano({
   }
 
   return (
-    <ModalPainel
-      aberto={aberto}
-      aoFechar={aoFechar}
+    <MolduraServico
       titulo="Trocar de plano"
       descricao="Escolha a velocidade que você quer e confirme a troca."
       icone={Zap}
-      largura="max-w-3xl"
     >
       {concluido ? (
         <SucessoEnvio
@@ -170,33 +188,35 @@ export function ModalTrocarPlano({
           mensagem={concluido.mensagem}
           protocolo={concluido.protocolo || undefined}
         >
-          <Button type="button" variant="outline" onClick={aoFechar}>
-            Fechar
+          <Button type="button" variant="outline" onClick={aoVoltar}>
+            Voltar ao painel
           </Button>
         </SucessoEnvio>
-      ) : planos.length === 0 ? (
-        <EstadoVazio
-          icone={Zap}
-          titulo="Nenhum plano disponível para troca"
-          texto="Fale com o atendimento: as opções para o seu endereço são confirmadas caso a caso."
-        />
       ) : (
         <form onSubmit={(e) => void submeter(e)} className="space-y-4 pt-4">
           <SeletorContrato contratos={contratos} valor={contratoId} aoMudar={setContratoId} />
 
           {contrato && (
-            <NotaModal>
+            <Nota>
               Plano atual: <strong>{contrato.plano || "—"}</strong> por{" "}
               <strong>{moeda(contrato.valorMensal)}</strong> por mês.
-            </NotaModal>
+            </Nota>
+          )}
+
+          {elegiveis.length === 0 && (
+            <EstadoVazio
+              icone={Zap}
+              titulo="Nenhum upgrade disponível para este contrato"
+              texto="Você já está no topo do que oferecemos aqui. Para rever o plano ou falar de um plano menor, chame o comercial no botão abaixo."
+            />
           )}
 
           <div className="grid gap-3 sm:grid-cols-2">
-            {planos.map((p) => (
+            {elegiveis.map((p) => (
               <button
                 key={p.id}
                 type="button"
-                onClick={() => setPlanoId(p.id)}
+                onClick={() => setEscolhido(p.id)}
                 className={cn(
                   "relative cursor-pointer rounded-xl border p-4 text-left transition-all hover:border-brand/50",
                   planoId === p.id ? "border-brand bg-brand/5 shadow-sm" : "border-border",
@@ -279,55 +299,81 @@ export function ModalTrocarPlano({
             </div>
           )}
 
-          <div className="rounded-xl bg-secondary/60 p-4">
-            <div className="flex items-center justify-between">
-              <span className="font-ui text-sm font-bold text-foreground">Novo valor mensal</span>
-              <span className="font-display text-xl font-extrabold text-brand">{moeda(total)}</span>
+          {plano && (
+            <div className="rounded-xl bg-secondary/60 p-4">
+              <div className="flex items-center justify-between">
+                <span className="font-ui text-sm font-bold text-foreground">Novo valor mensal</span>
+                <span className="font-display text-xl font-extrabold text-brand">
+                  {moeda(total)}
+                </span>
+              </div>
+              {contrato && diferenca !== 0 && (
+                <p className="mt-1 font-body text-xs text-muted-foreground">
+                  {diferenca > 0 ? "Aumento" : "Redução"} de {moeda(Math.abs(diferenca))} em relação
+                  ao plano atual.
+                </p>
+              )}
             </div>
-            {contrato && diferenca !== 0 && (
-              <p className="mt-1 font-body text-xs text-muted-foreground">
-                {diferenca > 0 ? "Aumento" : "Redução"} de {moeda(Math.abs(diferenca))} em relação
-                ao plano atual.
-              </p>
-            )}
-          </div>
+          )}
 
-          <AcoesModal
-            aoCancelar={aoFechar}
+          <AcoesFormulario
+            aoCancelar={aoVoltar}
             rotuloConfirmar="Confirmar troca de plano"
             enviando={envio.isPending}
             desabilitado={!plano}
           />
+
+          <FalarComComercial
+            mensagem={
+              contrato
+                ? `Olá! Sou cliente e tenho dúvidas sobre a troca do meu plano (contrato ${contrato.numero || contrato.id}).`
+                : "Olá! Sou cliente e tenho dúvidas sobre a troca do meu plano."
+            }
+            texto="Quer um plano menor, ou ficou com dúvida sobre fidelidade e prazos? Fale com o comercial — a troca para baixo é analisada caso a caso."
+          />
         </form>
       )}
-    </ModalPainel>
+    </MolduraServico>
   );
 }
 
 /* ---------------- indicações ---------------- */
 
-export function ModalIndicacoes({
-  aberto,
-  aoFechar,
+export function TelaIndicacoes({
+  aoVoltar,
   cliente,
   indicacoes,
 }: {
-  aberto: boolean;
-  aoFechar: () => void;
+  aoVoltar: () => void;
   cliente: ClientePainel;
   indicacoes: Indicacao[];
 }) {
   const [nome, setNome] = useState("");
   const [telefone, setTelefone] = useState("");
+  const [cidade, setCidade] = useState(cliente.endereco.cidade);
+  const [observacoes, setObservacoes] = useState("");
   const envio = useFormularioPainel();
   const tratarErro = useErroPainel();
 
-  const instaladas = indicacoes.filter((i) => i.status === "instalado");
+  const concluidas = indicacoes.filter((i) => i.status === "instalado");
 
   async function submeter(e: FormEvent) {
     e.preventDefault();
-    if (!nome.trim() || !telefone.trim()) {
-      toast.error("Preencha o nome e o telefone do seu amigo.");
+    if (!nome.trim()) {
+      toast.error("Diga o nome de quem você está indicando.");
+      return;
+    }
+    /*
+     * O telefone é o único jeito de chegar ao indicado — sem ele a linha entra
+     * no banco já sem serventia. `isValidPhone` cobre DDD + 8 ou 9 dígitos, que
+     * é o que existe no Brasil; o DDI vai no envio, não na digitação.
+     */
+    if (!isValidPhone(telefone)) {
+      toast.error("Confira o WhatsApp: precisa ser DDD + 8 ou 9 dígitos.");
+      return;
+    }
+    if (!cidade.trim()) {
+      toast.error("Diga em qual cidade seu amigo mora.");
       return;
     }
 
@@ -335,30 +381,42 @@ export function ModalIndicacoes({
       const resposta = await envio.mutateAsync({
         formulario: "indicar_amigo",
         dados: {
-          nome: nome.trim(),
-          telefone: telefone.trim(),
+          nome_cliente: cliente.nome,
+          nome_indicacao: nome.trim(),
+          // com DDI, do jeito que `indicacoes_web.telefone_indicacao` guarda
+          telefone_indicacao: `55${telefone.replace(/\D/g, "")}`,
+          cidade: cidade.trim(),
+          observacoes: observacoes.trim(),
           codigo_indicacao: cliente.codigoIndicacao,
+          // os nomes antigos, para um fluxo que ainda não foi atualizado
+          nome: nome.trim(),
+          telefone: `55${telefone.replace(/\D/g, "")}`,
         },
       });
 
+      const protocolo = textoDaResposta(
+        resposta.dados,
+        "protocolo",
+        "protocol",
+        "numero_protocolo",
+      );
       toast.success(
         resposta.mensagem ?? "Indicação enviada! Vamos entrar em contato com seu amigo.",
+        protocolo ? { description: `Protocolo ${protocolo}` } : undefined,
       );
       setNome("");
       setTelefone("");
+      setObservacoes("");
     } catch (erro) {
       tratarErro(erro, "Não foi possível enviar a indicação agora.");
     }
   }
 
   return (
-    <ModalPainel
-      aberto={aberto}
-      aoFechar={aoFechar}
+    <MolduraServico
       titulo="Minhas indicações"
       descricao="Indique um amigo e ganhe desconto quando ele instalar."
       icone={Users}
-      largura="max-w-3xl"
     >
       <div className="space-y-5 pt-4">
         <div className="grid gap-3 sm:grid-cols-3">
@@ -368,7 +426,7 @@ export function ModalIndicacoes({
           </div>
           <div className="rounded-xl border border-border p-4 text-center">
             <p className="font-display text-2xl font-extrabold text-emerald-600">
-              {instaladas.length}
+              {concluidas.length}
             </p>
             <p className="font-body text-xs text-muted-foreground">já instaladas</p>
           </div>
@@ -407,13 +465,27 @@ export function ModalIndicacoes({
               valor={nome}
               aoMudar={setNome}
               placeholder="Ex: Pedro Henrique"
+              autoComplete="off"
             />
-            <CampoTexto
-              rotulo="WhatsApp"
+            <CampoTelefone
+              rotulo="WhatsApp do amigo"
               valor={telefone}
               aoMudar={setTelefone}
-              placeholder="(49) 99999-8888"
-              inputMode="tel"
+              dica="DDD + 8 ou 9 dígitos. O +55 já vai junto."
+            />
+            <CampoTexto
+              rotulo="Cidade"
+              valor={cidade}
+              aoMudar={setCidade}
+              placeholder="Ex: Maravilha"
+              autoComplete="off"
+            />
+            <CampoTexto
+              rotulo="Observações (opcional)"
+              valor={observacoes}
+              aoMudar={setObservacoes}
+              placeholder="Ex: melhor horário para ligar, bairro, referência"
+              autoComplete="off"
             />
           </div>
           <div className="flex justify-end">
@@ -441,11 +513,17 @@ export function ModalIndicacoes({
                   key={i.id}
                   className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-border p-3"
                 >
-                  <div>
+                  <div className="min-w-0">
                     <p className="font-ui text-sm font-bold text-foreground">{i.nome || "—"}</p>
                     <p className="font-body text-xs text-muted-foreground">
-                      {i.telefone}
+                      {telefoneFormatado(i.telefone)}
+                      {i.cidade && ` · ${i.cidade}`}
                       {i.data && ` · ${data(i.data)}`}
+                    </p>
+                    <p className="font-body text-xs text-muted-foreground">
+                      {i.protocolo && `Protocolo ${i.protocolo}`}
+                      {i.protocolo && i.bonus && " · "}
+                      {i.bonus}
                     </p>
                   </div>
                   <div className="flex items-center gap-2">
@@ -462,24 +540,22 @@ export function ModalIndicacoes({
           )}
         </div>
       </div>
-    </ModalPainel>
+    </MolduraServico>
   );
 }
 
 /* ---------------- mudança de endereço ---------------- */
 
-export function ModalMudancaEndereco({
-  aberto,
-  aoFechar,
+export function TelaMudancaEndereco({
+  aoVoltar,
   contratos,
   contratoInicial,
 }: {
-  aberto: boolean;
-  aoFechar: () => void;
+  aoVoltar: () => void;
   contratos: Contrato[];
   contratoInicial: string;
 }) {
-  const [contratoId, setContratoId] = useState(contratoInicial);
+  const [contratoId, setContratoId] = useState(contratoInicial || contratos[0]?.id || "");
   const [cep, setCep] = useState("");
   const [logradouro, setLogradouro] = useState("");
   const [numero, setNumero] = useState("");
@@ -494,13 +570,6 @@ export function ModalMudancaEndereco({
 
   const envio = useFormularioPainel();
   const tratarErro = useErroPainel();
-
-  useEffect(() => {
-    if (!aberto) return;
-    setContratoId(contratoInicial || contratos[0]?.id || "");
-    setViabilidade(null);
-    setConcluido(null);
-  }, [aberto, contratoInicial, contratos]);
 
   async function conferirViabilidade() {
     if (cep.replace(/\D/g, "").length < 8) {
@@ -579,13 +648,10 @@ export function ModalMudancaEndereco({
   }
 
   return (
-    <ModalPainel
-      aberto={aberto}
-      aoFechar={aoFechar}
+    <MolduraServico
       titulo="Mudança de endereço"
       descricao="Leve sua internet para o endereço novo. Conferimos a cobertura antes."
       icone={Truck}
-      largura="max-w-3xl"
     >
       {concluido ? (
         <SucessoEnvio
@@ -593,8 +659,8 @@ export function ModalMudancaEndereco({
           mensagem={concluido.mensagem}
           protocolo={concluido.protocolo || undefined}
         >
-          <Button type="button" variant="outline" onClick={aoFechar}>
-            Fechar
+          <Button type="button" variant="outline" onClick={aoVoltar}>
+            Voltar ao painel
           </Button>
         </SucessoEnvio>
       ) : (
@@ -621,7 +687,7 @@ export function ModalMudancaEndereco({
           </div>
 
           {viabilidade && (
-            <NotaModal tom={viabilidade.ok ? "info" : "alerta"}>{viabilidade.mensagem}</NotaModal>
+            <Nota tom={viabilidade.ok ? "info" : "alerta"}>{viabilidade.mensagem}</Nota>
           )}
 
           <div className="grid gap-4 sm:grid-cols-[2fr_1fr]">
@@ -664,38 +730,36 @@ export function ModalMudancaEndereco({
             </Campo>
           </div>
 
-          <NotaModal>
+          <Nota>
             A data é uma preferência: a confirmação depende da agenda técnica da sua região e chega
             pelo WhatsApp.
-          </NotaModal>
+          </Nota>
 
-          <AcoesModal
-            aoCancelar={aoFechar}
+          <AcoesFormulario
+            aoCancelar={aoVoltar}
             rotuloConfirmar="Solicitar mudança"
             enviando={envio.isPending}
           />
         </form>
       )}
-    </ModalPainel>
+    </MolduraServico>
   );
 }
 
 /* ---------------- trocar titular ---------------- */
 
-export function ModalTrocarTitular({
-  aberto,
-  aoFechar,
+export function TelaTrocarTitular({
+  aoVoltar,
   contratos,
   cliente,
   contratoInicial,
 }: {
-  aberto: boolean;
-  aoFechar: () => void;
+  aoVoltar: () => void;
   contratos: Contrato[];
   cliente: ClientePainel;
   contratoInicial: string;
 }) {
-  const [contratoId, setContratoId] = useState(contratoInicial);
+  const [contratoId, setContratoId] = useState(contratoInicial || contratos[0]?.id || "");
   const [nome, setNome] = useState("");
   const [documento, setDocumento] = useState("");
   const [rg, setRg] = useState("");
@@ -708,12 +772,6 @@ export function ModalTrocarTitular({
 
   const envio = useFormularioPainel();
   const tratarErro = useErroPainel();
-
-  useEffect(() => {
-    if (!aberto) return;
-    setContratoId(contratoInicial || contratos[0]?.id || "");
-    setConcluido(null);
-  }, [aberto, contratoInicial, contratos]);
 
   async function submeter(e: FormEvent) {
     e.preventDefault();
@@ -757,13 +815,10 @@ export function ModalTrocarTitular({
   }
 
   return (
-    <ModalPainel
-      aberto={aberto}
-      aoFechar={aoFechar}
+    <MolduraServico
       titulo="Trocar titular do contrato"
       descricao="Passe o contrato para outra pessoa mantendo a instalação."
       icone={UserCheck}
-      largura="max-w-3xl"
     >
       {concluido ? (
         <SucessoEnvio
@@ -771,18 +826,18 @@ export function ModalTrocarTitular({
           mensagem={concluido.mensagem}
           protocolo={concluido.protocolo || undefined}
         >
-          <Button type="button" variant="outline" onClick={aoFechar}>
-            Fechar
+          <Button type="button" variant="outline" onClick={aoVoltar}>
+            Voltar ao painel
           </Button>
         </SucessoEnvio>
       ) : (
         <form onSubmit={(e) => void submeter(e)} className="space-y-4 pt-4">
           <SeletorContrato contratos={contratos} valor={contratoId} aoMudar={setContratoId} />
 
-          <NotaModal>
+          <Nota>
             Titular atual: <strong>{cliente.nome || "—"}</strong>
             {cliente.documento && ` · ${cliente.documento}`}
-          </NotaModal>
+          </Nota>
 
           <div className="grid gap-4 sm:grid-cols-2">
             <CampoTexto
@@ -842,18 +897,18 @@ export function ModalTrocarTitular({
             </span>
           </label>
 
-          <NotaModal tom="alerta">
+          <Nota tom="alerta">
             A transferência só é concluída depois da conferência dos documentos pelo nosso time.
-          </NotaModal>
+          </Nota>
 
-          <AcoesModal
-            aoCancelar={aoFechar}
+          <AcoesFormulario
+            aoCancelar={aoVoltar}
             rotuloConfirmar="Solicitar transferência"
             enviando={envio.isPending}
           />
         </form>
       )}
-    </ModalPainel>
+    </MolduraServico>
   );
 }
 
@@ -868,18 +923,16 @@ const CATEGORIAS = [
   "Outro assunto",
 ];
 
-export function ModalSuporte({
-  aberto,
-  aoFechar,
+export function TelaSuporte({
+  aoVoltar,
   contratos,
   contratoInicial,
 }: {
-  aberto: boolean;
-  aoFechar: () => void;
+  aoVoltar: () => void;
   contratos: Contrato[];
   contratoInicial: string;
 }) {
-  const [contratoId, setContratoId] = useState(contratoInicial);
+  const [contratoId, setContratoId] = useState(contratoInicial || contratos[0]?.id || "");
   const [categoria, setCategoria] = useState(CATEGORIAS[0] as string);
   const [assunto, setAssunto] = useState("");
   const [descricao, setDescricao] = useState("");
@@ -888,13 +941,6 @@ export function ModalSuporte({
 
   const envio = useFormularioPainel();
   const tratarErro = useErroPainel();
-
-  useEffect(() => {
-    if (!aberto) return;
-    setContratoId(contratoInicial || contratos[0]?.id || "");
-    setDiagnostico(null);
-    setConcluido(null);
-  }, [aberto, contratoInicial, contratos]);
 
   async function diagnosticar() {
     try {
@@ -942,9 +988,7 @@ export function ModalSuporte({
   }
 
   return (
-    <ModalPainel
-      aberto={aberto}
-      aoFechar={aoFechar}
+    <MolduraServico
       titulo="Suporte técnico"
       descricao="Conte o que está acontecendo e abrimos um chamado com protocolo."
       icone={Headphones}
@@ -955,8 +999,8 @@ export function ModalSuporte({
           mensagem={concluido.mensagem}
           protocolo={concluido.protocolo || undefined}
         >
-          <Button type="button" variant="outline" onClick={aoFechar}>
-            Fechar
+          <Button type="button" variant="outline" onClick={aoVoltar}>
+            Voltar ao painel
           </Button>
         </SucessoEnvio>
       ) : (
@@ -984,7 +1028,7 @@ export function ModalSuporte({
             </div>
             {diagnostico && (
               <div className="mt-3">
-                <NotaModal>{diagnostico}</NotaModal>
+                <Nota>{diagnostico}</Nota>
               </div>
             )}
           </div>
@@ -1019,164 +1063,13 @@ export function ModalSuporte({
             placeholder="Conte desde quando começou, em quais aparelhos acontece e quais luzes do equipamento estão acesas."
           />
 
-          <AcoesModal
-            aoCancelar={aoFechar}
+          <AcoesFormulario
+            aoCancelar={aoVoltar}
             rotuloConfirmar="Abrir chamado"
             enviando={envio.isPending}
           />
         </form>
       )}
-    </ModalPainel>
-  );
-}
-
-/* ---------------- teste de velocidade ---------------- */
-
-type Medicao = { download: number; upload: number; ping: number; mensagem: string };
-
-export function ModalTesteVelocidade({
-  aberto,
-  aoFechar,
-  contrato,
-}: {
-  aberto: boolean;
-  aoFechar: () => void;
-  contrato: Contrato | null;
-}) {
-  const [medicao, setMedicao] = useState<Medicao | null>(null);
-  const envio = useFormularioPainel();
-  const tratarErro = useErroPainel();
-
-  useEffect(() => {
-    if (aberto) setMedicao(null);
-  }, [aberto]);
-
-  const contratado = useMemo(() => {
-    const digitos = /(\d+)/.exec(contrato?.download ?? "");
-    return digitos ? Number(digitos[1]) : 0;
-  }, [contrato]);
-
-  async function medir() {
-    if (!contrato) return;
-    try {
-      const resposta = await envio.mutateAsync({
-        formulario: "teste_velocidade",
-        dados: { id_contrato: contrato.id },
-      });
-
-      setMedicao({
-        download: numeroDaResposta(resposta.dados, "download", "download_mbps", "velocidade"),
-        upload: numeroDaResposta(resposta.dados, "upload", "upload_mbps"),
-        ping: numeroDaResposta(resposta.dados, "ping", "latencia", "latency"),
-        mensagem: resposta.mensagem ?? "",
-      });
-    } catch (erro) {
-      tratarErro(erro, "Não foi possível medir agora.");
-    }
-  }
-
-  const percentual =
-    contratado > 0 && medicao ? Math.min((medicao.download / contratado) * 100, 100) : 0;
-
-  return (
-    <ModalPainel
-      aberto={aberto}
-      aoFechar={aoFechar}
-      titulo="Teste de velocidade"
-      descricao="Medimos a entrega no seu ponto, direto da nossa rede."
-      icone={Gauge}
-      largura="max-w-lg"
-    >
-      <div className="space-y-4 pt-4">
-        {contrato && (
-          <NotaModal>
-            {contrato.apelido} · plano contratado {contrato.download || "—"} de download
-          </NotaModal>
-        )}
-
-        {medicao ? (
-          <>
-            <div className="grid grid-cols-3 gap-3">
-              <div className="rounded-xl border border-border p-4 text-center">
-                <ArrowDown className="mx-auto size-4 text-brand" />
-                <p className="mt-1 font-display text-xl font-extrabold text-foreground">
-                  {medicao.download.toFixed(0)}
-                </p>
-                <p className="font-body text-[11px] text-muted-foreground">Mbps download</p>
-              </div>
-              <div className="rounded-xl border border-border p-4 text-center">
-                <ArrowUp className="mx-auto size-4 text-emerald-600" />
-                <p className="mt-1 font-display text-xl font-extrabold text-foreground">
-                  {medicao.upload.toFixed(0)}
-                </p>
-                <p className="font-body text-[11px] text-muted-foreground">Mbps upload</p>
-              </div>
-              <div className="rounded-xl border border-border p-4 text-center">
-                <Activity className="mx-auto size-4 text-amber-600" />
-                <p className="mt-1 font-display text-xl font-extrabold text-foreground">
-                  {medicao.ping.toFixed(0)}
-                </p>
-                <p className="font-body text-[11px] text-muted-foreground">ms de ping</p>
-              </div>
-            </div>
-
-            {percentual > 0 && (
-              <div>
-                <div className="h-2 overflow-hidden rounded-full bg-secondary">
-                  <div
-                    className="h-full rounded-full bg-brand transition-all"
-                    style={{ width: `${percentual}%` }}
-                  />
-                </div>
-                <p className="mt-1 font-body text-xs text-muted-foreground">
-                  {percentual.toFixed(0)}% da velocidade contratada.
-                </p>
-              </div>
-            )}
-
-            {medicao.mensagem && <NotaModal>{medicao.mensagem}</NotaModal>}
-
-            <div className="flex justify-end gap-2">
-              <Button type="button" variant="outline" onClick={aoFechar}>
-                Fechar
-              </Button>
-              <Button
-                type="button"
-                variant="brand"
-                disabled={envio.isPending}
-                onClick={() => void medir()}
-              >
-                Medir de novo
-              </Button>
-            </div>
-          </>
-        ) : (
-          <div className="flex flex-col items-center gap-4 py-6">
-            <div
-              className={cn(
-                "grid size-20 place-items-center rounded-full bg-brand/10 text-brand",
-                envio.isPending && "animate-pulse",
-              )}
-            >
-              <Gauge className={cn("size-9", envio.isPending && "animate-spin")} />
-            </div>
-            <p className="text-center font-body text-sm text-muted-foreground">
-              {envio.isPending
-                ? "Medindo a entrega no seu ponto..."
-                : "O teste mede o que a nossa rede entrega até o seu equipamento."}
-            </p>
-            <Button
-              type="button"
-              variant="brand"
-              disabled={envio.isPending || !contrato}
-              onClick={() => void medir()}
-            >
-              <Gauge className="size-4" />
-              {envio.isPending ? "Medindo..." : "Iniciar teste"}
-            </Button>
-          </div>
-        )}
-      </div>
-    </ModalPainel>
+    </MolduraServico>
   );
 }

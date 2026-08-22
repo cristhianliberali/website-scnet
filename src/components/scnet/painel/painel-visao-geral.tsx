@@ -17,15 +17,12 @@ import {
   CheckCircle2,
   ChevronDown,
   Copy,
-  FileSpreadsheet,
-  Gauge,
   Headphones,
   MapPin,
   Power,
   QrCode,
   Receipt,
   Truck,
-  UserCheck,
   Users,
   Wifi,
   Zap,
@@ -57,10 +54,11 @@ import {
   CartaoPainel,
   EstadoVazio,
   LinhaDado,
-  ModalPainelId,
+  ServicoPainelId,
   SeloStatus,
   TituloSecao,
 } from "./painel-ui";
+import { SERVICOS } from "./painel-servico";
 
 /* ---------------- status financeiro ---------------- */
 
@@ -89,7 +87,7 @@ export function BannerFinanceiro({
 }: {
   faturas: Fatura[];
   desbloqueioDisponivel: boolean;
-  aoAbrir: (modal: ModalPainelId) => void;
+  aoAbrir: (servico: ServicoPainelId) => void;
 }) {
   const situacao = situacaoFinanceira(faturas);
   const aparencia = APARENCIA[situacao];
@@ -172,7 +170,7 @@ export function BannerIndicacao({
 }: {
   cliente: ClientePainel;
   indicacoes: Indicacao[];
-  aoAbrir: (modal: ModalPainelId) => void;
+  aoAbrir: (servico: ServicoPainelId) => void;
 }) {
   const instaladas = indicacoes.filter((i) => i.status === "instalado").length;
   const link = cliente.linkIndicacao || cliente.codigoIndicacao;
@@ -226,14 +224,10 @@ export function SecaoContratos({
   contratos,
   aoAbrir,
   aoSelecionarContrato,
-  aoReiniciar,
-  reiniciando,
 }: {
   contratos: Contrato[];
-  aoAbrir: (modal: ModalPainelId) => void;
+  aoAbrir: (servico: ServicoPainelId) => void;
   aoSelecionarContrato: (id: string) => void;
-  aoReiniciar: (contrato: Contrato) => void;
-  reiniciando: string | null;
 }) {
   if (contratos.length === 0) {
     return (
@@ -258,8 +252,6 @@ export function SecaoContratos({
             contrato={contrato}
             aoAbrir={aoAbrir}
             aoSelecionarContrato={aoSelecionarContrato}
-            aoReiniciar={aoReiniciar}
-            reiniciando={reiniciando === contrato.id}
           />
         ))}
       </div>
@@ -271,20 +263,16 @@ function CartaoContrato({
   contrato,
   aoAbrir,
   aoSelecionarContrato,
-  aoReiniciar,
-  reiniciando,
 }: {
   contrato: Contrato;
-  aoAbrir: (modal: ModalPainelId) => void;
+  aoAbrir: (servico: ServicoPainelId) => void;
   aoSelecionarContrato: (id: string) => void;
-  aoReiniciar: (contrato: Contrato) => void;
-  reiniciando: boolean;
 }) {
   const [detalhes, setDetalhes] = useState(false);
 
-  const abrir = (modal: ModalPainelId) => {
+  const abrir = (servico: ServicoPainelId) => {
     aoSelecionarContrato(contrato.id);
-    aoAbrir(modal);
+    aoAbrir(servico);
   };
 
   const endereco = contrato.enderecoTexto || enderecoEmLinha(contrato.endereco);
@@ -316,7 +304,6 @@ function CartaoContrato({
             <p className="min-w-0 break-words font-display text-base font-extrabold text-brand-deep">
               {contrato.apelido}
             </p>
-            <SeloStatus tipo="conexao" valor={contrato.statusConexao} />
             <SeloStatus tipo="financeiro" valor={contrato.statusFinanceiro} />
           </div>
           {contrato.numero && (
@@ -369,6 +356,12 @@ function CartaoContrato({
         )}
       </div>
 
+      {/*
+        Só ações que o cadastro sustenta de ponta a ponta. Testar velocidade e
+        reiniciar a conexão pediam uma medição e um comando no equipamento que
+        nenhuma tabela nossa tem hoje — um botão que responde sempre a mesma
+        coisa é pior do que botão nenhum.
+      */}
       <div className="mt-4 flex flex-wrap gap-2">
         <Button type="button" size="sm" variant="brand" onClick={() => abrir("trocar_plano")}>
           <Zap className="size-4" />
@@ -378,19 +371,9 @@ function CartaoContrato({
           <Receipt className="size-4" />
           2ª via
         </Button>
-        <Button type="button" size="sm" variant="outline" onClick={() => abrir("teste_velocidade")}>
-          <Gauge className="size-4" />
-          Testar velocidade
-        </Button>
-        <Button
-          type="button"
-          size="sm"
-          variant="outline"
-          disabled={reiniciando}
-          onClick={() => aoReiniciar(contrato)}
-        >
-          <Power className={cn("size-4", reiniciando && "animate-spin")} />
-          {reiniciando ? "Reiniciando..." : "Reiniciar conexão"}
+        <Button type="button" size="sm" variant="outline" onClick={() => abrir("suporte")}>
+          <Headphones className="size-4" />
+          Suporte
         </Button>
         <Button type="button" size="sm" variant="outline" onClick={() => abrir("mudanca_endereco")}>
           <Truck className="size-4" />
@@ -426,59 +409,18 @@ function CartaoContrato({
 
 /* ---------------- grade de serviços ---------------- */
 
-const SERVICOS: {
-  id: ModalPainelId;
-  titulo: string;
-  icone: typeof Zap;
-  cor: string;
-}[] = [
-  { id: "trocar_plano", titulo: "Trocar de plano", icone: Zap, cor: "bg-brand/10 text-brand" },
-  {
-    id: "indicacoes",
-    titulo: "Minhas indicações",
-    icone: Users,
-    cor: "bg-emerald-100 text-emerald-700",
-  },
-  {
-    id: "pix_debito",
-    titulo: "PIX e débito automático",
-    icone: QrCode,
-    cor: "bg-orange-100 text-orange-700",
-  },
-  {
-    id: "mudanca_endereco",
-    titulo: "Mudança de endereço",
-    icone: Truck,
-    cor: "bg-violet-100 text-violet-700",
-  },
-  {
-    id: "trocar_titular",
-    titulo: "Trocar titular",
-    icone: UserCheck,
-    cor: "bg-indigo-100 text-indigo-700",
-  },
-  { id: "segunda_via", titulo: "2ª via de fatura", icone: Receipt, cor: "bg-red-100 text-red-700" },
-  {
-    id: "notas_fiscais",
-    titulo: "Notas fiscais",
-    icone: FileSpreadsheet,
-    cor: "bg-teal-100 text-teal-700",
-  },
-  { id: "suporte", titulo: "Suporte técnico", icone: Headphones, cor: "bg-sky-100 text-sky-700" },
-];
-
 export function GradeServicos({
   faturasEmAberto,
   aoAbrir,
 }: {
   faturasEmAberto: number;
-  aoAbrir: (modal: ModalPainelId) => void;
+  aoAbrir: (servico: ServicoPainelId) => void;
 }) {
   return (
     <div>
       <TituloSecao>Serviços</TituloSecao>
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-        {SERVICOS.map((servico) => {
+        {SERVICOS.filter((s) => !s.oculto).map((servico) => {
           const Icone = servico.icone;
           const aviso =
             servico.id === "segunda_via" && faturasEmAberto > 0 ? faturasEmAberto : null;
@@ -520,7 +462,7 @@ export function SecaoChamados({
   aoAbrir,
 }: {
   chamados: Chamado[];
-  aoAbrir: (modal: ModalPainelId) => void;
+  aoAbrir: (servico: ServicoPainelId) => void;
 }) {
   const recentes = chamados.slice(0, 4);
 
