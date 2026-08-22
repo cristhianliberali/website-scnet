@@ -1,6 +1,6 @@
 /**
  * As peças que todas as telas do painel usam: formatação, selos de status,
- * a moldura das telas de serviço e os campos de formulário.
+ * o cabeçalho das telas de serviço e os campos de formulário.
  *
  * Tudo aqui é apresentação. Nenhuma peça deste arquivo fala com o webhook —
  * quem faz isso é `use-painel.ts`.
@@ -129,18 +129,23 @@ export function SeloStatus({
   );
 }
 
-/* ---------------- moldura das telas de serviço ---------------- */
+/* ---------------- cabeçalho das telas de serviço ---------------- */
 
 /**
- * A moldura de um serviço aberto.
+ * O topo de um serviço aberto.
  *
  * Antes cada serviço era um `Dialog`. Um formulário de mudança de endereço
  * dentro de uma caixa que rola por dentro, com o resto da página escurecido
  * atrás, é o pior lugar para preencher oito campos no celular — e um modal não
  * tem endereço próprio: não dá para voltar, recarregar nem mandar o link. Aqui
  * o serviço é a página, e quem escolhe qual é a URL.
+ *
+ * Por isso também não há moldura: nem cartão, nem borda, nem a faixa azul de
+ * título. Uma caixa desenhada em volta do conteúdo é o que faz uma página
+ * parecer um pop-up preso no meio dela — o serviço é uma seção da página, e se
+ * anuncia como as outras, por um título.
  */
-export function MolduraServico({
+export function TopoServico({
   titulo,
   descricao,
   icone: Icone,
@@ -152,15 +157,19 @@ export function MolduraServico({
   children: ReactNode;
 }) {
   return (
-    <section className="overflow-hidden rounded-2xl border border-border bg-card shadow-sm">
-      <header className="gradient-brand px-5 py-5 sm:px-6">
-        <h2 className="flex items-center gap-2 font-display text-lg font-extrabold text-primary-foreground">
-          <Icone className="size-5 shrink-0" />
-          {titulo}
-        </h2>
-        <p className="mt-1 font-body text-sm text-primary-foreground/85">{descricao}</p>
-      </header>
-      <div className="px-5 pb-6 sm:px-6">{children}</div>
+    <section>
+      <div className="flex items-start gap-3">
+        <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-brand/10 text-brand">
+          <Icone className="size-5" />
+        </span>
+        <div className="min-w-0">
+          <h2 className="font-display text-xl font-extrabold text-brand-deep sm:text-2xl">
+            {titulo}
+          </h2>
+          <p className="mt-0.5 font-body text-sm text-muted-foreground">{descricao}</p>
+        </div>
+      </div>
+      {children}
     </section>
   );
 }

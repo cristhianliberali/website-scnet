@@ -57,10 +57,10 @@ import {
   CampoTextoLongo,
   EstadoVazio,
   FalarComComercial,
-  MolduraServico,
   Nota,
   SeloStatus,
   SucessoEnvio,
+  TopoServico,
 } from "./painel-ui";
 
 /** Seletor de contrato — repetido em quase todo formulário do painel. */
@@ -177,7 +177,7 @@ export function TelaTrocarPlano({
   }
 
   return (
-    <MolduraServico
+    <TopoServico
       titulo="Trocar de plano"
       descricao="Escolha a velocidade que você quer e confirme a troca."
       icone={Zap}
@@ -333,7 +333,7 @@ export function TelaTrocarPlano({
           />
         </form>
       )}
-    </MolduraServico>
+    </TopoServico>
   );
 }
 
@@ -413,7 +413,7 @@ export function TelaIndicacoes({
   }
 
   return (
-    <MolduraServico
+    <TopoServico
       titulo="Minhas indicações"
       descricao="Indique um amigo e ganhe desconto quando ele instalar."
       icone={Users}
@@ -540,7 +540,7 @@ export function TelaIndicacoes({
           )}
         </div>
       </div>
-    </MolduraServico>
+    </TopoServico>
   );
 }
 
@@ -648,7 +648,7 @@ export function TelaMudancaEndereco({
   }
 
   return (
-    <MolduraServico
+    <TopoServico
       titulo="Mudança de endereço"
       descricao="Leve sua internet para o endereço novo. Conferimos a cobertura antes."
       icone={Truck}
@@ -742,7 +742,7 @@ export function TelaMudancaEndereco({
           />
         </form>
       )}
-    </MolduraServico>
+    </TopoServico>
   );
 }
 
@@ -815,7 +815,7 @@ export function TelaTrocarTitular({
   }
 
   return (
-    <MolduraServico
+    <TopoServico
       titulo="Trocar titular do contrato"
       descricao="Passe o contrato para outra pessoa mantendo a instalação."
       icone={UserCheck}
@@ -908,7 +908,7 @@ export function TelaTrocarTitular({
           />
         </form>
       )}
-    </MolduraServico>
+    </TopoServico>
   );
 }
 
@@ -988,7 +988,7 @@ export function TelaSuporte({
   }
 
   return (
-    <MolduraServico
+    <TopoServico
       titulo="Suporte técnico"
       descricao="Conte o que está acontecendo e abrimos um chamado com protocolo."
       icone={Headphones}
@@ -1070,6 +1070,6 @@ export function TelaSuporte({
           />
         </form>
       )}
-    </MolduraServico>
+    </TopoServico>
   );
 }
