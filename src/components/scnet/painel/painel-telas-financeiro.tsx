@@ -41,10 +41,10 @@ import {
   Campo,
   CampoTexto,
   EstadoVazio,
-  MolduraServico,
   Nota,
   SeloStatus,
   SucessoEnvio,
+  TopoServico,
 } from "./painel-ui";
 
 /* ---------------- 2ª via de fatura ---------------- */
@@ -111,7 +111,7 @@ export function TelaSegundaVia({ aoVoltar, faturas }: { aoVoltar: () => void; fa
   const boleto = pagamento?.urlBoleto || fatura?.urlBoleto || "";
 
   return (
-    <MolduraServico
+    <TopoServico
       titulo="2ª via de fatura"
       descricao="Escolha a fatura e gere o PIX ou a linha digitável para pagar."
       icone={Receipt}
@@ -264,7 +264,7 @@ export function TelaSegundaVia({ aoVoltar, faturas }: { aoVoltar: () => void; fa
           )}
         </div>
       )}
-    </MolduraServico>
+    </TopoServico>
   );
 }
 
@@ -313,7 +313,7 @@ export function TelaNotasFiscais({
   }
 
   return (
-    <MolduraServico
+    <TopoServico
       titulo="Minhas notas fiscais"
       descricao="As notas emitidas para os seus contratos."
       icone={FileSpreadsheet}
@@ -382,7 +382,7 @@ export function TelaNotasFiscais({
           </div>
         )}
       </div>
-    </MolduraServico>
+    </TopoServico>
   );
 }
 
@@ -454,7 +454,7 @@ export function TelaPixDebito({ aoVoltar }: { aoVoltar: () => void }) {
   }
 
   return (
-    <MolduraServico
+    <TopoServico
       titulo="PIX automático e débito em conta"
       descricao="Deixe a fatura ser paga sozinha todo mês, sem precisar lembrar."
       icone={QrCode}
@@ -568,7 +568,7 @@ export function TelaPixDebito({ aoVoltar }: { aoVoltar: () => void }) {
           />
         </form>
       )}
-    </MolduraServico>
+    </TopoServico>
   );
 }
 
@@ -609,7 +609,7 @@ export function TelaDesbloqueio({
   }
 
   return (
-    <MolduraServico
+    <TopoServico
       titulo="Desbloqueio em confiança"
       descricao="Libere a conexão agora e regularize as faturas em seguida."
       icone={ShieldCheck}
@@ -662,6 +662,6 @@ export function TelaDesbloqueio({
           </div>
         </div>
       )}
-    </MolduraServico>
+    </TopoServico>
   );
 }

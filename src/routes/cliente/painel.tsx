@@ -68,6 +68,7 @@ import {
 import { consultarPainel, getSessaoCliente, logoutCliente } from "@/lib/cliente-auth";
 import { faturaEmAberto } from "@/lib/painel-formato";
 import { normalizarPainel } from "@/lib/painel-normalizar";
+import { cn } from "@/lib/utils";
 import type { PainelSnapshot } from "@/lib/painel-tipos";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 
@@ -157,7 +158,19 @@ function PainelCliente() {
     <div className="min-h-screen bg-background font-body">
       <Header />
       <main>
-        <section className="gradient-brand relative overflow-hidden pb-20 pt-28 sm:pt-32">
+        {/*
+          O cabeçalho azul termina de dois jeitos. Na visão geral ele é fundo: o
+          banner financeiro sobe por cima dele (`-mt-12` abaixo), e a faixa
+          precisa dos 80px para o cartão ter onde pousar. Num serviço aberto não
+          há cartão para pousar — o conteúdo começa no branco, e aqueles 80px
+          viravam uma tira azul vazia com o título colado nela.
+        */}
+        <section
+          className={cn(
+            "gradient-brand relative overflow-hidden pt-28 sm:pt-32",
+            servico ? "pb-10" : "pb-20",
+          )}
+        >
           <Blobs />
           <div className="relative mx-auto flex max-w-6xl flex-wrap items-end justify-between gap-4 px-4">
             <div>
@@ -198,7 +211,7 @@ function PainelCliente() {
           </div>
         </section>
 
-        <section className="relative -mt-12 pb-20">
+        <section className={cn("relative pb-20", servico ? "pt-8" : "-mt-12")}>
           <div className="mx-auto max-w-6xl space-y-6 px-4">
             {painel.isPending ? (
               <EsqueletoPainel />
