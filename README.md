@@ -502,10 +502,49 @@ O que dá para fazer:
 | Solicitações       | a fila de `web_formularios`: status, assunto, data da visita, observação |
 | Indicações         | `indicacoes_web`: status, bônus, campanha, vínculo com o novo contrato   |
 | Seção de indicação | título, descrição, banner, campanha vigente e o liga/desliga             |
+| Scripts e tags     | Tag Manager, pixels e chat colados no `<head>`, no `<body>` ou no rodapé |
 
 **Sem upload de arquivo.** As logos dos planos e os banners entram como URL, do
 mesmo jeito que já entravam pelo Postgres. Guardar arquivo pede storage, limite
 de tamanho e limpeza do que ficou órfão; colar um endereço não pede nada disso.
+
+#### Scripts e tags (Tag Manager, pixels, chat)
+
+A aba **Scripts e tags** cola código na página sem deploy, em três posições:
+dentro do `<head>`, logo depois do `<body>` (onde o `<noscript>` do GTM precisa
+ficar) e no fim do `<body>`. Dá para ter vários, editar, desligar sem apagar e
+excluir. O código vai para o HTML **exatamente como foi colado** — é o que faz
+um Tag Manager funcionar.
+
+**Isto não consulta o banco a cada visita.** Rastreamento entra em toda página
+de todo visitante, e uma consulta por requisição faria do Postgres o gargalo do
+site. O caminho é outro:
+
+1. O que você salva vai para uma linha de `web_config` (chave `scripts`).
+2. Na primeira requisição depois de o container subir, o servidor lê essa linha
+   **uma vez** e guarda na memória **já montada como HTML pronto**.
+3. Daí em diante, servir uma página custa três concatenações de texto. Medido:
+   **1 consulta** na partida fria (mesmo com 20 requisições simultâneas — elas
+   compartilham a mesma leitura) e **0** nas 30 seguintes.
+4. Salvar no /admin esvazia essa memória na hora: a próxima página já sai com o
+   código novo. Com mais de um container, os outros levam até
+   `SCRIPTS_CACHE_SECONDS` (padrão 60) para perceber.
+5. Banco fora do ar: o último conteúdo bom continua sendo servido. Nenhuma tag
+   derruba nenhuma página.
+
+A injeção acontece **depois** de o React terminar de renderizar, direto no HTML
+que está saindo (`src/lib/injetar-scripts.server.ts`), e não num componente.
+Assim um `<script>` mal fechado estraga só a si mesmo, em vez de quebrar a
+hidratação do site inteiro.
+
+**O `/admin` e a `/diagnostico` nunca recebem estas tags.** É deliberado: uma
+tag com erro que fosse injetada no /admin poderia quebrar exatamente a tela onde
+ela seria corrigida, e a saída seria mexer no banco à mão.
+
+Tags de estrutura (`<html>`, `<head>`, `<body>`) são recusadas ao salvar, com o
+motivo na tela: coladas por engano — acontece ao copiar a página inteira em vez
+do trecho — elas embaralhariam o ponto de injeção e cortariam o fim da página
+para todos os visitantes.
 
 ### TODA SOLICITAÇÃO VIRA UM ATENDIMENTO
 

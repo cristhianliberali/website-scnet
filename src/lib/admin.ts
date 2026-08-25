@@ -36,10 +36,13 @@ import {
   type ResumoAdmin,
 } from "./admin-db.server";
 import { gravarConfigIndicacao, lerConfigIndicacao } from "./config-db.server";
+import { MAX_CODIGO, excluirScript, listarScripts, salvarScript } from "./scripts-db.server";
+import { TAGS_PROIBIDAS } from "./admin-tipos";
 import type {
   ConfigIndicacao,
   IndicacaoAdmin,
   PlanoAdmin,
+  ScriptAdmin,
   SessaoAdmin,
   SolicitacaoAdmin,
 } from "./admin-tipos";
@@ -119,6 +122,50 @@ const configSchema = z.object({
   campanhaValor: texto(20),
 });
 
+/**
+ * Um trecho de código para colar na página.
+ *
+ * O `codigo` sai daqui para o HTML **sem nenhuma transformação** — é o que faz
+ * um Tag Manager funcionar, e é também por isso que a única validação possível
+ * é de tamanho e de estrutura. Quem chega até aqui já passou pela sessão de
+ * admin; a proteção é a porta, não o filtro.
+ *
+ * As tags de estrutura são recusadas porque um `</body>` colado por engano
+ * (acontece ao copiar a página inteira em vez do trecho) embaralharia o ponto
+ * de injeção e cortaria o final da página para todos os visitantes.
+ */
+const scriptSchema = z.object({
+  id: texto(80),
+  nome: texto(120),
+  posicao: z.enum(["head", "body_inicio", "body_fim"]),
+  // O teto de tamanho fica aqui, como barreira contra POST direto. As regras
+  // que a pessoa pode violar sem querer são conferidas no handler — veja abaixo.
+  codigo: z.string().max(MAX_CODIGO),
+  ativo: z.boolean(),
+});
+
+/**
+ * As duas recusas que um humano encontra, conferidas onde a mensagem chega até ele.
+ *
+ * Não dá para deixá-las no `.validator`: quando o zod recusa ali, o framework
+ * lança antes do handler, a tela cai no `catch` genérico e mostra "Falha de
+ * conexão. Tente de novo." — que é falso e não diz o que corrigir. Dentro do
+ * handler, a mesma recusa vira `{ ok: false, mensagem }` e aparece na tela com
+ * o motivo.
+ */
+function conferirScript(codigo: string): void {
+  if (codigo.trim() === "") {
+    throw new Error("Cole o código do script.");
+  }
+  const proibida = TAGS_PROIBIDAS.find((t) => codigo.toLowerCase().includes(t));
+  if (proibida) {
+    throw new Error(
+      `O código não pode conter "${proibida}>" — cole só o trecho que a ferramenta forneceu, ` +
+        "sem a estrutura da página em volta.",
+    );
+  }
+}
+
 /* ---------------- resposta ---------------- */
 
 export type AcaoAdmin = { ok: true; mensagem: string } | { ok: false; mensagem: string };
@@ -176,6 +223,7 @@ export type DadosAdmin = {
   solicitacoes: SolicitacaoAdmin[];
   indicacoes: IndicacaoAdmin[];
   config: ConfigIndicacao;
+  scripts: ScriptAdmin[];
 };
 
 /**
@@ -190,18 +238,18 @@ export const carregarAdmin = createServerFn({ method: "GET" }).handler(
   async (): Promise<DadosAdmin> => {
     await exigirSessaoAdmin();
 
-    const [resumo, planosSite, planosUpgrade, solicitacoes, indicacoes, config] = await Promise.all(
-      [
+    const [resumo, planosSite, planosUpgrade, solicitacoes, indicacoes, config, scripts] =
+      await Promise.all([
         resumoAdmin(),
         listaSegura("planos do site", listarPlanos("site")),
         listaSegura("planos de upgrade", listarPlanos("upgrade")),
         listaSegura("solicitações", listarSolicitacoes({})),
         listaSegura("indicações", listarIndicacoes({})),
         lerConfigIndicacao(),
-      ],
-    );
+        listaSegura("scripts", listarScripts()),
+      ]);
 
-    return { resumo, planosSite, planosUpgrade, solicitacoes, indicacoes, config };
+    return { resumo, planosSite, planosUpgrade, solicitacoes, indicacoes, config, scripts };
   },
 );
 
@@ -282,5 +330,28 @@ export const salvarConfigAdmin = createServerFn({ method: "POST" })
     acao(async () => {
       await gravarConfigIndicacao(data);
       return "Configuração salva.";
+    }),
+  );
+
+/* ---------------- scripts / tags ---------------- */
+
+export const salvarScriptAdmin = createServerFn({ method: "POST" })
+  .validator(scriptSchema)
+  .handler(async ({ data }) =>
+    acao(async () => {
+      conferirScript(data.codigo);
+      await salvarScript(data as ScriptAdmin);
+      // A gravação já esvazia o cache do servidor, então a próxima página
+      // servida sai com o trecho novo — não há deploy nem espera no meio.
+      return data.id ? "Script atualizado." : "Script incluído.";
+    }),
+  );
+
+export const excluirScriptAdmin = createServerFn({ method: "POST" })
+  .validator(z.object({ id: z.string().min(1).max(80) }))
+  .handler(async ({ data }) =>
+    acao(async () => {
+      await excluirScript(data.id);
+      return "Script excluído.";
     }),
   );
