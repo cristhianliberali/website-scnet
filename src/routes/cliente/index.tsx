@@ -1,7 +1,7 @@
 import { createFileRoute, redirect } from "@tanstack/react-router";
 import { Toaster } from "@/components/ui/sonner";
 import { Header } from "@/components/scnet/header";
-import { Footer, WhatsFloat } from "@/components/scnet/sections";
+import { Footer } from "@/components/scnet/sections";
 import { Blobs } from "@/components/scnet/shared";
 import { ClienteLogin } from "@/components/scnet/cliente-login";
 import { AreaClienteDesligada } from "@/components/scnet/area-cliente-desligada";
@@ -79,7 +79,6 @@ function ClienteLoginPage() {
         </section>
       </main>
       <Footer />
-      <WhatsFloat />
       <Toaster />
     </div>
   );

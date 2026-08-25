@@ -18,7 +18,7 @@ import {
   Faq,
   CtaFinal,
   Footer,
-  WhatsFloat,
+  CtaFlutuante,
 } from "@/components/scnet/sections";
 
 const title = "SCNET — Internet fibra óptica no Oeste e Litoral de SC";
@@ -82,7 +82,7 @@ function Index() {
         <Faq />
       </main>
       <Footer />
-      <WhatsFloat />
+      <CtaFlutuante />
       <Toaster />
     </div>
   );

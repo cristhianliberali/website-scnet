@@ -27,7 +27,7 @@ import skeeloLogo from "@/assets/skeelo.webp";
 import scMovelLogo from "@/assets/scmovel.webp";
 import { Button } from "@/components/ui/button";
 import { planoWebhook, type Plan } from "@/lib/plans";
-import { MENU_RODAPE, REDES_SOCIAIS } from "@/lib/links";
+import { ANCORA_FORMULARIO, HASH_FORMULARIO, MENU_RODAPE, REDES_SOCIAIS } from "@/lib/links";
 import {
   Accordion,
   AccordionContent,
@@ -36,11 +36,10 @@ import {
 } from "@/components/ui/accordion";
 import { useCountUp } from "@/hooks/use-reveal";
 import { ContractForm, type SelectedPlan } from "./contract-form";
-import { eventoDeClique, eventoWhatsapp } from "@/lib/datalayer";
+import { eventoDeClique } from "@/lib/datalayer";
 import { Blobs, LinkDeMenu, Reveal, SectionTitle } from "./shared";
 import { Carrossel } from "./carrossel";
 import { ItensPlano, LogosAgregados, PlanosIndisponiveis, PrecoPlano, SeloDestaque } from "./plano";
-import { waLink } from "@/lib/whatsapp";
 import { cn } from "@/lib/utils";
 
 /* ---------------- Hero ---------------- */
@@ -376,17 +375,19 @@ export function Planos({
             Não sabe qual é o plano ideal? Nossa equipe irá entender sua necessidade e indicar o
             plano perfeito para sua rotina!
           </p>
-          <Button variant="whats" size="xl" className="mt-5" asChild>
+          <Button variant="zap" size="xl" className="mt-5" asChild>
             <a
-              target="_blank"
-              rel="noopener"
-              href={waLink("Oi! Me ajuda a escolher o melhor plano da SCNET?")}
-              onClick={() => {
-                eventoDeClique("whatsapp_ajuda_plano", { local: "planos" });
-                eventoWhatsapp("ajuda_plano", { local: "planos" });
-              }}
+              href={HASH_FORMULARIO}
+              onClick={() =>
+                eventoDeClique("ajuda_plano", {
+                  texto: "Quero ajuda para escolher",
+                  local: "planos",
+                  destino: HASH_FORMULARIO,
+                })
+              }
             >
-              <MessageCircle /> Chamar no WhatsApp
+              Quero ajuda para escolher
+              <ArrowRight className="size-5" />
             </a>
           </Button>
         </Reveal>
@@ -470,13 +471,14 @@ export function Empresas() {
         <Reveal delay={120}>
           <Button variant="zap" size="hero" asChild>
             <a
-              target="_blank"
-              rel="noopener"
-              href={waLink("Oi! Quero um plano SCNET para minha empresa/condomínio.")}
-              onClick={() => {
-                eventoDeClique("whatsapp_empresas", { local: "empresas" });
-                eventoWhatsapp("empresas", { local: "empresas" });
-              }}
+              href={HASH_FORMULARIO}
+              onClick={() =>
+                eventoDeClique("empresas", {
+                  texto: "Quero um plano pra empresa",
+                  local: "empresas",
+                  destino: HASH_FORMULARIO,
+                })
+              }
             >
               <Building2 /> Quero um plano pra empresa
             </a>
@@ -623,7 +625,13 @@ export function CtaFinal({
   areaClienteAtiva?: boolean;
 }) {
   return (
-    <section className="gradient-brand relative overflow-hidden py-24">
+    /* A âncora vive na seção inteira, e não no formulário: quem chega de um CTA
+       precisa ver também a chamada ao lado, que é o que explica o formulário.
+       `scroll-mt` desconta o cabeçalho fixo, que senão cobriria o topo. */
+    <section
+      id={ANCORA_FORMULARIO}
+      className="gradient-brand relative scroll-mt-16 overflow-hidden py-24 lg:scroll-mt-28"
+    >
       <Blobs />
       <div className="relative mx-auto grid max-w-7xl items-center gap-12 px-4 lg:grid-cols-[1fr_580px]">
         <Reveal>
@@ -665,7 +673,7 @@ export function CtaFinal({
   );
 }
 
-/* ---------------- Footer + WhatsApp flutuante ---------------- */
+/* ---------------- Footer + CTA flutuante ---------------- */
 
 /**
  * O rodapé.
@@ -717,20 +725,30 @@ export function Footer() {
   );
 }
 
-export function WhatsFloat() {
+/**
+ * O CTA que acompanha a rolagem.
+ *
+ * Era o balão do WhatsApp; agora leva ao formulário, como todo CTA da página.
+ * O lead entra por um caminho só — o formulário —, em vez de metade dele
+ * chegar como conversa solta no aparelho de alguém, sem plano escolhido, sem
+ * atribuição e sem entrar no CRM.
+ */
+export function CtaFlutuante() {
   return (
     <a
-      href={waLink("Oi! Quero falar com a SCNET.")}
-      target="_blank"
-      rel="noopener"
-      aria-label="Falar no WhatsApp"
-      onClick={() => {
-        eventoDeClique("whatsapp_flutuante", { local: "botao_flutuante" });
-        eventoWhatsapp("botao_flutuante");
-      }}
-      className="animate-bounce-soft fixed bottom-5 right-5 z-50 grid size-14 place-items-center rounded-full bg-[#25D366] text-[#0b3d1f] shadow-2xl transition-transform hover:scale-110"
+      href={HASH_FORMULARIO}
+      aria-label="Ir para o formulário de contratação"
+      onClick={() =>
+        eventoDeClique("contratar_flutuante", {
+          texto: "Contrate agora",
+          local: "botao_flutuante",
+          destino: HASH_FORMULARIO,
+        })
+      }
+      className="font-ui fixed bottom-5 right-5 z-50 inline-flex items-center gap-2 rounded-full bg-zap px-5 py-3 text-sm font-bold text-zap-ink shadow-2xl transition-transform hover:scale-105"
     >
-      <MessageCircle className="size-7" />
+      Contrate agora
+      <ArrowRight className="size-5" />
     </a>
   );
 }
