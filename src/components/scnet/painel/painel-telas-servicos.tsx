@@ -13,7 +13,6 @@
 
 import { useMemo, useState, type FormEvent } from "react";
 import {
-  Activity,
   ArrowDown,
   ArrowUp,
   Check,
@@ -42,6 +41,7 @@ import { textoDaResposta } from "@/lib/painel-normalizar";
 import type {
   AdicionalPlano,
   ClientePainel,
+  ConfigIndicacaoPainel,
   Contrato,
   Indicacao,
   PlanoDisponivel,
@@ -339,14 +339,65 @@ export function TelaTrocarPlano({
 
 /* ---------------- indicações ---------------- */
 
+/**
+ * O banner da campanha, no topo do formulário.
+ *
+ * Duas imagens, uma para cada formato — não é a mesma arte redimensionada: um
+ * banner desenhado em 5:1 vira uma tira ilegível no celular. O `<picture>`
+ * troca a fonte pela largura da tela, então o navegador baixa **uma** das duas,
+ * e não as duas.
+ *
+ * Sem URL cadastrada no /admin, não há banner: nenhum espaço reservado, nenhum
+ * ícone de imagem quebrada. A seção começa direto no formulário, como antes de
+ * existir campanha nenhuma.
+ */
+function BannerIndicacao({ config }: { config: ConfigIndicacaoPainel }) {
+  const desktop = config.bannerDesktopUrl;
+  const mobile = config.bannerMobileUrl;
+  if (!desktop && !mobile) return null;
+
+  const imagem = (
+    <picture>
+      {desktop && mobile && <source media="(min-width: 640px)" srcSet={desktop} />}
+      <img
+        src={mobile || desktop}
+        alt={config.bannerAlt}
+        /*
+         * `alt` vazio não é esquecimento: quando ninguém escreveu a descrição, o
+         * banner é decoração, e um leitor de tela deve pulá-lo em vez de ler uma
+         * URL. Com descrição, ele vira conteúdo e é anunciado.
+         */
+        {...(config.bannerAlt ? {} : { role: "presentation" })}
+        loading="lazy"
+        className="w-full rounded-xl border border-border object-cover"
+      />
+    </picture>
+  );
+
+  if (!config.bannerLink) return imagem;
+
+  return (
+    <a
+      href={config.bannerLink}
+      target="_blank"
+      rel="noopener"
+      className="block transition-opacity hover:opacity-95"
+    >
+      {imagem}
+    </a>
+  );
+}
+
 export function TelaIndicacoes({
   aoVoltar,
   cliente,
   indicacoes,
+  config,
 }: {
   aoVoltar: () => void;
   cliente: ClientePainel;
   indicacoes: Indicacao[];
+  config: ConfigIndicacaoPainel;
 }) {
   const [nome, setNome] = useState("");
   const [telefone, setTelefone] = useState("");
@@ -413,12 +464,10 @@ export function TelaIndicacoes({
   }
 
   return (
-    <TopoServico
-      titulo="Minhas indicações"
-      descricao="Indique um amigo e ganhe desconto quando ele instalar."
-      icone={Users}
-    >
+    <TopoServico titulo={config.titulo} descricao={config.descricao} icone={Users}>
       <div className="space-y-5 pt-4">
+        <BannerIndicacao config={config} />
+
         <div className="grid gap-3 sm:grid-cols-3">
           <div className="rounded-xl border border-border p-4 text-center">
             <p className="font-display text-2xl font-extrabold text-brand">{indicacoes.length}</p>
@@ -522,7 +571,9 @@ export function TelaIndicacoes({
                     </p>
                     <p className="font-body text-xs text-muted-foreground">
                       {i.protocolo && `Protocolo ${i.protocolo}`}
-                      {i.protocolo && i.bonus && " · "}
+                      {i.protocolo && (i.campanha || i.bonus) && " · "}
+                      {i.campanha && <strong className="font-semibold">{i.campanha}</strong>}
+                      {i.campanha && i.bonus && " · "}
                       {i.bonus}
                     </p>
                   </div>
@@ -936,28 +987,10 @@ export function TelaSuporte({
   const [categoria, setCategoria] = useState(CATEGORIAS[0] as string);
   const [assunto, setAssunto] = useState("");
   const [descricao, setDescricao] = useState("");
-  const [diagnostico, setDiagnostico] = useState<string | null>(null);
   const [concluido, setConcluido] = useState<{ mensagem: string; protocolo: string } | null>(null);
 
   const envio = useFormularioPainel();
   const tratarErro = useErroPainel();
-
-  async function diagnosticar() {
-    try {
-      const resposta = await envio.mutateAsync({
-        formulario: "diagnostico_conexao",
-        dados: { id_contrato: contratoId },
-      });
-
-      setDiagnostico(
-        textoDaResposta(resposta.dados, "diagnostico", "resultado", "resumo") ||
-          resposta.mensagem ||
-          "Diagnóstico concluído. Nenhum problema encontrado na nossa rede.",
-      );
-    } catch (erro) {
-      tratarErro(erro, "Não foi possível rodar o diagnóstico agora.");
-    }
-  }
 
   async function submeter(e: FormEvent) {
     e.preventDefault();
@@ -974,7 +1007,6 @@ export function TelaSuporte({
           categoria,
           assunto: assunto.trim(),
           descricao: descricao.trim(),
-          ...(diagnostico ? { diagnostico } : {}),
         },
       });
 
@@ -1006,32 +1038,6 @@ export function TelaSuporte({
       ) : (
         <form onSubmit={(e) => void submeter(e)} className="space-y-4 pt-4">
           <SeletorContrato contratos={contratos} valor={contratoId} aoMudar={setContratoId} />
-
-          <div className="rounded-xl border border-border p-4">
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <div>
-                <p className="font-ui text-sm font-bold text-foreground">Diagnóstico rápido</p>
-                <p className="font-body text-xs text-muted-foreground">
-                  Conferimos o sinal do seu ponto antes de abrir o chamado.
-                </p>
-              </div>
-              <Button
-                type="button"
-                size="sm"
-                variant="outline"
-                disabled={envio.isPending}
-                onClick={() => void diagnosticar()}
-              >
-                <Activity className="size-4" />
-                Rodar diagnóstico
-              </Button>
-            </div>
-            {diagnostico && (
-              <div className="mt-3">
-                <Nota>{diagnostico}</Nota>
-              </div>
-            )}
-          </div>
 
           <Campo rotulo="Categoria">
             <Select value={categoria} onValueChange={setCategoria}>

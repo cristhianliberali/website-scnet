@@ -392,10 +392,15 @@ de upgrade saem do **Postgres**, direto — dado que já está numa tabela nossa
 precisa de um salto até o n8n para voltar. Os **formulários** continuam indo ao
 n8n: são ações, e quem fala com o ERP, o gateway e o WhatsApp é o fluxo. As
 tabelas estão em `docs/n8n/schema-painel.sql` (`clientes_web` com o cadastro
-completo, `contratos_web`, `faturas_web`) e em
-`docs/n8n/schema-upgrade-indicacoes.sql` (`planos_upgrade`, `indicacoes_web`), e
-o SQL traz um cliente fake para conferir a tela antes de plugar a base de
+completo, `contratos_web`, `faturas_web`), em
+`docs/n8n/schema-upgrade-indicacoes.sql` (`planos_upgrade`, `indicacoes_web`) e
+em `docs/n8n/schema-admin.sql` (`web_formularios`, `web_config`) — os dois
+últimos com um cliente fake para conferir a tela antes de plugar a base de
 verdade.
+
+**Para aplicar de uma vez**, use `docs/n8n/schema-completo.sql`: ele junta a
+estrutura dos três, na ordem certa e sem dado de mentira, é idempotente e
+termina dizendo o que ficou no banco. É o arquivo para colar no pgAdmin.
 
 **A troca de plano tem catálogo próprio.** Ela lê `planos_upgrade`, e não
 `planos_web` — a tabela da home carrega preço de campanha e oferta amarrada a um
@@ -469,6 +474,65 @@ não vem, a linha correspondente simplesmente não aparece — em vez de um valo
 plausível que ninguém apurou.
 
 This project was built with [Lovable](https://lovable.dev).
+
+### O PAINEL ADMINISTRATIVO (`/admin`)
+
+Uma tela para o provedor mexer no que antes só se mexia por `psql`: os planos da
+vitrine, os planos da troca de plano, a fila de solicitações e as indicações.
+
+**Fechada por padrão.** Sem `ADMIN_USUARIO` e `ADMIN_SENHA` no ambiente a rota
+responde **404** — ela nem existe. Não há tabela de usuários, e é escolha: um
+cadastro pede recuperação de senha, rotação e uma tela para administrar
+administradores, e nada disso se sustenta sozinho num painel de uma pessoa. Duas
+variáveis são trocadas em dez segundos no EasyPanel e não deixam hash parado no
+banco. A comparação é em tempo constante, o contador de tentativas é o mesmo do
+login do cliente, e a sessão vive num cookie selado próprio (`scnet_admin`, 8h,
+`SameSite=Strict`) — entrar como cliente nunca vira acesso de admin.
+
+**A segurança não está na tela.** Cada ação chama uma server function que
+confere a sessão **no servidor** antes de tocar no banco. Uma tela que esconde o
+botão sem o servidor conferir é uma porta trancada com o vidro aberto.
+
+O que dá para fazer:
+
+| Aba                  | O que muda                                                              |
+| -------------------- | ----------------------------------------------------------------------- |
+| Planos do site       | `planos_web` — a home e a /contratacao                                  |
+| Planos de upgrade    | `planos_upgrade` — a troca de plano do painel                           |
+| Solicitações         | a fila de `web_formularios`: status, assunto, data da visita, observação |
+| Indicações           | `indicacoes_web`: status, bônus, campanha, vínculo com o novo contrato   |
+| Seção de indicação   | título, descrição, banner, campanha vigente e o liga/desliga            |
+
+**Sem upload de arquivo.** As logos dos planos e os banners entram como URL, do
+mesmo jeito que já entravam pelo Postgres. Guardar arquivo pede storage, limite
+de tamanho e limpeza do que ficou órfão; colar um endereço não pede nada disso.
+
+### TODA SOLICITAÇÃO VIRA UM ATENDIMENTO
+
+Um pedido que só existe dentro do n8n é um pedido que o cliente não consegue
+acompanhar e que ninguém consegue mover de estado. Agora todo formulário de
+serviço grava uma linha em `web_formularios` — **protocolo gerado pelo banco**
+(`SOL-AAAAMM-000123`) e status `em_aberto` — e é dela que sai a seção
+"Atendimentos" do painel e a fila do /admin. O status muda no /admin ou direto
+no banco; com data de visita preenchida, o cliente vê "Agendado".
+
+Ficam de fora os três que não deixam nada pendente: consulta de cobertura, 2ª
+via e nota fiscal respondem na hora. A indicação também, mas por outro motivo:
+ela tem tabela, protocolo e extrato próprios.
+
+A ordem é **webhook primeiro, banco depois**: gravar antes deixaria um pedido
+registrado toda vez que o n8n recusasse a ação, e o cliente — que viu o erro —
+tentaria de novo, criando o segundo. A exceção é a instalação sem webhook
+nenhum: aí o banco é o destino, e não há o que recusar.
+
+### O BÔNUS DA INDICAÇÃO É POR CAMPANHA
+
+O bônus não é regra fixa do provedor: muda de campanha para campanha, e o mesmo
+cliente participa de várias ao longo do ano. Por isso cada indicação **carimba**,
+no envio, as condições vigentes — nome da campanha, tipo de pagamento, condição e
+valor — e fica com elas. Trocar a campanha no /admin muda o que as próximas vão
+valer e não reescreve nenhuma que já existe; é o que faz o extrato do cliente
+continuar verdadeiro depois da terceira campanha do ano.
 
 ## Segurança dos formulários e do webhook
 

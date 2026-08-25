@@ -33,6 +33,7 @@
  */
 
 import { env, getClient, identifier, type Sql } from "./postgres.server";
+import { lerConfigIndicacao } from "./config-db.server";
 import type { DadosPainel, ValorJson } from "./cliente-tipos";
 
 const DEFAULT_SCHEMA = "public";
@@ -47,6 +48,7 @@ const DEFAULT_FATURAS = "faturas_web";
  */
 const DEFAULT_PLANOS_UPGRADE = "planos_upgrade";
 const DEFAULT_INDICACOES = "indicacoes_web";
+const DEFAULT_FORMULARIOS = "web_formularios";
 
 /**
  * O que a leitura do painel devolve.
@@ -120,8 +122,21 @@ type PlanoRow = {
   codigo_oferta_mk: Texto;
 };
 
+type ChamadoRow = {
+  protocolo: Texto;
+  cod_contrato: Texto;
+  formulario: Texto;
+  categoria: Texto;
+  assunto: Texto;
+  descricao: Texto;
+  status: Texto;
+  agendado_para: Texto;
+  criado_em: Texto;
+};
+
 type IndicacaoRow = {
   protocolo: Texto;
+  campanha: Texto;
   nome_indicacao: Texto;
   telefone_indicacao: Texto;
   cidade: Texto;
@@ -245,6 +260,30 @@ function montarPlano(row: PlanoRow): ValorJson {
   };
 }
 
+/**
+ * Uma solicitação vira o atendimento que o cliente acompanha.
+ *
+ * O status da tela é mais fino que o do banco de propósito: `em_aberto` com
+ * data marcada aparece como **agendado**, porque para quem espera o técnico
+ * "agendado para dia 12" e "em aberto" não são a mesma notícia. O banco continua
+ * com os três estados que um humano consegue manter certos.
+ */
+function montarChamado(row: ChamadoRow): ValorJson {
+  const status = txt(row.status);
+  const agendado = txt(row.agendado_para);
+  return {
+    id: txt(row.protocolo),
+    protocolo: txt(row.protocolo),
+    id_contrato: txt(row.cod_contrato),
+    categoria: txt(row.categoria) || txt(row.formulario),
+    assunto: txt(row.assunto) || txt(row.categoria),
+    descricao: txt(row.descricao),
+    status: status === "em_aberto" && agendado ? "agendado" : status,
+    aberto_em: txt(row.criado_em),
+    agendado_para: agendado,
+  };
+}
+
 /** Como o bônus da indicação é escrito na tela. */
 const BONUS: Record<string, string> = {
   desconto_fatura: "Desconto na fatura",
@@ -263,6 +302,8 @@ function montarIndicacao(row: IndicacaoRow): ValorJson {
     cidade: txt(row.cidade),
     data: txt(row.data),
     status: txt(row.status),
+    // a campanha do dia do envio, para o extrato dizer de qual delas veio
+    campanha: txt(row.campanha),
     // a descrição escrita à mão manda; sem ela, o rótulo do tipo serve
     bonus: descricao || (tipo ? (BONUS[tipo] ?? tipo) : ""),
     valor_indicacao: num(row.valor_indicacao),
@@ -321,16 +362,30 @@ export async function carregarPainelDoBanco(idCliente: string): Promise<LeituraP
     "POSTGRES_PLANOS_UPGRADE_TABLE",
   );
   const indicacoes = tabela(DEFAULT_INDICACOES, DEFAULT_INDICACOES, "POSTGRES_INDICACOES_TABLE");
+  const formularios = tabela(
+    DEFAULT_FORMULARIOS,
+    DEFAULT_FORMULARIOS,
+    "POSTGRES_FORMULARIOS_TABLE",
+  );
 
   try {
-    const [linhasCliente, linhasContratos, linhasFaturas, linhasPlanos, linhasIndicacoes] =
-      await Promise.all([
-        consultarCliente(sql, schema, clientes, idCliente),
-        consultarContratos(sql, schema, contratos, idCliente),
-        consultarFaturas(sql, schema, faturas, idCliente),
-        consultarPlanos(sql, schema, planos),
-        consultarIndicacoes(sql, schema, indicacoes, idCliente),
-      ]);
+    const [
+      linhasCliente,
+      linhasContratos,
+      linhasFaturas,
+      linhasPlanos,
+      linhasIndicacoes,
+      linhasChamados,
+      configIndicacao,
+    ] = await Promise.all([
+      consultarCliente(sql, schema, clientes, idCliente),
+      consultarContratos(sql, schema, contratos, idCliente),
+      consultarFaturas(sql, schema, faturas, idCliente),
+      consultarPlanos(sql, schema, planos),
+      consultarIndicacoes(sql, schema, indicacoes, idCliente),
+      consultarChamados(sql, schema, formularios, idCliente),
+      lerConfigIndicacao(),
+    ]);
 
     const cliente = linhasCliente[0];
     if (!cliente) {
@@ -354,12 +409,26 @@ export async function carregarPainelDoBanco(idCliente: string): Promise<LeituraP
       faturas: linhasFaturas.map(montarFatura),
       planos: linhasPlanos.map(montarPlano),
       indicacoes: linhasIndicacoes.map(montarIndicacao),
+      chamados: linhasChamados.map(montarChamado),
       /*
-       * Sem tabela ainda: a tela mostra o estado vazio de cada uma. Quando
-       * existirem, é aqui que entram — nada mais precisa mudar.
+       * Os ajustes que o /admin edita. Vão no mesmo retrato do painel para a
+       * tela não precisar de uma segunda consulta só para saber se a indicação
+       * está ligada.
+       */
+      indicacao_config: {
+        ativo: configIndicacao.ativo,
+        titulo: configIndicacao.titulo,
+        descricao: configIndicacao.descricao,
+        banner_desktop_url: configIndicacao.bannerDesktopUrl,
+        banner_mobile_url: configIndicacao.bannerMobileUrl,
+        banner_alt: configIndicacao.bannerAlt,
+        banner_link: configIndicacao.bannerLink,
+      },
+      /*
+       * Sem tabela ainda: a tela mostra o estado vazio. Quando existir, é aqui
+       * que entra — nada mais precisa mudar.
        */
       notas_fiscais: [],
-      chamados: [],
       adicionais: [],
       avisos: [],
       /*
@@ -480,6 +549,41 @@ async function consultarPlanos(sql: Sql, schema: string, tab: string): Promise<P
 }
 
 /**
+ * Os atendimentos deste cliente.
+ *
+ * São as solicitações que ele mandou pelo painel — a mesma fila que o /admin
+ * mostra, filtrada por cliente. Falha aqui não derruba a página: a seção fica
+ * vazia, como ficava antes de a tabela existir.
+ */
+async function consultarChamados(
+  sql: Sql,
+  schema: string,
+  tab: string,
+  idCliente: string,
+): Promise<ChamadoRow[]> {
+  try {
+    return (await sql<ChamadoRow[]>`
+      select
+        protocolo, cod_contrato, formulario, categoria, assunto, descricao,
+        status::text        as status,
+        agendado_para::text as agendado_para,
+        criado_em::text     as criado_em
+      from ${sql(schema)}.${sql(tab)}
+      where id_cliente = ${idCliente}
+      order by criado_em desc
+      limit 50
+    `) as unknown as ChamadoRow[];
+  } catch (err) {
+    console.error(
+      `Falha ao carregar os atendimentos em ${schema}.${tab} — rode ` +
+        "docs/n8n/schema-admin.sql se as colunas de protocolo/status ainda não existem",
+      err,
+    );
+    return [];
+  }
+}
+
+/**
  * As indicações feitas por este cliente.
  *
  * Como os planos, uma falha aqui não derruba a página: a seção de indicações
@@ -495,7 +599,7 @@ async function consultarIndicacoes(
   try {
     return (await sql<IndicacaoRow[]>`
       select
-        protocolo, nome_indicacao, telefone_indicacao, cidade,
+        protocolo, campanha, nome_indicacao, telefone_indicacao, cidade,
         data::text            as data,
         status::text          as status,
         tipo_bonus::text      as tipo_bonus,

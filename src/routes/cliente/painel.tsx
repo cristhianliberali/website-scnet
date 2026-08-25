@@ -226,8 +226,13 @@ function PainelCliente() {
                 recarregando={painel.isFetching}
                 aoTentarDeNovo={() => void painel.refetch()}
               />
-            ) : servico ? (
-              <TelaServico servico={servico} aoAbrir={abrirServico} aoVoltar={voltarAoPainel}>
+            ) : servico && !ocultos(painel.data).includes(servico) ? (
+              <TelaServico
+                servico={servico}
+                servicosOcultos={ocultos(painel.data)}
+                aoAbrir={abrirServico}
+                aoVoltar={voltarAoPainel}
+              >
                 <ConteudoServico
                   servico={servico}
                   painel={painel.data}
@@ -266,6 +271,18 @@ function identificacao(
 }
 
 /**
+ * Quais serviços o /admin desligou.
+ *
+ * O interruptor da indicação vale para a área do cliente inteira: sem ele o
+ * serviço some da grade, some da navegação e a URL `?servico=indicacoes` cai na
+ * visão geral. Esconder só o botão deixaria o serviço vivo para quem tem o link
+ * — e um serviço que ainda responde é um serviço ligado.
+ */
+function ocultos(painel: PainelSnapshot): readonly ServicoPainelId[] {
+  return painel.indicacaoConfig.ativo ? [] : ["indicacoes"];
+}
+
+/**
  * O serviço aberto.
  *
  * Só um por vez está montado — quem não está na tela não está na árvore, e é
@@ -299,6 +316,7 @@ function ConteudoServico({
           aoVoltar={aoVoltar}
           cliente={painel.cliente}
           indicacoes={painel.indicacoes}
+          config={painel.indicacaoConfig}
         />
       );
     case "pix_debito":
@@ -374,9 +392,20 @@ function ConteudoPainel({
         </CartaoPainel>
       )}
 
-      <BannerIndicacao cliente={painel.cliente} indicacoes={painel.indicacoes} aoAbrir={aoAbrir} />
+      {painel.indicacaoConfig.ativo && (
+        <BannerIndicacao
+          cliente={painel.cliente}
+          indicacoes={painel.indicacoes}
+          config={painel.indicacaoConfig}
+          aoAbrir={aoAbrir}
+        />
+      )}
 
-      <GradeServicos faturasEmAberto={emAberto} aoAbrir={aoAbrir} />
+      <GradeServicos
+        faturasEmAberto={emAberto}
+        servicosOcultos={ocultos(painel)}
+        aoAbrir={aoAbrir}
+      />
 
       <div className="grid gap-6 lg:grid-cols-12">
         <div className="space-y-6 lg:col-span-7">

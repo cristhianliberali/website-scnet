@@ -39,7 +39,7 @@ motivo no log. Antes ela caía para o n8n em silêncio, e a tela carregava vazia
 é melhor que suceder errado.
 
 Na prática isso quer dizer que **o site não manda mais nenhum evento de
-consulta**. Os únicos eventos que chegam ao n8n são os de login e os doze de
+consulta**. Os únicos eventos que chegam ao n8n são os de login e os onze de
 formulário.
 
 **O que autoriza a consulta ao banco.** O `id_cliente` sai do cookie de sessão,
@@ -48,9 +48,14 @@ e nenhuma função aceita um id vindo do formulário — daí um `WHERE cod_clie
 $1` bastar para ninguém enxergar o cliente do vizinho.
 
 **O que o banco ainda não tem.** As tabelas de hoje cobrem cadastro, contratos,
-faturas, o catálogo de upgrade e as indicações. Notas fiscais e chamados voltam
-vazios, e a tela mostra o estado vazio de cada um — até existirem as tabelas
-correspondentes.
+faturas, o catálogo de upgrade, as indicações e os atendimentos. Só as notas
+fiscais voltam vazias, e a tela mostra o estado vazio — até existir a tabela
+correspondente.
+
+**Os atendimentos saem de `web_formularios`.** Todo formulário de serviço que o
+cliente envia vira uma linha lá, com protocolo gerado pelo banco e status
+`em_aberto` — inclusive quando o n8n responde sem protocolo nenhum. Quem move o
+status é um humano, pelo /admin ou pelo próprio banco.
 
 O schema está em [`schema-painel.sql`](./schema-painel.sql) e, para
 `planos_upgrade` e `indicacoes_web`, em
@@ -303,22 +308,26 @@ comuns funcionam. O que ele não reconhecer cai no padrão da coluna.
 
 #### De onde cada campo sai, quando a fonte é o banco
 
-| Campo do JSON                   | Coluna                                         |
-| ------------------------------- | ---------------------------------------------- |
-| `cliente.*`                     | `clientes_web`                                 |
-| `cliente.cliente_desde`         | a `data_adesao` mais antiga entre os contratos |
-| `cliente.codigo`                | `clientes_web.id_cliente`                      |
-| `contratos[].id` / `.numero`    | `contratos_web.cod_contrato`                   |
-| `contratos[].apelido`           | o primeiro trecho de `contratos_web.endereco`  |
-| `contratos[].status_conexao`    | `contratos_web.status_contrato` (não exibido)  |
-| `contratos[].status_financeiro` | `contratos_web.status_fatura`                  |
-| `contratos[].download`          | `contratos_web.velocidade`                     |
-| `faturas[].valor`               | `faturas_web.valor_atual` (com juros e multa)  |
-| `faturas[].valor_original`      | `faturas_web.valor_original`                   |
-| `faturas[].referencia`          | `faturas_web.descricao`                        |
-| `planos[]`                      | `planos_upgrade` — **não** `planos_web`        |
-| `indicacoes[]`                  | `indicacoes_web`                               |
-| `cliente.desconto_acumulado`    | soma de `valor_indicacao` das concluídas       |
+| Campo do JSON                   | Coluna                                              |
+| ------------------------------- | --------------------------------------------------- |
+| `cliente.*`                     | `clientes_web`                                      |
+| `cliente.cliente_desde`         | a `data_adesao` mais antiga entre os contratos      |
+| `cliente.codigo`                | `clientes_web.id_cliente`                           |
+| `contratos[].id` / `.numero`    | `contratos_web.cod_contrato`                        |
+| `contratos[].apelido`           | o primeiro trecho de `contratos_web.endereco`       |
+| `contratos[].status_conexao`    | `contratos_web.status_contrato` (não exibido)       |
+| `contratos[].status_financeiro` | `contratos_web.status_fatura`                       |
+| `contratos[].download`          | `contratos_web.velocidade`                          |
+| `faturas[].valor`               | `faturas_web.valor_atual` (com juros e multa)       |
+| `faturas[].valor_original`      | `faturas_web.valor_original`                        |
+| `faturas[].referencia`          | `faturas_web.descricao`                             |
+| `planos[]`                      | `planos_upgrade` — **não** `planos_web`             |
+| `indicacoes[]`                  | `indicacoes_web`                                    |
+| `indicacoes[].campanha`         | `indicacoes_web.campanha` (a do dia do envio)       |
+| `chamados[]`                    | `web_formularios`                                   |
+| `chamados[].protocolo`          | `web_formularios.protocolo` (gerado no banco)       |
+| `cliente.desconto_acumulado`    | soma de `valor_indicacao` das concluídas            |
+| `indicacao_config`              | `web_config` (chave `indicacao`), editada no /admin |
 
 Contratos com `status_contrato = 'cancelado'` e faturas com
 `status_fatura = 'cancelada'` ficam de fora da consulta: não há mais nada a
@@ -460,6 +469,11 @@ mostra só a mensagem.
 Os campos têm o nome das colunas de `indicacoes_web`, para o `INSERT` sair sem
 renomeação no meio. `nome` e `telefone` vão junto, repetidos, só para não
 quebrar um fluxo que ainda espera os nomes antigos.
+
+**Quem grava a indicação é o site**, logo depois de o webhook responder `ok` —
+com o carimbo da campanha vigente (nome, tipo de bônus, condição e valor) copiado
+da configuração para dentro da linha. O fluxo do n8n não precisa fazer o
+`INSERT`; se ele também gravar, a indicação aparece duas vezes.
 
 O **telefone chega sempre com DDI e só com dígitos** (`55` + DDD + 8 ou 9): o
 campo do formulário tem o `+55` fixo na frente e a tela recusa o envio antes de
@@ -710,29 +724,7 @@ enviar.
 }
 ```
 
-### 11. `painel_diagnostico_conexao`
-
-O botão "Rodar diagnóstico" dentro do suporte. **Não muda nada.**
-
-```json
-{ "id_contrato": "ctr_01" }
-```
-
-**Resposta**
-
-```json
-{
-  "status": "ok",
-  "dados": {
-    "diagnostico": "Sinal óptico normal (-18 dBm). Nenhuma perda entre a OLT e o seu ponto."
-  }
-}
-```
-
-O texto de `diagnostico` (ou `resultado`, ou `resumo`) aparece na tela e segue
-junto no chamado, se o cliente abrir um.
-
-### 12. `painel_desbloqueio_confianca`
+### 11. `painel_desbloqueio_confianca`
 
 ```json
 { "faturas": ["inv_02"], "valor_total": 219.9 }
@@ -755,12 +747,13 @@ como está.
 Para **esconder o botão** de quem não tem direito a ele, mande
 `"desbloqueio_disponivel": false` no `painel_bootstrap`.
 
-> **Saíram da tela:** `painel_reiniciar_conexao` e `painel_teste_velocidade`.
-> Os dois dependiam de um comando e de uma medição no equipamento do cliente,
-> que nada no banco alcança hoje — e um botão que responde sempre a mesma coisa
-> é pior que botão nenhum. Junto com eles saiu o selo "Conectado" do card do
-> contrato, que era `status_contrato` (ativo/bloqueado) fantasiado de estado da
-> conexão. Os ramos podem continuar no workflow; o site não os chama mais.
+> **Saíram da tela:** `painel_reiniciar_conexao`, `painel_teste_velocidade` e
+> `painel_diagnostico_conexao`. Os três dependiam de um comando ou de uma
+> medição no equipamento do cliente, que nada no banco alcança hoje — e um botão
+> que responde sempre a mesma coisa é pior que botão nenhum. Junto com eles saiu
+> o selo "Conectado" do card do contrato, que era `status_contrato`
+> (ativo/bloqueado) fantasiado de estado da conexão. Os ramos podem continuar no
+> workflow; o site não os chama mais.
 
 ---
 

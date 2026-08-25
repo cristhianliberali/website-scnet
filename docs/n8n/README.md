@@ -13,7 +13,28 @@ painel enquanto esse token estiver válido.
 | `schema-painel.sql`           | As tabelas que alimentam o painel (rode depois do `schema.sql`) |
 
 `schema-painel.sql` também cria `planos_web`, que alimenta a grade de planos da
-home e o modal "Trocar de plano" do painel.
+home. A troca de plano do painel lê `planos_upgrade`, que é outra tabela.
+
+## O SQL, em um arquivo só
+
+Para aplicar tudo de uma vez — é este que você cola no pgAdmin:
+
+**[`schema-completo.sql`](./schema-completo.sql)** — junta, na ordem certa e sem
+nenhum dado de mentira, a estrutura que o painel do cliente e o /admin precisam:
+as colunas novas do cadastro, `contratos_web`, `faturas_web`, `planos_web`,
+`planos_upgrade`, `indicacoes_web`, `web_formularios` e `web_config`. É
+idempotente — rodar de novo não recria nem apaga nada — e termina respondendo
+uma tabela de conferência com o que existe e quantas linhas tem cada coisa.
+
+Ele funciona nas duas instalações: com `clientes_web` como **tabela** (o caso da
+SCNET) ele acrescenta as colunas e as chaves estrangeiras; como **view**, pula
+esses dois blocos avisando o porquê, e o resto entra igual.
+
+Os arquivos por assunto continuam aqui, para aplicar em partes ou para ler o
+porquê de cada decisão: `schema.sql` (login), `schema-painel.sql` (cadastro,
+contratos, faturas, planos), `schema-upgrade-indicacoes.sql` (troca de plano e
+indicações) e `schema-admin.sql` (fila de atendimento e configuração). Os dois
+últimos também trazem dado de exemplo, para conferir a tela em banco de teste.
 
 ## Antes de importar
 
@@ -109,10 +130,15 @@ código ou da senha.
 O workflow importado traz dois ramos genéricos, que atendem qualquer chamada do
 painel:
 
-| Evento              | O que o ramo faz                                            |
-| ------------------- | ----------------------------------------------------------- |
-| `consulta_painel`   | Valida o token e devolve a seção pedida                     |
-| `formulario_painel` | Valida o token e registra o formulário em `web_formularios` |
+| Evento              | O que o ramo faz                        |
+| ------------------- | --------------------------------------- |
+| `consulta_painel`   | Valida o token e devolve a seção pedida |
+| `formulario_painel` | Valida o token e executa a ação         |
+
+> **Quem grava o formulário é o site.** A linha em `web_formularios` — com
+> protocolo e status — é escrita pela aplicação depois que o webhook responde
+> `ok`. Se o fluxo também gravar, o mesmo atendimento aparece duas vezes na tela
+> do cliente e na fila do /admin.
 
 A tela, porém, manda **um evento por assunto** — `painel_bootstrap` para o
 carregamento inicial, `painel_abrir_chamado` para o suporte, `painel_segunda_via`
