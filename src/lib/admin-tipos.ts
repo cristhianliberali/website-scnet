@@ -199,6 +199,86 @@ export const TAMANHO_BANNER = {
   mobile: { largura: 720, altura: 360, proporcao: "2:1" },
 } as const;
 
+/* ---------------- scripts / tags ---------------- */
+
+/**
+ * Onde o código colado entra no HTML.
+ *
+ * São os três lugares que qualquer ferramenta de tag pede, e cada um existe por
+ * um motivo diferente — não é gosto:
+ *
+ * - `head`: o script principal do Tag Manager, verificações de propriedade de
+ *   domínio (Google, Facebook), e qualquer coisa que precise rodar ANTES da
+ *   página aparecer.
+ * - `body_inicio`: o `<noscript>` do Tag Manager. O Google exige que ele seja a
+ *   primeira coisa dentro do `<body>`, e é só para quem está sem JavaScript.
+ * - `body_fim`: widget de chat, pixel secundário, qualquer coisa que possa
+ *   esperar a página inteira carregar. É o lugar mais seguro: nada aqui atrasa
+ *   o que a pessoa vê.
+ */
+export type PosicaoScript = "head" | "body_inicio" | "body_fim";
+
+/** O rótulo e a explicação de cada posição, na ordem em que a tela mostra. */
+export const POSICOES_SCRIPT: Record<PosicaoScript, { rotulo: string; ajuda: string }> = {
+  head: {
+    rotulo: "Header — dentro do <head>",
+    ajuda: "Roda antes da página aparecer. É aqui que vai o script do Google Tag Manager.",
+  },
+  body_inicio: {
+    rotulo: "Body — logo depois do <body>",
+    ajuda: "O <noscript> do Tag Manager pede exatamente este lugar.",
+  },
+  body_fim: {
+    rotulo: "Footer — no fim do <body>",
+    ajuda: "Chat, pixel secundário. O lugar mais seguro: não atrasa nada do que a pessoa vê.",
+  },
+};
+
+/**
+ * Um trecho de código colado no /admin.
+ *
+ * O `codigo` é HTML cru e vai para a página **exatamente** como foi colado —
+ * é o que faz um Tag Manager funcionar. Isso também quer dizer que aqui não
+ * existe rede de proteção: o que for colado roda no navegador de todo visitante.
+ * Por isso a tela do admin é a única porta, e por isso o /admin e a /diagnostico
+ * nunca recebem estes trechos (ver `injetar-scripts.server.ts`).
+ */
+export type ScriptAdmin = {
+  /** Gerado no servidor ao criar. É a chave para editar e excluir. */
+  id: string;
+  /** Só para você se achar na lista: "Google Tag Manager", "Pixel Meta". */
+  nome: string;
+  posicao: PosicaoScript;
+  codigo: string;
+  /**
+   * Desligado, o trecho continua guardado mas some da página.
+   *
+   * É o que permite desligar um rastreamento em dez segundos sem perder o
+   * código — apagar para depois recolar é como se perde um GTM configurado.
+   */
+  ativo: boolean;
+  atualizadoEm: string;
+};
+
+/** Um trecho novo, antes de ser salvo. */
+export const SCRIPT_VAZIO: ScriptAdmin = {
+  id: "",
+  nome: "",
+  posicao: "head",
+  codigo: "",
+  ativo: true,
+  atualizadoEm: "",
+};
+
+/**
+ * Tags de estrutura da página, que um trecho de rastreamento nunca precisa.
+ *
+ * Recusadas na hora de salvar. Um `</body>` colado por engano no meio de um
+ * snippet — acontece quando se copia a página inteira em vez do trecho —
+ * embaralharia o ponto de injeção e cortaria o final da página para todo mundo.
+ */
+export const TAGS_PROIBIDAS = ["<html", "</html", "<head", "</head", "<body", "</body"];
+
 /* ---------------- sessão ---------------- */
 
 export type SessaoAdmin = { usuario: string };

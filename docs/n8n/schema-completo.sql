@@ -563,23 +563,35 @@ ON CONFLICT (chave) DO NOTHING;
 -- ON DELETE SET NULL onde o vínculo é referência: uma fatura sobrevive ao fim
 -- do contrato, e a indicação sobrevive ao cadastro do indicado.
 
+/*
+ * O `oid` do cadastro é guardado numa variável, e a conferência das restrições
+ * só acontece DEPOIS de ele existir.
+ *
+ * Escrever isso como uma expressão só — `to_regclass(...) IS NOT NULL AND
+ * EXISTS (... 'public.clientes_web'::regclass ...)` — parece equivalente e não
+ * é: o `::regclass` é avaliado de qualquer jeito e LANÇA ERRO quando a tabela
+ * não existe, em vez de o `AND` curto-circuitar. Como este arquivo roda dentro
+ * de uma transação, esse erro desfazia o script INTEIRO: num banco vazio,
+ * nenhuma tabela era criada e a única pista era um erro no fim.
+ */
 DO $$
 DECLARE
-  cadastro_ok boolean;
+  oid_cadastro oid := to_regclass('public.clientes_web');
+  cadastro_ok boolean := false;
 BEGIN
-  SELECT to_regclass('public.clientes_web') IS NOT NULL
-         AND (SELECT relkind FROM pg_class WHERE oid = to_regclass('public.clientes_web')) = 'r'
-         AND EXISTS (
-           SELECT 1 FROM pg_constraint
-            WHERE conrelid = 'public.clientes_web'::regclass
-              AND contype IN ('p', 'u')
-              AND conkey = ARRAY[(
-                    SELECT attnum FROM pg_attribute
-                     WHERE attrelid = 'public.clientes_web'::regclass
-                       AND attname = 'id_cliente'
-                  )]
-         )
-    INTO cadastro_ok;
+  IF oid_cadastro IS NOT NULL
+     AND (SELECT relkind FROM pg_class WHERE oid = oid_cadastro) = 'r' THEN
+    SELECT EXISTS (
+      SELECT 1 FROM pg_constraint
+       WHERE conrelid = oid_cadastro
+         AND contype IN ('p', 'u')
+         AND conkey = ARRAY[(
+               SELECT attnum FROM pg_attribute
+                WHERE attrelid = oid_cadastro
+                  AND attname = 'id_cliente'
+             )]
+    ) INTO cadastro_ok;
+  END IF;
 
   IF NOT cadastro_ok THEN
     RAISE NOTICE 'Chaves estrangeiras puladas: clientes_web precisa ser tabela com id_cliente único.';

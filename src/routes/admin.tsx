@@ -35,16 +35,19 @@ import {
 } from "@/components/scnet/admin/admin-solicitacoes";
 import { SecaoIndicacoes } from "@/components/scnet/admin/admin-indicacoes";
 import { SecaoConfig } from "@/components/scnet/admin/admin-config";
+import { SecaoScripts } from "@/components/scnet/admin/admin-scripts";
 import {
   carregarAdmin,
   entrarAdmin,
   estadoAdmin,
   excluirIndicacaoAdmin,
   excluirPlanoAdmin,
+  excluirScriptAdmin,
   sairAdmin,
   salvarConfigAdmin,
   salvarIndicacaoAdmin,
   salvarPlanoAdmin,
+  salvarScriptAdmin,
   salvarSolicitacaoAdmin,
   type AcaoAdmin,
   type DadosAdmin,
@@ -54,9 +57,17 @@ import type {
   ConfigIndicacao,
   IndicacaoAdmin,
   PlanoAdmin,
+  ScriptAdmin,
 } from "@/lib/admin-tipos";
 
-const ABAS = ["planos-site", "planos-upgrade", "solicitacoes", "indicacoes", "indicacao"] as const;
+const ABAS = [
+  "planos-site",
+  "planos-upgrade",
+  "solicitacoes",
+  "indicacoes",
+  "indicacao",
+  "scripts",
+] as const;
 type Aba = (typeof ABAS)[number];
 
 const buscaSchema = z.object({
@@ -249,6 +260,21 @@ function Painel({ sessao, dados }: { sessao: { usuario: string }; dados: DadosAd
   const salvarConfig = (config: ConfigIndicacao) =>
     void executar(() => salvarConfigAdmin({ data: config }));
 
+  const salvarScript = (script: ScriptAdmin) =>
+    void executar(() =>
+      salvarScriptAdmin({
+        data: {
+          id: script.id,
+          nome: script.nome,
+          posicao: script.posicao,
+          codigo: script.codigo,
+          ativo: script.ativo,
+        },
+      }),
+    );
+
+  const excluirScript = (id: string) => void executar(() => excluirScriptAdmin({ data: { id } }));
+
   async function sair() {
     await sairAdmin();
     await router.invalidate();
@@ -308,6 +334,7 @@ function Painel({ sessao, dados }: { sessao: { usuario: string }; dados: DadosAd
           <TabsTrigger value="solicitacoes">Solicitações</TabsTrigger>
           <TabsTrigger value="indicacoes">Indicações</TabsTrigger>
           <TabsTrigger value="indicacao">Seção de indicação</TabsTrigger>
+          <TabsTrigger value="scripts">Scripts e tags</TabsTrigger>
         </TabsList>
 
         <Cartao>
@@ -359,6 +386,15 @@ function Painel({ sessao, dados }: { sessao: { usuario: string }; dados: DadosAd
               config={dados.config}
               salvando={salvando}
               aoSalvar={salvarConfig}
+            />
+          </TabsContent>
+
+          <TabsContent value="scripts">
+            <SecaoScripts
+              scripts={dados.scripts}
+              salvando={salvando}
+              aoSalvar={salvarScript}
+              aoExcluir={excluirScript}
             />
           </TabsContent>
         </Cartao>

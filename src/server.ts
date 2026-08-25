@@ -2,6 +2,7 @@ import "./lib/error-capture";
 
 import { consumeLastCapturedError } from "./lib/error-capture";
 import { renderErrorPage } from "./lib/error-page";
+import { blocosParaRequisicao, injetarScripts } from "./lib/injetar-scripts.server";
 
 type ServerEntry = {
   fetch: (request: Request, env: unknown, ctx: unknown) => Promise<Response> | Response;
@@ -48,8 +49,18 @@ export default {
   async fetch(request: Request, env: unknown, ctx: unknown) {
     try {
       const handler = await getServerEntry();
-      const response = await handler.fetch(request, env, ctx);
-      return await normalizeCatastrophicSsrResponse(response);
+      /*
+       * As tags do /admin são buscadas EM PARALELO com a renderização, não
+       * antes dela: no caminho comum elas já estão na memória e resolvem na
+       * hora, e na única requisição em que não estão (a primeira depois de o
+       * container subir) a leitura acontece enquanto a página é montada, em vez
+       * de somar ao tempo dela.
+       */
+      const [response, blocos] = await Promise.all([
+        handler.fetch(request, env, ctx),
+        blocosParaRequisicao(request),
+      ]);
+      return injetarScripts(await normalizeCatastrophicSsrResponse(response), blocos);
     } catch (error) {
       console.error(error);
       return new Response(renderErrorPage(), {
