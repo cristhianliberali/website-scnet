@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { getAttribution } from "@/lib/utm";
 import { getRecaptchaToken } from "@/lib/recaptcha";
 import { getFacebookCookies, trackLeadEvent } from "@/lib/facebook-pixel";
-import { submitLead } from "@/lib/submit-lead";
+import { RECAPTCHA_ACTION_LEAD, submitLead } from "@/lib/submit-lead";
 import { capitalizeName, isValidPhone, maskPhone } from "@/lib/form-utils";
 import { writeContractHandoffCookie } from "@/lib/contract-handoff";
 import { redirectToWhatsAppSupport, whatsappSupportLink } from "@/lib/whatsapp";
@@ -32,7 +32,10 @@ async function sendLead(input: {
   plan?: SelectedPlan | undefined;
 }): Promise<{ ok: boolean; message?: string | undefined }> {
   try {
-    const recaptchaToken = await getRecaptchaToken("contract_form_submit");
+    // A action VEM do endpoint (`RECAPTCHA_ACTION_LEAD`), e não é escrita aqui:
+    // este formulário usava "contract_form_submit" enquanto o servidor conferia
+    // "lead_submit", e o Google recusava todo token por action_mismatch.
+    const recaptchaToken = await getRecaptchaToken(RECAPTCHA_ACTION_LEAD);
     const { fbc, fbp } = getFacebookCookies();
     const result = await submitLead({
       data: {
@@ -102,10 +105,7 @@ export function ContractForm({
         : "border-border focus:border-brand focus:ring-brand/30",
     );
   const label = (hasError: boolean) =>
-    cn(
-      "font-ui text-sm font-semibold transition",
-      hasError ? "text-red-500" : "text-brand-deep",
-    );
+    cn("font-ui text-sm font-semibold transition", hasError ? "text-red-500" : "text-brand-deep");
 
   async function submit(e: FormEvent) {
     e.preventDefault();
@@ -187,7 +187,9 @@ export function ContractForm({
           )}
         </div>
       )}
-      <p className="font-display text-2xl font-extrabold text-brand-deep">Contrate agora (Leva menos de 2 minutos...)</p>
+      <p className="font-display text-2xl font-extrabold text-brand-deep">
+        Contrate agora (Leva menos de 2 minutos...)
+      </p>
       <div className="mt-4 space-y-3">
         <div className="space-y-1.5">
           <label className={label(!!errors.name)} htmlFor="nome-contrate">

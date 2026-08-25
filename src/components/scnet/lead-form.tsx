@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { getAttribution } from "@/lib/utm";
 import { getRecaptchaToken } from "@/lib/recaptcha";
 import { getFacebookCookies, trackLeadEvent } from "@/lib/facebook-pixel";
-import { submitLead } from "@/lib/submit-lead";
+import { RECAPTCHA_ACTION_LEAD, submitLead } from "@/lib/submit-lead";
 import { capitalizeName, isValidPhone, maskPhone } from "@/lib/form-utils";
 import { isRateLimited } from "@/lib/http-errors";
 import { cn } from "@/lib/utils";
@@ -17,7 +17,8 @@ import { waLink } from "@/lib/whatsapp";
  */
 async function submitLeadInBackground(name: string, ddi: string, phone: string) {
   try {
-    const recaptchaToken = await getRecaptchaToken("lead_submit");
+    // Mesma fonte que o servidor confere — ver RECAPTCHA_ACTION_LEAD.
+    const recaptchaToken = await getRecaptchaToken(RECAPTCHA_ACTION_LEAD);
     const { fbc, fbp } = getFacebookCookies();
     await submitLead({
       data: {
