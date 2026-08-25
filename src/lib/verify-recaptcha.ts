@@ -48,6 +48,8 @@
  * resposta em dez segundos, sem terminal e sem log.
  */
 
+import { lerSeguranca } from "./seguranca-db.server";
+
 export type RecaptchaVerdict =
   /** Sem RECAPTCHA_SECRET_KEY: verificação desligada. */
   | { kind: "skipped" }
@@ -58,26 +60,35 @@ export type RecaptchaVerdict =
 /** Corte padrão: abaixo disso o Google considera tráfego provavelmente automatizado. */
 export const RECAPTCHA_MIN_SCORE_PADRAO = 0.3;
 
-/**
- * O corte de score, de RECAPTCHA_MIN_SCORE.
- *
- * Existe como variável porque o número certo depende do site: o Google calibra
- * por volume, e um provedor regional com poucas visitas por dia recebe score
- * baixo de gente real por meses. Poder baixar para 0.1 — ou para 0, que desliga
- * só o corte por score — é a diferença entre ajustar em um minuto no painel e
- * ficar sem formulário até o próximo deploy.
- */
-export function minScore(): number {
-  const bruto = process.env["RECAPTCHA_MIN_SCORE"];
-  if (bruto === undefined || bruto.trim() === "") return RECAPTCHA_MIN_SCORE_PADRAO;
+/** Lê um corte de score de um texto, ou `null` quando o texto não serve. */
+function corteValido(bruto: string | undefined, origem: string): number | null {
+  if (bruto === undefined || bruto.trim() === "") return null;
   const n = Number(bruto);
   if (!Number.isFinite(n) || n < 0 || n > 1) {
-    console.error(
-      `RECAPTCHA_MIN_SCORE inválido (${bruto}); usando ${RECAPTCHA_MIN_SCORE_PADRAO}. Use um número de 0 a 1.`,
-    );
-    return RECAPTCHA_MIN_SCORE_PADRAO;
+    console.error(`${origem} inválido (${bruto}); ignorado. Use um número de 0 a 1.`);
+    return null;
   }
   return n;
+}
+
+/**
+ * O corte de score em vigor.
+ *
+ * Duas fontes, nesta ordem: o que foi definido no `/admin` e, na falta dele,
+ * a variável `RECAPTCHA_MIN_SCORE`. O painel vem primeiro porque é o único
+ * alcançável por quem está atendendo — a variável exige painel do servidor e
+ * reinício do container.
+ *
+ * O número certo depende do site: o Google calibra por volume, e um provedor
+ * regional com poucas visitas recebe score baixo de gente real por meses. 0
+ * desliga só o corte por score, mantendo o resto da verificação.
+ */
+export function minScore(doAdmin?: string): number {
+  return (
+    corteValido(doAdmin, "Corte de pontuação do /admin") ??
+    corteValido(process.env["RECAPTCHA_MIN_SCORE"], "RECAPTCHA_MIN_SCORE") ??
+    RECAPTCHA_MIN_SCORE_PADRAO
+  );
 }
 
 type SiteVerifyResponse = {
@@ -168,6 +179,20 @@ export async function verifyRecaptcha(
   const secret = process.env["RECAPTCHA_SECRET_KEY"];
   if (!secret) return { kind: "skipped" };
 
+  /*
+   * O interruptor do /admin, conferido antes de qualquer coisa.
+   *
+   * É a saída de emergência: quando o reCAPTCHA passa a recusar clientes de
+   * verdade por um problema de configuração que só se resolve no painel do
+   * Google ou num novo build, desligar por aqui devolve os formulários em dez
+   * segundos, sem deploy. O limite por IP continua valendo enquanto isso.
+   *
+   * A leitura é em cache e só acontece no ENVIO de um formulário, nunca numa
+   * visita comum.
+   */
+  const seguranca = await lerSeguranca();
+  if (!seguranca.recaptchaAtivo) return { kind: "skipped" };
+
   const reprovar = (
     reason: string,
     score: number | undefined,
@@ -254,7 +279,7 @@ export async function verifyRecaptcha(
     return reprovar("hostname_mismatch", data.score, data.hostname);
   }
 
-  const corte = minScore();
+  const corte = minScore(seguranca.minScore);
   if ((data.score ?? 1) < corte) {
     return reprovar(`score_baixo(<${corte})`, data.score, data.hostname);
   }

@@ -199,6 +199,63 @@ export const TAMANHO_BANNER = {
   mobile: { largura: 720, altura: 360, proporcao: "2:1" },
 } as const;
 
+/* ---------------- segurança (reCAPTCHA) ---------------- */
+
+/**
+ * O controle do anti-robô, editável no /admin.
+ *
+ * **Por que isto existe.** O reCAPTCHA só podia ser desligado apagando a
+ * `RECAPTCHA_SECRET_KEY` no painel do servidor e reiniciando o container. Quando
+ * ele passa a recusar clientes de verdade — chave pública que não entrou no
+ * build, domínio fora da lista no painel do Google, pontuação baixa num site
+ * novo —, o formulário para de funcionar para TODO MUNDO, e a única saída fica
+ * fora do alcance de quem está atendendo. Um provedor não pode ficar sem
+ * receber pedido esperando um deploy.
+ *
+ * O que estiver definido aqui manda; o que estiver vazio cai na variável de
+ * ambiente. Assim quem já configurou por variável não perde nada, e quem
+ * precisa mexer às pressas mexe pela tela.
+ */
+export type ConfigSeguranca = {
+  /** Desligado, nenhum envio é recusado por reCAPTCHA (o limite por IP continua). */
+  recaptchaAtivo: boolean;
+  /**
+   * Corte de pontuação, como texto ("0.1"). Vazio usa RECAPTCHA_MIN_SCORE, e
+   * na falta dela o padrão do código.
+   */
+  minScore: string;
+};
+
+export const CONFIG_SEGURANCA_PADRAO: ConfigSeguranca = {
+  recaptchaAtivo: true,
+  minScore: "",
+};
+
+/**
+ * O que o /admin mostra sobre o estado do anti-robô.
+ *
+ * Isto é leitura, não configuração: são os fatos que só o servidor conhece e
+ * que respondem "por que não deixa enviar?" — a mesma coisa que a /diagnostico
+ * mostra, trazida para onde a pessoa já está logada.
+ */
+export type DiagnosticoSeguranca = {
+  /** A chave PÚBLICA entrou no build? Falso aqui explica 100% das recusas. */
+  siteKeyNoBundle: boolean;
+  /** A chave SECRETA existe no servidor? Sem ela nada é verificado. */
+  secretNoServidor: boolean;
+  /** O corte em vigor agora, já considerando o que foi definido no /admin. */
+  minScoreEmVigor: number;
+  /** Domínio derivado de VITE_SITE_URL. */
+  hostnameEsperado: string;
+  /** As últimas recusas, da mais recente para a mais antiga. */
+  ultimosBloqueios: {
+    em: string;
+    formulario: string;
+    motivo: string;
+    score: number | null;
+  }[];
+};
+
 /* ---------------- scripts / tags ---------------- */
 
 /**

@@ -495,14 +495,15 @@ botão sem o servidor conferir é uma porta trancada com o vidro aberto.
 
 O que dá para fazer:
 
-| Aba                | O que muda                                                               |
-| ------------------ | ------------------------------------------------------------------------ |
-| Planos do site     | `planos_web` — a home e a /contratacao                                   |
-| Planos de upgrade  | `planos_upgrade` — a troca de plano do painel                            |
-| Solicitações       | a fila de `web_formularios`: status, assunto, data da visita, observação |
-| Indicações         | `indicacoes_web`: status, bônus, campanha, vínculo com o novo contrato   |
-| Seção de indicação | título, descrição, banner, campanha vigente e o liga/desliga             |
-| Scripts e tags     | Tag Manager, pixels e chat colados no `<head>`, no `<body>` ou no rodapé |
+| Aba                | O que muda                                                                 |
+| ------------------ | -------------------------------------------------------------------------- |
+| Planos do site     | `planos_web` — a home e a /contratacao                                     |
+| Planos de upgrade  | `planos_upgrade` — a troca de plano do painel                              |
+| Solicitações       | a fila de `web_formularios`: status, assunto, data da visita, observação   |
+| Indicações         | `indicacoes_web`: status, bônus, campanha, vínculo com o novo contrato     |
+| Seção de indicação | título, descrição, banner, campanha vigente e o liga/desliga               |
+| Scripts e tags     | Tag Manager, pixels e chat colados no `<head>`, no `<body>` ou no rodapé   |
+| Anti-robô          | diagnóstico do reCAPTCHA, corte de pontuação e o interruptor de emergência |
 
 **Sem upload de arquivo.** As logos dos planos e os banners entram como URL, do
 mesmo jeito que já entravam pelo Postgres. Guardar arquivo pede storage, limite
@@ -623,7 +624,17 @@ libera o envio — ver o comentário em `.env.example`.
 
 #### "O formulário não deixa enviar"
 
-Abra **`/diagnostico?token=...`** e olhe o bloco `recaptcha`. Ele responde as
+**O caminho curto: `/admin` → aba "Anti-robô".** Ela responde em uma frase o que
+está acontecendo, lista as últimas recusas com o motivo traduzido, e tem o
+interruptor. Desligar ali destrava os formulários **na hora**, sem deploy e sem
+reiniciar container — o limite por IP continua valendo. Existe porque a única
+saída antes era apagar a `RECAPTCHA_SECRET_KEY` no painel do servidor: fora do
+alcance de quem está atendendo, e com o provedor sem receber pedido enquanto
+isso. O corte de pontuação também se ajusta por lá, e o que for definido no
+painel vence a variável de ambiente.
+
+O caminho longo, com o detalhe cru: **`/diagnostico?token=...`**, bloco
+`recaptcha`. Ele responde as
 três perguntas que separam as causas, e a página traduz o achado para português:
 
 | O que aparece                                              | O que significa                                                                                                                                                                                                           |
