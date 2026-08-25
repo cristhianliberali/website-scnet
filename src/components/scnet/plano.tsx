@@ -4,11 +4,11 @@
  * itens com ícone de check e os logos dos agregados.
  */
 
-import { Check, MessageCircle } from "lucide-react";
+import { ArrowRight, Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { precoVigente, textoPosDesconto, type Plan } from "@/lib/plans";
-import { waLink } from "@/lib/whatsapp";
+import { HASH_FORMULARIO } from "@/lib/links";
 
 /** Título fixo acima dos logos dos agregados. */
 export const TITULO_AGREGADOS = "O que você leva";
@@ -118,10 +118,22 @@ export function ItensPlano({
 
 /**
  * Mostrado no lugar dos cards quando a consulta ao banco não trouxe plano
- * nenhum. Sem lista de reserva, a saída do cliente é o atendimento — e o
+ * nenhum. Sem lista de reserva, a saída do cliente é deixar o contato — e o
  * motivo real fica no log do servidor.
+ *
+ * O `destino` existe porque este bloco aparece em duas páginas. Na home, o
+ * formulário está logo abaixo e o fragmento sozinho basta: rola até ele sem
+ * recarregar, preservando as UTMs e o `codigo_oferta` da URL. Na
+ * `/contratacao` não há seção nenhuma para ancorar, e quem chama passa o
+ * endereço completo.
  */
-export function PlanosIndisponiveis({ className }: { className?: string }) {
+export function PlanosIndisponiveis({
+  className,
+  destino = HASH_FORMULARIO,
+}: {
+  className?: string;
+  destino?: string;
+}) {
   return (
     <div
       className={cn("rounded-3xl border border-border bg-card p-8 text-center sm:p-10", className)}
@@ -130,16 +142,13 @@ export function PlanosIndisponiveis({ className }: { className?: string }) {
         Não foi possível carregar os planos agora
       </p>
       <p className="mx-auto mt-2 max-w-md font-body text-sm text-muted-foreground">
-        É coisa rápida. Chame a gente no WhatsApp que um consultor passa os planos e as condições na
-        hora.
+        É coisa rápida. Deixe seu nome e telefone no formulário que um consultor passa os planos e
+        as condições na hora.
       </p>
-      <Button variant="whats" size="xl" className="mt-6" asChild>
-        <a
-          target="_blank"
-          rel="noopener"
-          href={waLink("Oi! O site não está mostrando os planos. Pode me passar as opções?")}
-        >
-          <MessageCircle /> Falar com um consultor
+      <Button variant="zap" size="xl" className="mt-6" asChild>
+        <a href={destino}>
+          Falar com um consultor
+          <ArrowRight className="size-5" />
         </a>
       </Button>
     </div>

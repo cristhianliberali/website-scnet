@@ -30,6 +30,7 @@ import {
   maskPhone,
   nationalPhoneDigits,
 } from "@/lib/form-utils";
+import { LINK_FORMULARIO } from "@/lib/links";
 import { getAttribution } from "@/lib/utm";
 import { getRecaptchaToken } from "@/lib/recaptcha";
 import { submitContractStep } from "@/lib/submit-contract-step";
@@ -1239,7 +1240,7 @@ function StepPlanos({
 }) {
   // Sem plano não há como avançar: em vez de travar o cliente no "Continuar",
   // a etapa oferece a saída pelo atendimento.
-  if (!plans.length) return <PlanosIndisponiveis />;
+  if (!plans.length) return <PlanosIndisponiveis destino={LINK_FORMULARIO} />;
 
   return (
     <div>

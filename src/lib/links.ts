@@ -51,6 +51,29 @@ export function urlDoSite(caminho = "/"): string {
 /** Endereço absoluto de uma seção da home: `urlDaSecao("planos")`. */
 export const urlDaSecao = (secao: string) => urlDoSite(`/#${secao}`);
 
+/**
+ * O formulário principal — o "Contrate agora" que fecha a home.
+ *
+ * Fica aqui porque virou o destino único dos CTAs da página: no lugar dos
+ * botões que abriam o WhatsApp, cada seção agora aponta para o formulário, e
+ * um endereço repetido em quatro arquivos é um convite a que um deles fique
+ * para trás quando a seção mudar de nome.
+ *
+ * São duas formas do mesmo destino, e a diferença importa:
+ *
+ * - `HASH_FORMULARIO` é só o fragmento, e é o que os CTAs da própria home
+ *   usam. O navegador rola a página sem recarregar — a URL continua com as
+ *   UTMs e com o `codigo_oferta` que liberou os planos de campanha. Com a
+ *   barra na frente, a mesma URL vista de `/?codigo_oferta=X` é outro
+ *   endereço, e o recarregamento levaria a oferta embora.
+ * - `LINK_FORMULARIO` é o endereço completo, para quem chama de fora da home
+ *   (a `/contratacao`, por exemplo), onde não existe seção nenhuma para
+ *   ancorar.
+ */
+export const ANCORA_FORMULARIO = "contratar";
+export const HASH_FORMULARIO = `#${ANCORA_FORMULARIO}`;
+export const LINK_FORMULARIO = `/${HASH_FORMULARIO}`;
+
 /*
  * Os endereços que ficam fora deste site. Cada um é opcional: sem a variável,
  * o item some do menu em vez de virar um link morto.

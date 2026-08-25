@@ -34,7 +34,7 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Toaster } from "@/components/ui/sonner";
 import { Header } from "@/components/scnet/header";
-import { Footer, WhatsFloat } from "@/components/scnet/sections";
+import { Footer } from "@/components/scnet/sections";
 import { Blobs } from "@/components/scnet/shared";
 import {
   AvisoCadastroInativo,
@@ -292,7 +292,6 @@ function PainelAtivo({
       </main>
 
       <Footer />
-      <WhatsFloat />
       <Toaster />
     </div>
   );

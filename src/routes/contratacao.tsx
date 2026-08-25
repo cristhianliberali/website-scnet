@@ -3,7 +3,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { z } from "zod";
 import { Toaster } from "@/components/ui/sonner";
 import { Header } from "@/components/scnet/header";
-import { Footer, WhatsFloat } from "@/components/scnet/sections";
+import { Footer } from "@/components/scnet/sections";
 import { Blobs } from "@/components/scnet/shared";
 import { ContractWizard } from "@/components/scnet/contract-wizard";
 import { readContractHandoffCookie, type ContractHandoff } from "@/lib/contract-handoff";
@@ -112,7 +112,6 @@ function Contratacao() {
         </section>
       </main>
       <Footer />
-      <WhatsFloat />
       <Toaster />
     </div>
   );
