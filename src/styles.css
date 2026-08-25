@@ -78,6 +78,33 @@
   }
 }
 
+/*
+ * O texto de exemplo dos campos — o "Maria Silva", o "(49) 99999-9999".
+ *
+ * Ele é sugestão, não conteúdo, e por isso nasce fraco: um exemplo com a mesma
+ * força do texto digitado faz o campo vazio parecer preenchido, e quem passa os
+ * olhos no formulário antes de enviar não vê o que ainda falta. Ao clicar no
+ * campo ele enfraquece mais ainda — dali em diante o exemplo já cumpriu o
+ * papel, e o que importa é o que está sendo escrito por cima dele.
+ *
+ * Só a opacidade mora aqui. A COR fica em cada campo, porque muda com o fundo:
+ * no fundo da marca o exemplo é claro, no fundo branco é escuro. Assim cada
+ * formulário mantém o seu tom e todos herdam a mesma escala de força — e uma
+ * mudança de escala acontece num lugar só.
+ */
+@utility placeholder-fraco {
+  &::placeholder {
+    opacity: 0.55;
+    transition: opacity 0.2s ease;
+  }
+
+  /* `:focus`, e não `:focus-visible`: aqui o gatilho é o clique no campo tanto
+     quanto o Tab, e `:focus-visible` ignora justamente o clique. */
+  &:focus::placeholder {
+    opacity: 0.3;
+  }
+}
+
 @utility gradient-brand {
   background-image: linear-gradient(125deg, var(--color-brand-deep) 0%, var(--color-brand) 100%);
 }

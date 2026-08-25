@@ -82,10 +82,10 @@ export function LeadForm({ variant = "hero" }: { variant?: "hero" | "light" }) {
     );
   const field = (hasError: boolean) =>
     cn(
-      "w-full rounded-lg border px-4 py-3 font-body outline-none transition focus:ring-2",
+      "placeholder-fraco w-full rounded-lg border px-4 py-3 font-body outline-none transition focus:ring-2",
       onBrand
         ? cn(
-            "bg-primary-foreground/10 placeholder:text-primary-foreground/50",
+            "bg-primary-foreground/10 placeholder:text-primary-foreground",
             hasError
               ? "border-red-400 text-primary-foreground focus:border-red-500 focus:ring-red-300/40"
               : "border-primary-foreground/25 text-primary-foreground focus:border-zap focus:ring-zap/40",

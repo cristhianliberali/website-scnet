@@ -114,7 +114,7 @@ const ymd = (d: Date) =>
 
 const inputCls = (error?: boolean) =>
   cn(
-    "w-full rounded-lg border bg-muted/40 px-4 py-3 font-body text-foreground placeholder:text-muted-foreground outline-none transition focus:ring-2",
+    "placeholder-fraco w-full rounded-lg border bg-muted/40 px-4 py-3 font-body text-foreground placeholder:text-muted-foreground outline-none transition focus:ring-2",
     error
       ? "border-red-400 focus:border-red-500 focus:ring-red-300/40"
       : "border-border focus:border-brand focus:ring-brand/30",
