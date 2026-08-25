@@ -37,6 +37,7 @@ import { SecaoIndicacoes } from "@/components/scnet/admin/admin-indicacoes";
 import { SecaoConfig } from "@/components/scnet/admin/admin-config";
 import { SecaoScripts } from "@/components/scnet/admin/admin-scripts";
 import { SecaoSeguranca } from "@/components/scnet/admin/admin-seguranca";
+import { SecaoAreaCliente } from "@/components/scnet/admin/admin-area-cliente";
 import {
   carregarAdmin,
   entrarAdmin,
@@ -48,6 +49,7 @@ import {
   salvarConfigAdmin,
   salvarIndicacaoAdmin,
   salvarPlanoAdmin,
+  salvarAreaClienteAdmin,
   salvarScriptAdmin,
   salvarSegurancaAdmin,
   salvarSolicitacaoAdmin,
@@ -56,6 +58,7 @@ import {
 } from "@/lib/admin";
 import type {
   CatalogoPlanos,
+  ConfigAreaCliente,
   ConfigIndicacao,
   ConfigSeguranca,
   IndicacaoAdmin,
@@ -71,6 +74,7 @@ const ABAS = [
   "indicacao",
   "scripts",
   "seguranca",
+  "area-cliente",
 ] as const;
 type Aba = (typeof ABAS)[number];
 
@@ -282,6 +286,9 @@ function Painel({ sessao, dados }: { sessao: { usuario: string }; dados: DadosAd
   const salvarSeguranca = (config: ConfigSeguranca) =>
     void executar(() => salvarSegurancaAdmin({ data: config }));
 
+  const salvarAreaCliente = (config: ConfigAreaCliente) =>
+    void executar(() => salvarAreaClienteAdmin({ data: config }));
+
   async function sair() {
     await sairAdmin();
     await router.invalidate();
@@ -343,6 +350,7 @@ function Painel({ sessao, dados }: { sessao: { usuario: string }; dados: DadosAd
           <TabsTrigger value="indicacao">Seção de indicação</TabsTrigger>
           <TabsTrigger value="scripts">Scripts e tags</TabsTrigger>
           <TabsTrigger value="seguranca">Anti-robô</TabsTrigger>
+          <TabsTrigger value="area-cliente">Área do cliente</TabsTrigger>
         </TabsList>
 
         <Cartao>
@@ -403,6 +411,15 @@ function Painel({ sessao, dados }: { sessao: { usuario: string }; dados: DadosAd
               salvando={salvando}
               aoSalvar={salvarScript}
               aoExcluir={excluirScript}
+            />
+          </TabsContent>
+
+          <TabsContent value="area-cliente">
+            <SecaoAreaCliente
+              key={JSON.stringify(dados.areaCliente)}
+              config={dados.areaCliente}
+              salvando={salvando}
+              aoSalvar={salvarAreaCliente}
             />
           </TabsContent>
 

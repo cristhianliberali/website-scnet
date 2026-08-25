@@ -36,6 +36,7 @@ import {
 } from "@/components/ui/accordion";
 import { useCountUp } from "@/hooks/use-reveal";
 import { ContractForm, type SelectedPlan } from "./contract-form";
+import { eventoDeClique, eventoWhatsapp } from "@/lib/datalayer";
 import { Blobs, LinkDeMenu, Reveal, SectionTitle } from "./shared";
 import { Carrossel } from "./carrossel";
 import { ItensPlano, LogosAgregados, PlanosIndisponiveis, PrecoPlano, SeloDestaque } from "./plano";
@@ -76,7 +77,16 @@ export function Hero() {
           </Reveal>
           <Reveal delay={240} className="mt-7 sm:mt-8">
             <Button asChild variant="zap" size="hero" className="w-full shadow-lg sm:w-auto">
-              <a href="#planos">
+              <a
+                href="#planos"
+                onClick={() =>
+                  eventoDeClique("ver_planos", {
+                    texto: "Quero ver os planos",
+                    local: "hero",
+                    destino: "#planos",
+                  })
+                }
+              >
                 Quero ver os planos
                 <ArrowRight className="size-5" />
               </a>
@@ -296,7 +306,20 @@ function PlanoCard({ plan, onSelect }: { plan: Plan; onSelect: (plan: SelectedPl
         className="mt-6 w-full"
         asChild
       >
-        <a href="#contrate" onClick={() => onSelect(planoWebhook(plan))}>
+        <a
+          href="#contrate"
+          onClick={() => {
+            onSelect(planoWebhook(plan));
+            // O plano escolhido viaja no evento: é o que permite ver no
+            // relatório qual grade converte, e não só quantos clicaram.
+            eventoDeClique("escolher_plano", {
+              texto: "Quero este plano",
+              local: "grade_de_planos",
+              plano: plan.nome,
+              destaque: plan.destaque,
+            });
+          }}
+        >
           Quero este plano
         </a>
       </Button>
@@ -358,6 +381,10 @@ export function Planos({
               target="_blank"
               rel="noopener"
               href={waLink("Oi! Me ajuda a escolher o melhor plano da SCNET?")}
+              onClick={() => {
+                eventoDeClique("whatsapp_ajuda_plano", { local: "planos" });
+                eventoWhatsapp("ajuda_plano", { local: "planos" });
+              }}
             >
               <MessageCircle /> Chamar no WhatsApp
             </a>
@@ -446,6 +473,10 @@ export function Empresas() {
               target="_blank"
               rel="noopener"
               href={waLink("Oi! Quero um plano SCNET para minha empresa/condomínio.")}
+              onClick={() => {
+                eventoDeClique("whatsapp_empresas", { local: "empresas" });
+                eventoWhatsapp("empresas", { local: "empresas" });
+              }}
             >
               <Building2 /> Quero um plano pra empresa
             </a>
@@ -583,10 +614,13 @@ export function Faq() {
 export function CtaFinal({
   selectedPlan,
   codigoOferta,
+  areaClienteAtiva = true,
 }: {
   selectedPlan: SelectedPlan | null;
   /** Código de campanha da URL, repassado adiante para /contratacao. */
   codigoOferta?: string | undefined;
+  /** Vem do /admin: decide para onde vai quem marca "Já sou cliente". */
+  areaClienteAtiva?: boolean;
 }) {
   return (
     <section className="gradient-brand relative overflow-hidden py-24">
@@ -620,7 +654,11 @@ export function CtaFinal({
           </div>
         </Reveal>
         <Reveal delay={120} className="w-full lg:justify-self-end">
-          <ContractForm selectedPlan={selectedPlan} codigoOferta={codigoOferta} />
+          <ContractForm
+            selectedPlan={selectedPlan}
+            codigoOferta={codigoOferta}
+            areaClienteAtiva={areaClienteAtiva}
+          />
         </Reveal>
       </div>
     </section>
@@ -686,6 +724,10 @@ export function WhatsFloat() {
       target="_blank"
       rel="noopener"
       aria-label="Falar no WhatsApp"
+      onClick={() => {
+        eventoDeClique("whatsapp_flutuante", { local: "botao_flutuante" });
+        eventoWhatsapp("botao_flutuante");
+      }}
       className="animate-bounce-soft fixed bottom-5 right-5 z-50 grid size-14 place-items-center rounded-full bg-[#25D366] text-[#0b3d1f] shadow-2xl transition-transform hover:scale-110"
     >
       <MessageCircle className="size-7" />

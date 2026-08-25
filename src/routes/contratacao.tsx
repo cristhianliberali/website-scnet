@@ -8,6 +8,7 @@ import { Blobs } from "@/components/scnet/shared";
 import { ContractWizard } from "@/components/scnet/contract-wizard";
 import { readContractHandoffCookie, type ContractHandoff } from "@/lib/contract-handoff";
 import { fetchPlanos } from "@/lib/fetch-planos";
+import { estadoAreaCliente } from "@/lib/area-cliente";
 import { planosVisiveis } from "@/lib/plans";
 
 const searchSchema = z.object({
@@ -26,9 +27,12 @@ export const Route = createFileRoute("/contratacao")({
   loaderDeps: ({ search }) => ({ codigoOferta: search.codigo_oferta }),
   // Mesma fonte e mesma regra da home: os planos ativos do Postgres, com os de
   // campanha liberados só pelo código que veio na URL.
-  loader: async ({ deps }) => ({
-    planos: planosVisiveis(await fetchPlanos(), deps.codigoOferta),
-  }),
+  // A área do cliente entra aqui pelo mesmo motivo da home: quem marcar "Já sou
+  // cliente" precisa ser desviado no instante do clique.
+  loader: async ({ deps }) => {
+    const [planos, areaCliente] = await Promise.all([fetchPlanos(), estadoAreaCliente()]);
+    return { planos: planosVisiveis(planos, deps.codigoOferta), areaCliente };
+  },
   head: () => ({
     meta: [
       { title },
@@ -52,7 +56,7 @@ export const Route = createFileRoute("/contratacao")({
 
 function Contratacao() {
   const search = Route.useSearch();
-  const { planos } = Route.useLoaderData();
+  const { planos, areaCliente } = Route.useLoaderData();
   // A URL é a fonte primária; o cookie só completa o que faltar nela.
   const [handoff, setHandoff] = useState<ContractHandoff>(search);
   const [ready, setReady] = useState(false);
@@ -97,7 +101,13 @@ function Contratacao() {
         <section className="relative -mt-10 pb-24">
           {/* max-w-7xl: espaço para a grade de 4 colunas da etapa de planos */}
           <div className="mx-auto max-w-7xl px-4">
-            {ready && <ContractWizard plans={planos} handoff={handoff} />}
+            {ready && (
+              <ContractWizard
+                plans={planos}
+                handoff={handoff}
+                areaClienteAtiva={areaCliente.ativa}
+              />
+            )}
           </div>
         </section>
       </main>

@@ -1,4 +1,5 @@
-import { useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useNavigate } from "@tanstack/react-router";
 import { toast } from "sonner";
 import {
   Check,
@@ -33,6 +34,8 @@ import { getAttribution } from "@/lib/utm";
 import { getRecaptchaToken } from "@/lib/recaptcha";
 import { submitContractStep } from "@/lib/submit-contract-step";
 import { redirectToWhatsAppSupport, whatsappSupportLink } from "@/lib/whatsapp";
+import { dispararEvento, eventoDaEtapa, eventoDeClique, EVENTO } from "@/lib/datalayer";
+import { AreaClienteDesligada } from "./area-cliente-desligada";
 import { cn } from "@/lib/utils";
 import type { ContractHandoff } from "@/lib/contract-handoff";
 
@@ -254,7 +257,16 @@ const LAST_STEP = STEPS.length - 1;
 
 /* ---------------- wizard ---------------- */
 
-export function ContractWizard({ plans, handoff }: { plans: Plan[]; handoff: ContractHandoff }) {
+export function ContractWizard({
+  plans,
+  handoff,
+  areaClienteAtiva = true,
+}: {
+  plans: Plan[];
+  handoff: ContractHandoff;
+  /** Vem do /admin: com a área desligada, cliente-base vai ao WhatsApp da central. */
+  areaClienteAtiva?: boolean;
+}) {
   const prefilledPlan = useMemo(
     () => plans.find((p) => p.nome === handoff.plano) ?? null,
     [plans, handoff.plano],
@@ -290,6 +302,27 @@ export function ContractWizard({ plans, handoff }: { plans: Plan[]; handoff: Con
       ? []
       : ([["Interesse", intentLabel(prefilledLead.intencao)]] as Array<[string, string]>)),
   ];
+
+  /**
+   * Quem já é cliente não tem o que contratar aqui.
+   *
+   * Dois caminhos chegam neste estado: marcar "Já sou cliente" no bloco de lead
+   * (quem caiu direto em /contratacao) e chegar com `?intencao=ja_sou_cliente`
+   * na URL. Nos dois, seguir o funil seria pedir um cadastro que já existe.
+   */
+  const [clienteBase, setClienteBase] = useState(() => prefilledLead.intencao === "ja_sou_cliente");
+
+  const navigate = useNavigate();
+
+  /*
+   * A navegação para o login não pode acontecer durante a renderização — daí o
+   * efeito. Com a área desligada não há para onde ir: fica a tela da central.
+   */
+  useEffect(() => {
+    if (!clienteBase) return;
+    dispararEvento(EVENTO.leadClienteBase, { origem: "contratacao" });
+    if (areaClienteAtiva) void navigate({ to: "/cliente" });
+  }, [clienteBase, areaClienteAtiva, navigate]);
 
   const [plan, setPlan] = useState<Plan | null>(prefilledPlan);
   const [step, setStep] = useState(prefilledPlan ? 1 : 0);
@@ -549,6 +582,34 @@ export function ContractWizard({ plans, handoff }: { plans: Plan[]; handoff: Con
       });
       if (result.ok) {
         setStepBlock(null);
+        /*
+         * `contratacao_1`, `contratacao_2`... um por etapa CONCLUÍDA.
+         *
+         * Disparar na conclusão, e não na abertura, é o que faz o funil dizer a
+         * verdade: a etapa que foi recusada não conta, e é exatamente aí que a
+         * queda aparece no relatório do GTM.
+         */
+        dispararEvento(eventoDaEtapa(index), {
+          etapa: index + 1,
+          etapa_id: stepInfo.id,
+          etapa_nome: stepInfo.label,
+          ...(chosenPlan
+            ? {
+                plano: chosenPlan.nome,
+                preco: precoVigente(chosenPlan.valor, chosenPlan.valor_primeiras_faturas),
+              }
+            : {}),
+        });
+        if (index === LAST_STEP) {
+          dispararEvento(EVENTO.contratacaoConcluida, {
+            ...(chosenPlan
+              ? {
+                  plano: chosenPlan.nome,
+                  preco: precoVigente(chosenPlan.valor, chosenPlan.valor_primeiras_faturas),
+                }
+              : {}),
+          });
+        }
         return true;
       }
       return block(
@@ -611,6 +672,37 @@ export function ContractWizard({ plans, handoff }: { plans: Plan[]; handoff: Con
   function finish() {
     if (!validate(LAST_STEP)) return;
     void advance(LAST_STEP, plan);
+  }
+
+  /*
+   * Cliente da base: a tela de contratação não tem o que oferecer a ele.
+   *
+   * Com a área de membros no ar, o destino é o login — o efeito faz a navegação
+   * porque `navigate` durante a renderização é proibido no React. Desligada,
+   * fica a mensagem com o WhatsApp da central.
+   */
+  if (clienteBase) {
+    if (!areaClienteAtiva) {
+      return (
+        <div className="rounded-3xl border border-border bg-white shadow-xl">
+          <AreaClienteDesligada
+            mensagem="A área do cliente está em manutenção. Nossa central resolve com você agora mesmo pelo WhatsApp."
+            origem="contratacao"
+          />
+        </div>
+      );
+    }
+    return (
+      <div className="rounded-3xl border border-border bg-white p-8 text-center shadow-xl">
+        <h2 className="font-display text-2xl font-extrabold text-brand-deep">
+          Você já é cliente SCNET
+        </h2>
+        <p className="mx-auto mt-3 max-w-lg font-body text-muted-foreground">
+          Estamos te levando para a área do cliente, onde você resolve segunda via, suporte e
+          mudança de plano.
+        </p>
+      </div>
+    );
   }
 
   if (done) {
@@ -738,6 +830,13 @@ export function ContractWizard({ plans, handoff }: { plans: Plan[]; handoff: Con
                               onClick={() => {
                                 setLead((p) => ({ ...p, intencao: value }));
                                 clearError("lead_intencao");
+                                eventoDeClique(`intencao_${value}`, {
+                                  texto: text,
+                                  local: "contratacao",
+                                });
+                                // Já é cliente: sai do funil aqui mesmo, em vez
+                                // de preencher endereço e documentos à toa.
+                                if (value === "ja_sou_cliente") setClienteBase(true);
                               }}
                               className={cn(
                                 "rounded-lg border px-3 py-3 font-ui text-sm font-semibold leading-6 transition",
