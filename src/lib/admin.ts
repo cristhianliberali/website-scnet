@@ -36,10 +36,14 @@ import {
   type ResumoAdmin,
 } from "./admin-db.server";
 import { gravarConfigIndicacao, lerConfigIndicacao } from "./config-db.server";
+import { gravarSeguranca, lerSegurancaFresca } from "./seguranca-db.server";
+import { minScore, ultimosVereditos } from "./verify-recaptcha";
 import { MAX_CODIGO, excluirScript, listarScripts, salvarScript } from "./scripts-db.server";
 import { TAGS_PROIBIDAS } from "./admin-tipos";
 import type {
   ConfigIndicacao,
+  ConfigSeguranca,
+  DiagnosticoSeguranca,
   IndicacaoAdmin,
   PlanoAdmin,
   ScriptAdmin,
@@ -106,6 +110,12 @@ const indicacaoSchema = z.object({
   tipoBonus: z.enum(["", "desconto_fatura", "premio", "pix"]),
   descricaoBonus: texto(2000),
   valorIndicacao: texto(20),
+});
+
+const segurancaSchema = z.object({
+  recaptchaAtivo: z.boolean(),
+  // vazio = "usa a variável de ambiente". O número é conferido na leitura.
+  minScore: texto(10),
 });
 
 const configSchema = z.object({
@@ -224,6 +234,9 @@ export type DadosAdmin = {
   indicacoes: IndicacaoAdmin[];
   config: ConfigIndicacao;
   scripts: ScriptAdmin[];
+  seguranca: ConfigSeguranca;
+  /** Leitura, não ajuste: o estado do anti-robô como o servidor o enxerga. */
+  diagnosticoSeguranca: DiagnosticoSeguranca;
 };
 
 /**
@@ -238,18 +251,37 @@ export const carregarAdmin = createServerFn({ method: "GET" }).handler(
   async (): Promise<DadosAdmin> => {
     await exigirSessaoAdmin();
 
-    const [resumo, planosSite, planosUpgrade, solicitacoes, indicacoes, config, scripts] =
-      await Promise.all([
-        resumoAdmin(),
-        listaSegura("planos do site", listarPlanos("site")),
-        listaSegura("planos de upgrade", listarPlanos("upgrade")),
-        listaSegura("solicitações", listarSolicitacoes({})),
-        listaSegura("indicações", listarIndicacoes({})),
-        lerConfigIndicacao(),
-        listaSegura("scripts", listarScripts()),
-      ]);
+    const [
+      resumo,
+      planosSite,
+      planosUpgrade,
+      solicitacoes,
+      indicacoes,
+      config,
+      scripts,
+      seguranca,
+    ] = await Promise.all([
+      resumoAdmin(),
+      listaSegura("planos do site", listarPlanos("site")),
+      listaSegura("planos de upgrade", listarPlanos("upgrade")),
+      listaSegura("solicitações", listarSolicitacoes({})),
+      listaSegura("indicações", listarIndicacoes({})),
+      lerConfigIndicacao(),
+      listaSegura("scripts", listarScripts()),
+      lerSegurancaFresca(),
+    ]);
 
-    return { resumo, planosSite, planosUpgrade, solicitacoes, indicacoes, config, scripts };
+    return {
+      resumo,
+      planosSite,
+      planosUpgrade,
+      solicitacoes,
+      indicacoes,
+      config,
+      scripts,
+      seguranca,
+      diagnosticoSeguranca: diagnosticoDaSeguranca(seguranca),
+    };
   },
 );
 
@@ -353,5 +385,55 @@ export const excluirScriptAdmin = createServerFn({ method: "POST" })
     acao(async () => {
       await excluirScript(data.id);
       return "Script excluído.";
+    }),
+  );
+
+/* ---------------- segurança (anti-robô) ---------------- */
+
+/**
+ * O estado do reCAPTCHA como só o servidor consegue ver.
+ *
+ * `siteKeyNoBundle` é o campo que resolve o caso mais comum e mais invisível:
+ * `VITE_RECAPTCHA_SITE_KEY` entra no JavaScript em tempo de BUILD, então, se ela
+ * foi preenchida só como variável de ambiente no EasyPanel e não também nos
+ * *Build Args*, o navegador não tem chave, não gera token, e o servidor recusa
+ * TODOS os envios. Nada disso aparece na tela do visitante, e a leitura literal
+ * aqui é exatamente o valor que foi para o navegador.
+ */
+function diagnosticoDaSeguranca(seguranca: ConfigSeguranca): DiagnosticoSeguranca {
+  const siteKey = (import.meta.env["VITE_RECAPTCHA_SITE_KEY"] as string | undefined)?.trim();
+  const siteUrl = (import.meta.env["VITE_SITE_URL"] as string | undefined)?.trim();
+
+  let hostname = "";
+  try {
+    if (siteUrl) hostname = new URL(siteUrl).hostname;
+  } catch {
+    hostname = "";
+  }
+
+  return {
+    siteKeyNoBundle: Boolean(siteKey),
+    secretNoServidor: Boolean(process.env["RECAPTCHA_SECRET_KEY"]),
+    minScoreEmVigor: minScore(seguranca.minScore),
+    hostnameEsperado: hostname,
+    ultimosBloqueios: ultimosVereditos()
+      .slice(0, 10)
+      .map((v) => ({
+        em: v.em,
+        formulario: v.action,
+        motivo: v.motivo,
+        score: v.score,
+      })),
+  };
+}
+
+export const salvarSegurancaAdmin = createServerFn({ method: "POST" })
+  .validator(segurancaSchema)
+  .handler(async ({ data }) =>
+    acao(async () => {
+      await gravarSeguranca(data);
+      return data.recaptchaAtivo
+        ? "Anti-robô ligado."
+        : "Anti-robô DESLIGADO. Os formulários voltaram a aceitar envios.";
     }),
   );

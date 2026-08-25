@@ -8,6 +8,7 @@
 
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 
+import { normalizarSeguranca } from "./seguranca-db.server";
 import {
   isLikelyBot,
   mensagemRecaptcha,
@@ -96,6 +97,35 @@ describe("corte por score", () => {
     expect(minScore()).toBe(RECAPTCHA_MIN_SCORE_PADRAO);
     process.env["RECAPTCHA_MIN_SCORE"] = "7";
     expect(minScore()).toBe(RECAPTCHA_MIN_SCORE_PADRAO);
+  });
+
+  test("o corte do /admin vence a variável de ambiente", () => {
+    // O painel é o único alcançável por quem está atendendo; a variável exige
+    // acesso ao servidor e reinício. Quem pode agir precisa mandar.
+    process.env["RECAPTCHA_MIN_SCORE"] = "0.9";
+    expect(minScore("0.1")).toBe(0.1);
+    expect(minScore("0")).toBe(0);
+  });
+
+  test("corte vazio ou inválido no /admin cai na variável, não no padrão", () => {
+    process.env["RECAPTCHA_MIN_SCORE"] = "0.7";
+    expect(minScore("")).toBe(0.7);
+    expect(minScore("abc")).toBe(0.7);
+  });
+});
+
+describe("interruptor do /admin", () => {
+  test("só um `false` explícito desliga — lixo na coluna mantém a proteção", () => {
+    expect(normalizarSeguranca(null).recaptchaAtivo).toBe(true);
+    expect(normalizarSeguranca({}).recaptchaAtivo).toBe(true);
+    expect(normalizarSeguranca({ recaptcha_ativo: "nao" }).recaptchaAtivo).toBe(true);
+    expect(normalizarSeguranca({ recaptcha_ativo: null }).recaptchaAtivo).toBe(true);
+    expect(normalizarSeguranca({ recaptcha_ativo: false }).recaptchaAtivo).toBe(false);
+  });
+
+  test("o corte guardado volta como texto limpo", () => {
+    expect(normalizarSeguranca({ min_score: " 0.1 " }).minScore).toBe("0.1");
+    expect(normalizarSeguranca({ min_score: 0.1 }).minScore).toBe("");
   });
 });
 

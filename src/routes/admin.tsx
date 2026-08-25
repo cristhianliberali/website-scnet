@@ -36,6 +36,7 @@ import {
 import { SecaoIndicacoes } from "@/components/scnet/admin/admin-indicacoes";
 import { SecaoConfig } from "@/components/scnet/admin/admin-config";
 import { SecaoScripts } from "@/components/scnet/admin/admin-scripts";
+import { SecaoSeguranca } from "@/components/scnet/admin/admin-seguranca";
 import {
   carregarAdmin,
   entrarAdmin,
@@ -48,6 +49,7 @@ import {
   salvarIndicacaoAdmin,
   salvarPlanoAdmin,
   salvarScriptAdmin,
+  salvarSegurancaAdmin,
   salvarSolicitacaoAdmin,
   type AcaoAdmin,
   type DadosAdmin,
@@ -55,6 +57,7 @@ import {
 import type {
   CatalogoPlanos,
   ConfigIndicacao,
+  ConfigSeguranca,
   IndicacaoAdmin,
   PlanoAdmin,
   ScriptAdmin,
@@ -67,6 +70,7 @@ const ABAS = [
   "indicacoes",
   "indicacao",
   "scripts",
+  "seguranca",
 ] as const;
 type Aba = (typeof ABAS)[number];
 
@@ -275,6 +279,9 @@ function Painel({ sessao, dados }: { sessao: { usuario: string }; dados: DadosAd
 
   const excluirScript = (id: string) => void executar(() => excluirScriptAdmin({ data: { id } }));
 
+  const salvarSeguranca = (config: ConfigSeguranca) =>
+    void executar(() => salvarSegurancaAdmin({ data: config }));
+
   async function sair() {
     await sairAdmin();
     await router.invalidate();
@@ -335,6 +342,7 @@ function Painel({ sessao, dados }: { sessao: { usuario: string }; dados: DadosAd
           <TabsTrigger value="indicacoes">Indicações</TabsTrigger>
           <TabsTrigger value="indicacao">Seção de indicação</TabsTrigger>
           <TabsTrigger value="scripts">Scripts e tags</TabsTrigger>
+          <TabsTrigger value="seguranca">Anti-robô</TabsTrigger>
         </TabsList>
 
         <Cartao>
@@ -395,6 +403,16 @@ function Painel({ sessao, dados }: { sessao: { usuario: string }; dados: DadosAd
               salvando={salvando}
               aoSalvar={salvarScript}
               aoExcluir={excluirScript}
+            />
+          </TabsContent>
+
+          <TabsContent value="seguranca">
+            <SecaoSeguranca
+              key={JSON.stringify(dados.seguranca)}
+              seguranca={dados.seguranca}
+              diagnostico={dados.diagnosticoSeguranca}
+              salvando={salvando}
+              aoSalvar={salvarSeguranca}
             />
           </TabsContent>
         </Cartao>
