@@ -55,6 +55,15 @@ const EXPLICACAO: { chave: string; titulo: string; texto: string }[] = [
       "pessoas realmente acessam o site.",
   },
   {
+    chave: "action_mismatch",
+    titulo: "O código foi gerado para outra finalidade",
+    texto:
+      "O token do reCAPTCHA carrega o nome da ação com que foi criado, e o servidor recusa um " +
+      "token de ação diferente. Nota alta (acima de 0.5) com este motivo NÃO é robô: é o site " +
+      "usando nomes diferentes dos dois lados — um erro de código, não de configuração. Se isto " +
+      "aparecer, mande a linha para quem cuida do site.",
+  },
+  {
     chave: "score_baixo",
     titulo: "Gente real está sendo reprovada pela pontuação",
     texto:

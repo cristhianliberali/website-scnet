@@ -16,8 +16,22 @@ import { postToWebhook, type WebhookOutcome } from "./webhook";
 /** Identifica a origem do envio para quem consome o webhook. */
 const FORM_ID = "lead";
 
-/** Action com que o cliente gera o token do reCAPTCHA (ver lead-form.tsx). */
-const RECAPTCHA_ACTION = "lead_submit";
+/**
+ * A `action` do reCAPTCHA deste endpoint — exportada, e é o ponto importante.
+ *
+ * O token do reCAPTCHA v3 carrega o nome da ação com que foi gerado, e o
+ * servidor recusa um token gerado para outra ação. Isso quer dizer que os dois
+ * lados precisam usar EXATAMENTE a mesma palavra, e a única forma de garantir
+ * isso é não haver duas palavras: quem envia para cá importa esta constante.
+ *
+ * **Foi assim que o formulário "Contrate agora" da home parou.** Ele gerava o
+ * token com `"contract_form_submit"` — escrito à mão no componente — e postava
+ * aqui, onde a conferência era contra `"lead_submit"`. As duas strings viviam em
+ * arquivos diferentes, nada as ligava, e o resultado era `action_mismatch` em
+ * 100% dos envios: o cliente preenchia, era recusado como robô, e o log dizia
+ * apenas "blocked by reCAPTCHA". A pontuação vinha 0.9 — gente real, com folga.
+ */
+export const RECAPTCHA_ACTION_LEAD = "lead_submit";
 
 export type LeadResult = WebhookOutcome;
 
@@ -113,7 +127,7 @@ export const submitLead = createServerFn({ method: "POST" })
   .handler(async ({ data }): Promise<LeadResult> => {
     const clientIp = clientIpFromHeaders(getRequest().headers);
 
-    const recaptcha = await verifyRecaptcha(data.recaptchaToken, RECAPTCHA_ACTION, clientIp);
+    const recaptcha = await verifyRecaptcha(data.recaptchaToken, RECAPTCHA_ACTION_LEAD, clientIp);
     if (isLikelyBot(recaptcha)) {
       // O motivo já foi para o log dentro de `verifyRecaptcha` — aqui só sobra
       // dizer à pessoa o que fazer, e cada motivo pede uma saída diferente.
