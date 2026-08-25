@@ -10,6 +10,8 @@ import { RECAPTCHA_ACTION_LEAD, submitLead } from "@/lib/submit-lead";
 import { capitalizeName, isValidPhone, maskPhone } from "@/lib/form-utils";
 import { writeContractHandoffCookie } from "@/lib/contract-handoff";
 import { redirectToWhatsAppSupport, whatsappSupportLink } from "@/lib/whatsapp";
+import { dispararEvento, EVENTO, eventoDeClique } from "@/lib/datalayer";
+import { AreaClienteDesligada } from "@/components/scnet/area-cliente-desligada";
 import { precoVigente, textoPosDesconto, type PlanoWebhook } from "@/lib/plans";
 import { cn } from "@/lib/utils";
 
@@ -68,8 +70,17 @@ async function sendLead(input: {
 export function ContractForm({
   selectedPlan,
   codigoOferta,
+  areaClienteAtiva = true,
 }: {
   selectedPlan: SelectedPlan | null;
+  /**
+   * Se a área do cliente está no ar (vem do /admin, pelo loader da rota).
+   *
+   * Decide para onde vai quem marca "Já sou cliente": o login, ou o WhatsApp da
+   * central quando a área está em manutenção. O padrão é `true` para que um
+   * ponto do site que ainda não passe o valor nunca esconda a área por engano.
+   */
+  areaClienteAtiva?: boolean;
   /**
    * Código de campanha que veio na URL. Segue no handoff para /contratacao
    * continuar exibindo o plano da oferta que o cliente escolheu aqui.
@@ -87,6 +98,8 @@ export function ContractForm({
   const [serverError, setServerError] = useState<string | null>(null);
   /** Erro no envio: o cliente está sendo levado ao WhatsApp. */
   const [redirecting, setRedirecting] = useState(false);
+  /** "Já sou cliente" com a área de membros desligada no /admin. */
+  const [desligada, setDesligada] = useState(false);
 
   /** "nos 3 primeiros meses, após R$ 139,90" — só quando há promoção. */
   const posDesconto = selectedPlan
@@ -157,6 +170,41 @@ export function ContractForm({
 
       trackLeadEvent();
 
+      /*
+       * DOIS eventos, de propósito.
+       *
+       * `lead_form` é o genérico — "entrou um lead pelo formulário da home" —, e
+       * serve para um gatilho único no GTM sem precisar somar os dois nomes.
+       * Depois vem o qualificado: quem quer contratar é aquisição, quem já é
+       * cliente é atendimento. Num evento só, o custo por lead do Ads sairia
+       * diluído por gente que nunca foi lead, e é essa conta que decide quanto
+       * se investe na campanha.
+       */
+      const dadosDoLead = {
+        intencao: chosenIntent,
+        ...(selectedPlan ? { plano: selectedPlan.nome, preco: selectedPlan.preco } : {}),
+      };
+      dispararEvento(EVENTO.leadHome, dadosDoLead);
+      dispararEvento(
+        chosenIntent === "ja_sou_cliente" ? EVENTO.leadClienteBase : EVENTO.leadNovoCliente,
+        dadosDoLead,
+      );
+
+      /*
+       * Já é cliente: o lugar dele é a área do cliente, não o funil de
+       * contratação. Mandá-lo para /contratacao seria pedir que preenchesse um
+       * cadastro que já existe.
+       */
+      if (chosenIntent === "ja_sou_cliente") {
+        if (areaClienteAtiva) {
+          void navigate({ to: "/cliente" });
+        } else {
+          // Área em manutenção: quem resolve o caso dele é a central.
+          setDesligada(true);
+        }
+        return;
+      }
+
       const handoff = {
         nome: trimmedName,
         whatsapp,
@@ -170,6 +218,20 @@ export function ContractForm({
     } finally {
       setSending(false);
     }
+  }
+
+  if (desligada) {
+    return (
+      <div
+        id="contrate"
+        className="w-full scroll-mt-28 rounded-2xl border border-border bg-white shadow-xl"
+      >
+        <AreaClienteDesligada
+          mensagem="A área do cliente está em manutenção. Nossa central resolve com você agora mesmo pelo WhatsApp."
+          origem="formulario_contratacao"
+        />
+      </div>
+    );
   }
 
   return (
@@ -246,6 +308,9 @@ export function ContractForm({
                 onClick={() => {
                   setIntent(value);
                   if (errors.intent) setErrors((prev) => ({ ...prev, intent: false }));
+                  // A escolha aqui separa aquisição de atendimento; medir o
+                  // clique mostra a proporção mesmo de quem não termina o envio.
+                  eventoDeClique(`intencao_${value}`, { texto: text, local: "formulario_home" });
                 }}
                 className={cn(
                   // px/py/leading iguais aos inputs acima — mesma altura de caixa

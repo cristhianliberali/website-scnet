@@ -5,6 +5,7 @@ import { Toaster } from "@/components/ui/sonner";
 import { Header } from "@/components/scnet/header";
 import type { SelectedPlan } from "@/components/scnet/contract-form";
 import { fetchPlanos } from "@/lib/fetch-planos";
+import { estadoAreaCliente } from "@/lib/area-cliente";
 import { planosVisiveis } from "@/lib/plans";
 import {
   Hero,
@@ -34,9 +35,15 @@ export const Route = createFileRoute("/")({
   // Planos vêm do Postgres no servidor, então já saem renderizados no HTML.
   // O filtro de campanha roda aqui, e não na tela, para que um plano de oferta
   // sem o código na URL não trafegue nem escondido no HTML.
-  loader: async ({ deps }) => ({
-    planos: planosVisiveis(await fetchPlanos(), deps.codigoOferta),
-  }),
+  /*
+   * O estado da área do cliente entra aqui porque o formulário precisa dele no
+   * momento do clique em "Já sou cliente" — buscar naquele instante custaria
+   * uma ida ao servidor no meio de um envio.
+   */
+  loader: async ({ deps }) => {
+    const [planos, areaCliente] = await Promise.all([fetchPlanos(), estadoAreaCliente()]);
+    return { planos: planosVisiveis(planos, deps.codigoOferta), areaCliente };
+  },
   head: () => ({
     meta: [
       { title },
@@ -51,7 +58,7 @@ export const Route = createFileRoute("/")({
 });
 
 function Index() {
-  const { planos } = Route.useLoaderData();
+  const { planos, areaCliente } = Route.useLoaderData();
   const { codigo_oferta: codigoOferta } = Route.useSearch();
   const [selectedPlan, setSelectedPlan] = useState<SelectedPlan | null>(null);
 
@@ -66,7 +73,11 @@ function Index() {
         <Beneficios />
         <Empresas />
         <Depoimentos />
-        <CtaFinal selectedPlan={selectedPlan} codigoOferta={codigoOferta} />
+        <CtaFinal
+          selectedPlan={selectedPlan}
+          codigoOferta={codigoOferta}
+          areaClienteAtiva={areaCliente.ativa}
+        />
         {/* Dúvidas fecham a página, depois do formulário de contratação. */}
         <Faq />
       </main>

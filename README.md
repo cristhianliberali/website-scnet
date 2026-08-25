@@ -504,6 +504,7 @@ O que dá para fazer:
 | Seção de indicação | título, descrição, banner, campanha vigente e o liga/desliga               |
 | Scripts e tags     | Tag Manager, pixels e chat colados no `<head>`, no `<body>` ou no rodapé   |
 | Anti-robô          | diagnóstico do reCAPTCHA, corte de pontuação e o interruptor de emergência |
+| Área do cliente    | liga/desliga a área de membros inteira e a mensagem de manutenção          |
 
 **Sem upload de arquivo.** As logos dos planos e os banners entram como URL, do
 mesmo jeito que já entravam pelo Postgres. Guardar arquivo pede storage, limite
@@ -546,6 +547,62 @@ Tags de estrutura (`<html>`, `<head>`, `<body>`) são recusadas ao salvar, com o
 motivo na tela: coladas por engano — acontece ao copiar a página inteira em vez
 do trecho — elas embaralhariam o ponto de injeção e cortariam o fim da página
 para todos os visitantes.
+
+#### Ligar e desligar a área de membros
+
+A aba **Área do cliente** fecha `/cliente` e `/cliente/painel` de uma vez. Com
+ela desligada, quem chega lê a mensagem que você escreveu e é levado ao WhatsApp
+de `VITE_WHATSAPP_NUMBER_CENTRAL` — um número separado do comercial, porque
+mandar um cliente com problema de fatura para o time de vendas seria pior do que
+não mandar.
+
+O alcance é a área inteira, não só o login: o **"Já sou cliente"** do formulário
+de contratação também passa a levar ao WhatsApp em vez de a um login que não vai
+funcionar. Vale tanto para quem marca a opção na home quanto para quem cai
+direto em `/contratacao`.
+
+Existe para manutenção do n8n, migração de cadastro ou queda do sistema —
+momentos em que a área responderia erro para todo mundo, e erro genérico faz o
+cliente desistir em vez de procurar quem resolve. Uma falha ao LER essa
+configuração nunca fecha a área sozinha: o padrão é sempre "ligada".
+
+### EVENTOS PARA O GOOGLE TAG MANAGER (`dataLayer`)
+
+O site anuncia o que acontece em `window.dataLayer`; o GTM escuta e traduz para
+o que você configurar lá (conversão do Ads, evento do GA4, pixel). **O site não
+sabe nada sobre Ads ou Analytics** — a tradução é sua, no GTM, sem deploy.
+
+Os nomes são constantes em `src/lib/datalayer.ts`: é essa lista que você
+configura como gatilho.
+
+| Evento                            | Quando dispara                               | Parâmetros                                          |
+| --------------------------------- | -------------------------------------------- | --------------------------------------------------- |
+| `lead_form`                       | Formulário da home enviado e aceito          | `intencao`, `plano`, `preco`                        |
+| `lead_form_novo_cliente`          | ...e a pessoa marcou "Quero contratar"       | idem                                                |
+| `lead_form_cliente_base`          | ...e marcou "Já sou cliente"                 | idem                                                |
+| `contratacao_1` … `contratacao_4` | Cada etapa da `/contratacao` **concluída**   | `etapa`, `etapa_id`, `etapa_nome`, `plano`, `preco` |
+| `contratacao_concluida`           | Última etapa aceita — a contratação terminou | `plano`, `preco`                                    |
+| `clique_botao`                    | Clique num CTA                               | `botao`, `texto`, `local`, e extras (`plano`)       |
+| `clique_whatsapp`                 | Clique que leva ao WhatsApp                  | `origem`, `local`                                   |
+| `area_cliente_desligada`          | Alguém bateu na área de membros fechada      | `origem`                                            |
+
+**Por que `lead_form` E o específico.** O genérico serve para um gatilho único
+("entrou lead"); os dois qualificados separam aquisição de atendimento. Num
+evento só, o custo por lead do Ads sairia diluído por gente que já é cliente — e
+é essa conta que decide quanto se investe na campanha.
+
+**Por que na etapa concluída, e não na aberta.** É o que faz o funil dizer a
+verdade: etapa recusada não conta, e é exatamente aí que a queda aparece no
+relatório.
+
+Identificadores de `clique_botao` hoje: `ver_planos`, `escolher_plano`,
+`intencao_quero_contratar`, `intencao_ja_sou_cliente`, `area_do_cliente`,
+`whatsapp_ajuda_plano`, `whatsapp_empresas`, `whatsapp_flutuante`. O `botao` é
+estável — não muda quando o texto do botão muda —, então crie o gatilho por ele
+e use `texto` só para ler o rótulo no relatório.
+
+A ordem de carregamento não importa: o array é criado no primeiro evento, e o
+GTM processa tudo o que já estiver nele quando carregar.
 
 ### TODA SOLICITAÇÃO VIRA UM ATENDIMENTO
 

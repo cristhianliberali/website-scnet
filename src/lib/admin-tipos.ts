@@ -199,6 +199,32 @@ export const TAMANHO_BANNER = {
   mobile: { largura: 720, altura: 360, proporcao: "2:1" },
 } as const;
 
+/* ---------------- área do cliente ---------------- */
+
+/**
+ * O liga/desliga da área de membros inteira.
+ *
+ * Desligada, `/cliente` e `/cliente/painel` deixam de funcionar: quem chega vê
+ * a mensagem abaixo e é levado ao WhatsApp da central. Existe para quando o n8n
+ * cai, o Mikrotik está em manutenção ou o cadastro está sendo migrado — momentos
+ * em que a área do cliente responderia erro para todo mundo, e um erro genérico
+ * manda o cliente embora enquanto a central resolveria o caso em um minuto.
+ *
+ * Vale também para o "Já sou cliente" do formulário de contratação: com a área
+ * ligada ele leva ao login; desligada, ao mesmo WhatsApp.
+ */
+export type ConfigAreaCliente = {
+  ativa: boolean;
+  /** O que o cliente lê antes de ser levado ao WhatsApp. */
+  mensagem: string;
+};
+
+export const CONFIG_AREA_CLIENTE_PADRAO: ConfigAreaCliente = {
+  ativa: true,
+  mensagem:
+    "A área do cliente está em manutenção no momento. Nossa central resolve com você agora mesmo pelo WhatsApp.",
+};
+
 /* ---------------- segurança (reCAPTCHA) ---------------- */
 
 /**

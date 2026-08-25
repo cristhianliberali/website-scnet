@@ -12,8 +12,29 @@ export const WHATSAPP_NUMBER =
   (import.meta.env["VITE_WHATSAPP_NUMBER"] as string | undefined)?.replace(/\D/g, "") ||
   FALLBACK_NUMBER;
 
+/**
+ * O WhatsApp da CENTRAL de atendimento, de VITE_WHATSAPP_NUMBER_CENTRAL.
+ *
+ * É outro número porque é outro assunto: o `WHATSAPP_NUMBER` é comercial (quem
+ * quer contratar) e este é suporte a quem JÁ é cliente. Quando a área do
+ * cliente está desligada no /admin, é para cá que quem tentou entrar é levado —
+ * mandar um cliente com problema de fatura para o time de vendas seria pior do
+ * que não mandar.
+ *
+ * Vazia, cai no número comercial: um link para a central que não existe seria
+ * pior do que o número errado.
+ */
+export const WHATSAPP_CENTRAL =
+  (import.meta.env["VITE_WHATSAPP_NUMBER_CENTRAL"] as string | undefined)?.replace(/\D/g, "") ||
+  WHATSAPP_NUMBER;
+
 export function waLink(message: string) {
   return `https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent(message)}`;
+}
+
+/** Link para a central de atendimento (clientes). */
+export function waLinkCentral(message: string) {
+  return `https://wa.me/${WHATSAPP_CENTRAL}?text=${encodeURIComponent(message)}`;
 }
 
 /** Mensagem usada quando um formulário falha e o cliente é levado ao atendimento. */

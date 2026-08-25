@@ -13,6 +13,7 @@ import { ChevronDown } from "lucide-react";
 import logoBranca from "@/assets/logo-scnet-branca.webp";
 import { Button } from "@/components/ui/button";
 import { LinkDeMenu } from "@/components/scnet/shared";
+import { eventoDeClique } from "@/lib/datalayer";
 import { MENU_CELULAR, MENU_PRINCIPAL, MENU_SOLUCOES } from "@/lib/links";
 import { cn } from "@/lib/utils";
 
@@ -74,7 +75,18 @@ export function Header() {
             className="hidden shadow-[0_0_18px_color-mix(in_oklab,var(--color-zap)_45%,transparent)] sm:inline-flex"
             asChild
           >
-            <Link to="/cliente">Área do cliente</Link>
+            <Link
+              to="/cliente"
+              onClick={() =>
+                eventoDeClique("area_do_cliente", {
+                  texto: "Área do cliente",
+                  local: "cabecalho",
+                  destino: "/cliente",
+                })
+              }
+            >
+              Área do cliente
+            </Link>
           </Button>
           <button
             aria-label="Abrir menu"

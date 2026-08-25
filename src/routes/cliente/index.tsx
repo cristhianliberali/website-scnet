@@ -4,7 +4,9 @@ import { Header } from "@/components/scnet/header";
 import { Footer, WhatsFloat } from "@/components/scnet/sections";
 import { Blobs } from "@/components/scnet/shared";
 import { ClienteLogin } from "@/components/scnet/cliente-login";
+import { AreaClienteDesligada } from "@/components/scnet/area-cliente-desligada";
 import { getSessaoCliente } from "@/lib/cliente-auth";
+import { estadoAreaCliente } from "@/lib/area-cliente";
 
 const title = "Área do cliente — SCNET";
 
@@ -14,6 +16,13 @@ export const Route = createFileRoute("/cliente/")({
     const sessao = await getSessaoCliente();
     if (sessao) throw redirect({ to: "/cliente/painel" });
   },
+  /*
+   * O interruptor da área de membros. Conferido aqui, e não dentro do
+   * componente, porque desligada a tela de login não deve nem ser montada: um
+   * formulário que aparece e não funciona faz o cliente tentar, errar e desistir
+   * — em vez de ir direto para quem resolve.
+   */
+  loader: async () => ({ areaCliente: await estadoAreaCliente() }),
   head: () => ({
     meta: [
       { title },
@@ -33,6 +42,20 @@ export const Route = createFileRoute("/cliente/")({
 });
 
 function ClienteLoginPage() {
+  const { areaCliente } = Route.useLoaderData();
+
+  if (!areaCliente.ativa) {
+    return (
+      <div className="min-h-screen bg-background font-body">
+        <Header />
+        <main className="pt-24">
+          <AreaClienteDesligada mensagem={areaCliente.mensagem} origem="login" />
+        </main>
+        <Footer />
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-background font-body">
       <Header />

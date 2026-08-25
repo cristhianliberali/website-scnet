@@ -37,10 +37,12 @@ import {
 } from "./admin-db.server";
 import { gravarConfigIndicacao, lerConfigIndicacao } from "./config-db.server";
 import { gravarSeguranca, lerSegurancaFresca } from "./seguranca-db.server";
+import { gravarAreaCliente, lerAreaClienteFresca } from "./area-cliente-db.server";
 import { minScore, ultimosVereditos } from "./verify-recaptcha";
 import { MAX_CODIGO, excluirScript, listarScripts, salvarScript } from "./scripts-db.server";
 import { TAGS_PROIBIDAS } from "./admin-tipos";
 import type {
+  ConfigAreaCliente,
   ConfigIndicacao,
   ConfigSeguranca,
   DiagnosticoSeguranca,
@@ -110,6 +112,11 @@ const indicacaoSchema = z.object({
   tipoBonus: z.enum(["", "desconto_fatura", "premio", "pix"]),
   descricaoBonus: texto(2000),
   valorIndicacao: texto(20),
+});
+
+const areaClienteSchema = z.object({
+  ativa: z.boolean(),
+  mensagem: texto(600),
 });
 
 const segurancaSchema = z.object({
@@ -235,6 +242,7 @@ export type DadosAdmin = {
   config: ConfigIndicacao;
   scripts: ScriptAdmin[];
   seguranca: ConfigSeguranca;
+  areaCliente: ConfigAreaCliente;
   /** Leitura, não ajuste: o estado do anti-robô como o servidor o enxerga. */
   diagnosticoSeguranca: DiagnosticoSeguranca;
 };
@@ -260,6 +268,7 @@ export const carregarAdmin = createServerFn({ method: "GET" }).handler(
       config,
       scripts,
       seguranca,
+      areaCliente,
     ] = await Promise.all([
       resumoAdmin(),
       listaSegura("planos do site", listarPlanos("site")),
@@ -269,6 +278,7 @@ export const carregarAdmin = createServerFn({ method: "GET" }).handler(
       lerConfigIndicacao(),
       listaSegura("scripts", listarScripts()),
       lerSegurancaFresca(),
+      lerAreaClienteFresca(),
     ]);
 
     return {
@@ -280,6 +290,7 @@ export const carregarAdmin = createServerFn({ method: "GET" }).handler(
       config,
       scripts,
       seguranca,
+      areaCliente,
       diagnosticoSeguranca: diagnosticoDaSeguranca(seguranca),
     };
   },
@@ -435,5 +446,18 @@ export const salvarSegurancaAdmin = createServerFn({ method: "POST" })
       return data.recaptchaAtivo
         ? "Anti-robô ligado."
         : "Anti-robô DESLIGADO. Os formulários voltaram a aceitar envios.";
+    }),
+  );
+
+/* ---------------- área do cliente ---------------- */
+
+export const salvarAreaClienteAdmin = createServerFn({ method: "POST" })
+  .validator(areaClienteSchema)
+  .handler(async ({ data }) =>
+    acao(async () => {
+      await gravarAreaCliente(data);
+      return data.ativa
+        ? "Área do cliente LIGADA."
+        : "Área do cliente DESLIGADA. Quem tentar entrar vai para o WhatsApp da central.";
     }),
   );

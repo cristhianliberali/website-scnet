@@ -25,6 +25,8 @@
  */
 
 import { createFileRoute, redirect, useNavigate } from "@tanstack/react-router";
+import { AreaClienteDesligada } from "@/components/scnet/area-cliente-desligada";
+import { estadoAreaCliente } from "@/lib/area-cliente";
 import { LogOut, Power, RefreshCw, ShieldCheck, TriangleAlert } from "lucide-react";
 import { toast } from "sonner";
 
@@ -84,6 +86,14 @@ export const Route = createFileRoute("/cliente/painel")({
    * `initialData` do cache, para que a hidratação não repita a chamada.
    */
   loader: async () => {
+    /*
+     * O interruptor vem PRIMEIRO, antes da sessão e antes do bootstrap: com a
+     * área desligada não há por que consultar o n8n — e é justamente quando ele
+     * está fora do ar que o interruptor costuma estar desligado.
+     */
+    const areaCliente = await estadoAreaCliente();
+    if (!areaCliente.ativa) return { areaCliente, sessao: null, inicial: null };
+
     const sessao = await getSessaoCliente();
     if (!sessao) throw redirect({ to: "/cliente" });
 
@@ -91,7 +101,7 @@ export const Route = createFileRoute("/cliente/painel")({
     // token recusado entre o login e agora: não há painel a mostrar
     if (!inicial.ok && inicial.expirado) throw redirect({ to: "/cliente" });
 
-    return { sessao, inicial };
+    return { areaCliente, sessao, inicial };
   },
   /*
    * A URL é digitável, então nada dela entra na tela sem passar por aqui:
@@ -110,8 +120,38 @@ export const Route = createFileRoute("/cliente/painel")({
   component: PainelCliente,
 });
 
+/**
+ * A porta: com a área desligada, nem os hooks do painel são montados.
+ *
+ * O componente de verdade é o de baixo. A separação existe porque hook não pode
+ * ser condicional — e `inicial` chega nulo quando o loader parou antes de
+ * consultar o n8n.
+ */
 function PainelCliente() {
-  const { sessao, inicial } = Route.useLoaderData();
+  const { areaCliente, sessao, inicial } = Route.useLoaderData();
+
+  if (!areaCliente.ativa || !sessao || !inicial) {
+    return (
+      <div className="min-h-screen bg-background font-body">
+        <Header />
+        <main className="pt-24">
+          <AreaClienteDesligada mensagem={areaCliente.mensagem} origem="painel" />
+        </main>
+        <Footer />
+      </div>
+    );
+  }
+
+  return <PainelAtivo sessao={sessao} inicial={inicial} />;
+}
+
+function PainelAtivo({
+  sessao,
+  inicial,
+}: {
+  sessao: NonNullable<ReturnType<typeof Route.useLoaderData>["sessao"]>;
+  inicial: NonNullable<ReturnType<typeof Route.useLoaderData>["inicial"]>;
+}) {
   const { servico: naBusca, contrato: contratoSelecionado = "" } = Route.useSearch();
   /*
    * Confere de novo o que veio da URL. `validateSearch` já limpa o valor, mas o
