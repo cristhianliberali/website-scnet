@@ -10,7 +10,12 @@ import {
 } from "./attachment-validation";
 import { attributionSchema, dadosSchema, neutralizeDeep } from "./form-schemas";
 import { clientIpFromHeaders } from "./rate-limit";
-import { isLikelyBot, recaptchaScore, verifyRecaptcha } from "./verify-recaptcha";
+import {
+  isLikelyBot,
+  mensagemRecaptcha,
+  recaptchaScore,
+  verifyRecaptcha,
+} from "./verify-recaptcha";
 import { postToWebhook, type WebhookOutcome } from "./webhook";
 
 /**
@@ -69,13 +74,15 @@ export const submitContractStep = createServerFn({ method: "POST" })
       clientIp,
     );
     if (isLikelyBot(recaptcha)) {
-      console.error(`Contract step ${data.etapa} blocked by reCAPTCHA`);
+      // Aqui a mensagem pesa mais do que nos outros formulários: é a última
+      // etapa que carrega os documentos, e o motivo mais comum de reprovação
+      // nela é o token ter vencido durante o upload. "Envie de novo" resolve;
+      // "você é um robô" faz o cliente desistir depois de anexar tudo.
       return {
         ok: false,
         status: null,
         reason: "recaptcha",
-        message:
-          "Não conseguimos confirmar que você não é um robô. Recarregue a página e tente de novo.",
+        message: mensagemRecaptcha(recaptcha),
       };
     }
 

@@ -5,7 +5,12 @@ import { z } from "zod";
 import { isValidPhone } from "./form-utils";
 import { NAME_RE, attributionSchema } from "./form-schemas";
 import { clientIpFromHeaders } from "./rate-limit";
-import { isLikelyBot, recaptchaScore, verifyRecaptcha } from "./verify-recaptcha";
+import {
+  isLikelyBot,
+  mensagemRecaptcha,
+  recaptchaScore,
+  verifyRecaptcha,
+} from "./verify-recaptcha";
 import { postToWebhook, type WebhookOutcome } from "./webhook";
 
 /** Identifica a origem do envio para quem consome o webhook. */
@@ -110,13 +115,13 @@ export const submitLead = createServerFn({ method: "POST" })
 
     const recaptcha = await verifyRecaptcha(data.recaptchaToken, RECAPTCHA_ACTION, clientIp);
     if (isLikelyBot(recaptcha)) {
-      console.error("Lead blocked by reCAPTCHA");
+      // O motivo já foi para o log dentro de `verifyRecaptcha` — aqui só sobra
+      // dizer à pessoa o que fazer, e cada motivo pede uma saída diferente.
       return {
         ok: false,
         status: null,
         reason: "recaptcha",
-        message:
-          "Não conseguimos confirmar que você não é um robô. Recarregue a página e tente de novo.",
+        message: mensagemRecaptcha(recaptcha),
       };
     }
 
