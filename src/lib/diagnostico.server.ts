@@ -12,6 +12,7 @@
  */
 
 import { env, getClient, identifier } from "./postgres.server";
+import { minScore, ultimosVereditos, type RegistroVeredito } from "./verify-recaptcha";
 
 export type TabelaDiag = {
   nome: string;
@@ -32,6 +33,38 @@ export type PlanoDiag = {
 
 export type OndeEsta = { tabela: string; schemas: string[] };
 
+/**
+ * O estado do reCAPTCHA, que é a segunda pergunta cara deste site: "por que não
+ * deixa enviar o formulário?".
+ *
+ * Ela era impossível de responder de fora. A recusa chega ao cliente como uma
+ * frase só ("não conseguimos confirmar que você não é um robô") e os motivos
+ * possíveis são cinco, quatro deles sem relação com robô nenhum. Aqui estão os
+ * três dados que separam um do outro: se a chave PÚBLICA entrou no build, se a
+ * chave SECRETA existe no servidor, e o que o Google respondeu nas últimas
+ * recusas.
+ */
+export type RecaptchaDiag = {
+  /**
+   * A VITE_RECAPTCHA_SITE_KEY chegou ao bundle. É a pegadinha mais comum da
+   * implantação: no EasyPanel, variável VITE_* precisa estar também em
+   * "Build Args" — só como Environment Variable ela não entra no JavaScript que
+   * vai ao navegador, e aí NENHUM token é gerado e TODO envio é recusado.
+   */
+  site_key_no_bundle: boolean;
+  /** A chave pública, que é pública mesmo — está no HTML. Serve para conferir com o painel do Google. */
+  site_key: string | null;
+  secret_no_servidor: boolean;
+  /** Sem a secret, a verificação está desligada e nada é bloqueado por ela. */
+  verificacao_ligada: boolean;
+  /** Corte de score em vigor (RECAPTCHA_MIN_SCORE). 0 = não bloqueia por score. */
+  min_score: number;
+  /** Domínio derivado de VITE_SITE_URL; token emitido em outro domínio é recusado. */
+  hostname_esperado: string | null;
+  /** As últimas recusas e indisponibilidades, com o motivo do Google. */
+  ultimos_bloqueios: RegistroVeredito[];
+};
+
 export type Diagnostico = {
   gerado_em: string;
   ambiente: Record<string, string>;
@@ -44,6 +77,7 @@ export type Diagnostico = {
     porta: number | null;
   };
   schema: string;
+  recaptcha: RecaptchaDiag;
   tabelas: TabelaDiag[];
   colunas_faltando_em_clientes_web: string[];
   /** Outros bancos no MESMO servidor — o SQL pode ter sido rodado num deles. */
@@ -120,6 +154,32 @@ function ambiente(): Record<string, string> {
 
 const mensagem = (err: unknown) => (err instanceof Error ? err.message : String(err));
 
+function recaptchaDiag(): RecaptchaDiag {
+  // Lido pelo nome literal: é assim que o Vite substitui o valor no build, e é
+  // exatamente o mesmo valor que foi para o navegador — por isso este campo
+  // responde de verdade se a Build Arg chegou.
+  const siteKey = (import.meta.env["VITE_RECAPTCHA_SITE_KEY"] as string | undefined)?.trim();
+  const siteUrl = (import.meta.env["VITE_SITE_URL"] as string | undefined)?.trim();
+  const secret = Boolean(env("RECAPTCHA_SECRET_KEY"));
+
+  let hostname: string | null = null;
+  try {
+    if (siteUrl) hostname = new URL(siteUrl).hostname;
+  } catch {
+    hostname = null;
+  }
+
+  return {
+    site_key_no_bundle: Boolean(siteKey),
+    site_key: siteKey || null,
+    secret_no_servidor: secret,
+    verificacao_ligada: secret,
+    min_score: minScore(),
+    hostname_esperado: hostname,
+    ultimos_bloqueios: ultimosVereditos(),
+  };
+}
+
 export async function coletarDiagnostico(): Promise<Diagnostico> {
   const schema = identifier(env("POSTGRES_SCHEMA"), "public", "POSTGRES_SCHEMA");
   const tabelaPlanos = identifier(
@@ -133,6 +193,9 @@ export async function coletarDiagnostico(): Promise<Diagnostico> {
     ambiente: ambiente(),
     conexao: { ok: false, erro: null, banco: null, usuario: null, servidor: null, porta: null },
     schema,
+    // Antes de qualquer coisa de banco: o reCAPTCHA não depende do Postgres, e
+    // precisa aparecer no relatório mesmo quando a conexão falha logo abaixo.
+    recaptcha: recaptchaDiag(),
     tabelas: [],
     colunas_faltando_em_clientes_web: [],
     bancos_no_servidor: [],

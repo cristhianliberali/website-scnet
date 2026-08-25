@@ -30,6 +30,7 @@ import { randomUUID } from "node:crypto";
 
 import {
   isLikelyBot,
+  mensagemRecaptcha,
   recaptchaScore,
   verifyRecaptcha,
   type RecaptchaVerdict,
@@ -94,8 +95,13 @@ const ERRO_GENERICO = "Não foi possível concluir o acesso agora. Tente novamen
 const ERRO_INDISPONIVEL =
   "A área do cliente está indisponível no momento. Fale com nosso atendimento pelo WhatsApp.";
 const ERRO_DESAFIO_EXPIRADO = "Sua tentativa expirou. Recomece informando seu documento.";
-const ERRO_ROBO =
-  "Não conseguimos confirmar que você não é um robô. Recarregue a página e tente de novo.";
+/*
+ * O texto do bloqueio por reCAPTCHA vem de `mensagemRecaptcha(veredito)`, e não
+ * de uma constante: "não conseguimos confirmar que você não é um robô" é a
+ * resposta certa para score baixo e a resposta errada para token vencido ou
+ * bloqueador de anúncios — nos dois últimos existe algo que a pessoa pode
+ * fazer, e a mensagem genérica escondia isso.
+ */
 const ERRO_CODIGO = "Código inválido. Confira e digite de novo.";
 const ERRO_CREDENCIAIS = "Login ou senha incorretos.";
 const ERRO_SESSAO_EXPIRADA = "Sua sessão expirou. Entre novamente para continuar.";
@@ -300,10 +306,7 @@ export async function iniciarAcessoDocumentoServer(
   if (bloqueio.blocked) return erro(mensagemDeBloqueio(bloqueio.retryAfterSeconds));
 
   const recaptcha = await verifyRecaptcha(data.recaptchaToken, "cliente_documento", ipOrigem());
-  if (isLikelyBot(recaptcha)) {
-    console.error("Acesso por documento bloqueado pelo reCAPTCHA");
-    return erro(ERRO_ROBO);
-  }
+  if (isLikelyBot(recaptcha)) return erro(mensagemRecaptcha(recaptcha));
 
   const resultado = await postToPainelWebhook(
     envelope("documento_cliente", { tipo_documento: data.tipoDocumento, documento }, recaptcha),
@@ -360,7 +363,7 @@ export async function enviarCodigoServer(data: CanalInput): Promise<MensagemOk |
   if (bloqueio.blocked) return erro(mensagemDeBloqueio(bloqueio.retryAfterSeconds));
 
   const recaptcha = await verifyRecaptcha(data.recaptchaToken, "cliente_envio_codigo", ipOrigem());
-  if (isLikelyBot(recaptcha)) return erro(ERRO_ROBO);
+  if (isLikelyBot(recaptcha)) return erro(mensagemRecaptcha(recaptcha));
 
   const resultado = await postToPainelWebhook(
     envelope(
@@ -408,7 +411,7 @@ export async function verificarCodigoServer(
     "cliente_verificacao_codigo",
     ipOrigem(),
   );
-  if (isLikelyBot(recaptcha)) return erro(ERRO_ROBO);
+  if (isLikelyBot(recaptcha)) return erro(mensagemRecaptcha(recaptcha));
 
   const resultado = await postToPainelWebhook(
     envelope(
@@ -494,10 +497,7 @@ export async function acessarComSenhaServer(data: SenhaInput): Promise<LoginConc
   if (bloqueio.blocked) return erro(mensagemDeBloqueio(bloqueio.retryAfterSeconds));
 
   const recaptcha = await verifyRecaptcha(data.recaptchaToken, "cliente_senha", ipOrigem());
-  if (isLikelyBot(recaptcha)) {
-    console.error("Acesso por login e senha bloqueado pelo reCAPTCHA");
-    return erro(ERRO_ROBO);
-  }
+  if (isLikelyBot(recaptcha)) return erro(mensagemRecaptcha(recaptcha));
 
   const resultado = await postToPainelWebhook(
     envelope("acesso_senha", { login, senha: data.senha }, recaptcha),
@@ -576,7 +576,7 @@ export async function solicitarLoginServer(
     "cliente_solicitacao_login",
     ipOrigem(),
   );
-  if (isLikelyBot(recaptcha)) return erro(ERRO_ROBO);
+  if (isLikelyBot(recaptcha)) return erro(mensagemRecaptcha(recaptcha));
 
   const resultado = await postToPainelWebhook(
     envelope(
@@ -736,7 +736,7 @@ async function chamarPainel(chamada: ChamadaPainel): Promise<PainelOk | PainelEr
     chamada.acaoRecaptcha,
     ipOrigem(),
   );
-  if (isLikelyBot(recaptcha)) return erroPainel(ERRO_ROBO);
+  if (isLikelyBot(recaptcha)) return erroPainel(mensagemRecaptcha(recaptcha));
 
   const autenticacao = { token: sessao.token.valor, idCliente: sessao.idCliente };
   const modo = modoEventos();

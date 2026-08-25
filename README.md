@@ -60,7 +60,7 @@ Crie uma landing page vibrante, moderna e de alta conversão para a **SCNET**, p
 
 Logo "SCNET" à esquerda, ao centro, menu rápido com ancoras na própria página [Planos, "Nossas soluções" {Para mim, para minha empresa, Condomínios, Internet rural} Depoimentos, Dúvidas], botão ao lado "Área do cliente" com leve glow, fundo transparente que ganha blur + cor sólida ao rolar.
 
-**2. Hero 
+**2. Hero
 
 Na esquerda da sessão:
 
@@ -76,7 +76,7 @@ Na direita da sessão:
 
 - Imagem de casa com wifi (arquivo: casa-wifi-hero)
 
-- Efeitos visuais modernos no fundo 
+- Efeitos visuais modernos no fundo
 
 **3. Barra de prova social (fundo branco, ícones em azul vibrante)**
 
@@ -84,7 +84,7 @@ Na direita da sessão:
 
 - "+30 mil clientes online"
 
-- "Nota 4.9/5 ⭐⭐⭐⭐⭐ nas avaliações do Google" *(número com efeito count-up)*
+- "Nota 4.9/5 ⭐⭐⭐⭐⭐ nas avaliações do Google" _(número com efeito count-up)_
 
 - "Suporte e equipe técnica com gente da sua cidade!"
 
@@ -425,10 +425,10 @@ modo que a hidratação não repete a chamada.
 
 **O resultado fica guardado em dois lugares**, de propósito:
 
-| Camada              | Prazo                         | Some quando                                             |
-| ------------------- | ----------------------------- | ------------------------------------------------------- |
-| TanStack Query (aba) | 5 min                        | recarregar a página, fechar a aba, clicar em "Atualizar" |
-| Memória do servidor | 60 s (`PAINEL_CACHE_SECONDS`) | formulário que muda algo, logout, reinício do container  |
+| Camada               | Prazo                         | Some quando                                              |
+| -------------------- | ----------------------------- | -------------------------------------------------------- |
+| TanStack Query (aba) | 5 min                         | recarregar a página, fechar a aba, clicar em "Atualizar" |
+| Memória do servidor  | 60 s (`PAINEL_CACHE_SECONDS`) | formulário que muda algo, logout, reinício do container  |
 
 O primeiro faz abrir e fechar um serviço não custar nada; o segundo faz um F5 — que
 joga fora o cache do navegador inteiro — não virar outra ida ao n8n. Nenhum dos
@@ -495,13 +495,13 @@ botão sem o servidor conferir é uma porta trancada com o vidro aberto.
 
 O que dá para fazer:
 
-| Aba                  | O que muda                                                              |
-| -------------------- | ----------------------------------------------------------------------- |
-| Planos do site       | `planos_web` — a home e a /contratacao                                  |
-| Planos de upgrade    | `planos_upgrade` — a troca de plano do painel                           |
-| Solicitações         | a fila de `web_formularios`: status, assunto, data da visita, observação |
-| Indicações           | `indicacoes_web`: status, bônus, campanha, vínculo com o novo contrato   |
-| Seção de indicação   | título, descrição, banner, campanha vigente e o liga/desliga            |
+| Aba                | O que muda                                                               |
+| ------------------ | ------------------------------------------------------------------------ |
+| Planos do site     | `planos_web` — a home e a /contratacao                                   |
+| Planos de upgrade  | `planos_upgrade` — a troca de plano do painel                            |
+| Solicitações       | a fila de `web_formularios`: status, assunto, data da visita, observação |
+| Indicações         | `indicacoes_web`: status, bônus, campanha, vínculo com o novo contrato   |
+| Seção de indicação | título, descrição, banner, campanha vigente e o liga/desliga             |
 
 **Sem upload de arquivo.** As logos dos planos e os banners entram como URL, do
 mesmo jeito que já entravam pelo Postgres. Guardar arquivo pede storage, limite
@@ -581,6 +581,27 @@ Sem `RECAPTCHA_SECRET_KEY` a verificação fica desligada (dev local). Com a cha
 configurada ela é **obrigatória**: requisição sem token, com token inválido ou
 com token de outra `action`/hostname é recusada. Só o Google estar fora do ar
 libera o envio — ver o comentário em `.env.example`.
+
+#### "O formulário não deixa enviar"
+
+Abra **`/diagnostico?token=...`** e olhe o bloco `recaptcha`. Ele responde as
+três perguntas que separam as causas, e a página traduz o achado para português:
+
+| O que aparece                                              | O que significa                                                                                                                                                                                                           |
+| ---------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `site_key_no_bundle: false` com `verificacao_ligada: true` | A chave pública não entrou no build: o navegador não gera token e **todo** envio é recusado. No EasyPanel, `VITE_RECAPTCHA_SITE_KEY` precisa estar também em _Build Args_, e o serviço precisa ser reconstruído.          |
+| `invalid-input-response` nos bloqueios                     | Chave pública e secreta de **registros diferentes**, ou chave v2 com este código v3. As duas têm que sair do mesmo registro v3.                                                                                           |
+| `score_baixo` nos bloqueios                                | Gente real reprovada pela pontuação. Site novo recebe score baixo do Google por semanas: baixe `RECAPTCHA_MIN_SCORE` (ex.: `0.1`, ou `0` para não bloquear por score). É variável de runtime — não precisa de novo build. |
+| `timeout-or-duplicate`                                     | Token vencido (vale 2 min), normalmente durante o upload dos documentos na última etapa. Enviar de novo resolve.                                                                                                          |
+| `hostname_mismatch`                                        | `VITE_SITE_URL` aponta para um domínio diferente do que as pessoas usam para acessar.                                                                                                                                     |
+| `missing_token`                                            | O navegador não conseguiu rodar o reCAPTCHA: bloqueador de anúncios, extensão de privacidade, rede que bloqueia `google.com`, ou o domínio fora da lista da chave.                                                        |
+
+**Destravar agora, sem deploy:** apagar `RECAPTCHA_SECRET_KEY` desliga a
+verificação e libera todos os formulários. O limite por IP continua valendo.
+
+Uma chave **secreta** errada não reprova ninguém: vale como verificação
+indisponível, grita no log e aparece aqui. Fechar a loja inteira por um erro de
+digitação seria pior que o abuso que a verificação evita.
 
 ### Webhook (n8n)
 
