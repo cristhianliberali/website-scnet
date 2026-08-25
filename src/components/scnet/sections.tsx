@@ -27,6 +27,7 @@ import skeeloLogo from "@/assets/skeelo.webp";
 import scMovelLogo from "@/assets/scmovel.webp";
 import { Button } from "@/components/ui/button";
 import { planoWebhook, type Plan } from "@/lib/plans";
+import { MENU_RODAPE, REDES_SOCIAIS } from "@/lib/links";
 import {
   Accordion,
   AccordionContent,
@@ -35,7 +36,7 @@ import {
 } from "@/components/ui/accordion";
 import { useCountUp } from "@/hooks/use-reveal";
 import { ContractForm, type SelectedPlan } from "./contract-form";
-import { Blobs, Reveal, SectionTitle } from "./shared";
+import { Blobs, LinkDeMenu, Reveal, SectionTitle } from "./shared";
 import { Carrossel } from "./carrossel";
 import { ItensPlano, LogosAgregados, PlanosIndisponiveis, PrecoPlano, SeloDestaque } from "./plano";
 import { waLink } from "@/lib/whatsapp";
@@ -627,17 +628,15 @@ export function CtaFinal({
 }
 
 /* ---------------- Footer + WhatsApp flutuante ---------------- */
-const footerLinks: Array<[string, string]> = [
-  ["Planos", "#planos"],
-  ["Empresas", "#empresas"],
-  ["Trabalhe conosco", "#top"],
-  ["FAQ", "#duvidas"],
-  ["Contratos e Regulamentos", "#top"],
-  ["Área do cliente", "/cliente"],
-  ["App SCNET", "#top"],
-  ["Segunda via fatura", "#top"],
-];
 
+/**
+ * O rodapé.
+ *
+ * Os destinos vêm de `lib/links.ts` — os mesmos do cabeçalho, e pelo mesmo
+ * motivo: metade deles apontava para `#top`, que de qualquer página que não
+ * fosse a home levava a lugar nenhum. O que não tem endereço configurado
+ * (trabalhe conosco, contratos, app, redes) simplesmente não aparece.
+ */
 export function Footer() {
   return (
     <footer className="bg-brand-deep py-14 text-primary-foreground">
@@ -649,27 +648,28 @@ export function Footer() {
           </p>
         </div>
         <nav className="grid grid-cols-2 gap-2 font-ui text-sm">
-          {footerLinks.map(([l, h]) => (
-            <a key={l} href={h} className="text-primary-foreground/80 transition hover:text-zap">
-              {l}
-            </a>
+          {MENU_RODAPE.map((item) => (
+            <LinkDeMenu
+              key={item.rotulo}
+              item={item}
+              className="text-primary-foreground/80 transition hover:text-zap"
+            />
           ))}
         </nav>
         <div className="font-body text-sm text-primary-foreground/80">
           <p>Atendimento: 0800 000 0000</p>
           <p className="mt-1">contato@scnet.com.br</p>
-          <div className="mt-4 flex gap-3">
-            {["Instagram", "Facebook", "YouTube"].map((s) => (
-              <a
-                key={s}
-                href="#top"
-                aria-label={s}
-                className="grid size-10 place-items-center rounded-full bg-primary-foreground/10 transition hover:bg-zap hover:text-zap-ink"
-              >
-                {s[0]}
-              </a>
-            ))}
-          </div>
+          {REDES_SOCIAIS.length > 0 && (
+            <div className="mt-4 flex gap-3">
+              {REDES_SOCIAIS.map((item) => (
+                <LinkDeMenu
+                  key={item.rotulo}
+                  item={item}
+                  className="grid size-10 place-items-center rounded-full bg-primary-foreground/10 transition hover:bg-zap hover:text-zap-ink"
+                />
+              ))}
+            </div>
+          )}
         </div>
       </div>
       <p className="mt-10 text-center font-body text-xs text-primary-foreground/60">
