@@ -392,10 +392,15 @@ de upgrade saem do **Postgres**, direto — dado que já está numa tabela nossa
 precisa de um salto até o n8n para voltar. Os **formulários** continuam indo ao
 n8n: são ações, e quem fala com o ERP, o gateway e o WhatsApp é o fluxo. As
 tabelas estão em `docs/n8n/schema-painel.sql` (`clientes_web` com o cadastro
-completo, `contratos_web`, `faturas_web`) e em
-`docs/n8n/schema-upgrade-indicacoes.sql` (`planos_upgrade`, `indicacoes_web`), e
-o SQL traz um cliente fake para conferir a tela antes de plugar a base de
+completo, `contratos_web`, `faturas_web`), em
+`docs/n8n/schema-upgrade-indicacoes.sql` (`planos_upgrade`, `indicacoes_web`) e
+em `docs/n8n/schema-admin.sql` (`web_formularios`, `web_config`) — os dois
+últimos com um cliente fake para conferir a tela antes de plugar a base de
 verdade.
+
+**Para aplicar de uma vez**, use `docs/n8n/schema-completo.sql`: ele junta a
+estrutura dos três, na ordem certa e sem dado de mentira, é idempotente e
+termina dizendo o que ficou no banco. É o arquivo para colar no pgAdmin.
 
 **A troca de plano tem catálogo próprio.** Ela lê `planos_upgrade`, e não
 `planos_web` — a tabela da home carrega preço de campanha e oferta amarrada a um
