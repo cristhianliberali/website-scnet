@@ -67,6 +67,7 @@ import type {
   PlanoAdmin,
   ScriptAdmin,
 } from "@/lib/admin-tipos";
+import { LIMITE_ADMIN } from "@/lib/form-limits";
 
 const ABAS = [
   "planos-site",
@@ -165,6 +166,7 @@ function Login() {
             value={usuario}
             onChange={(e) => setUsuario(e.target.value)}
             autoComplete="username"
+            maxLength={LIMITE_ADMIN.login.usuario}
             autoFocus
           />
         </div>
@@ -182,6 +184,7 @@ function Login() {
             value={senha}
             onChange={(e) => setSenha(e.target.value)}
             autoComplete="current-password"
+            maxLength={LIMITE_ADMIN.login.senha}
           />
         </div>
 

@@ -17,6 +17,7 @@ import { useState, type FormEvent } from "react";
 import { DoorClosed, DoorOpen } from "lucide-react";
 
 import type { ConfigAreaCliente } from "@/lib/admin-tipos";
+import { LIMITE_ADMIN } from "@/lib/form-limits";
 import { WHATSAPP_CENTRAL } from "@/lib/whatsapp";
 import { BotaoSalvar, Cartao, MarcaAdmin, TextoLongoAdmin, TituloBloco } from "./admin-ui";
 
@@ -78,6 +79,7 @@ export function SecaoAreaCliente({
             valor={rascunho.mensagem}
             aoMudar={(v) => setRascunho({ ...rascunho, mensagem: v })}
             rows={3}
+            maxLength={LIMITE_ADMIN.areaCliente.mensagem}
             dica="Diga o que houve e que a central resolve. É o que a pessoa lê antes de ir para o WhatsApp."
           />
 

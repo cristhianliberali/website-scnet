@@ -18,6 +18,7 @@ import { toast } from "sonner";
 
 import { Input } from "@/components/ui/input";
 import { data as formatarData, telefone as formatarTelefone } from "@/lib/painel-formato";
+import { LIMITE } from "@/lib/form-limits";
 import {
   ROTULO_CAMPO_ANEXO,
   ROTULO_FORMULARIO_ENVIO,
@@ -106,6 +107,7 @@ export function SecaoEnvios({
             value={busca}
             onChange={(e) => setBusca(e.target.value)}
             placeholder="Nome, telefone, plano, endereço…"
+            maxLength={LIMITE.busca}
             className="pl-9"
           />
         </div>

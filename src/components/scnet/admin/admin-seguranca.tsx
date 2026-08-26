@@ -22,6 +22,7 @@ import { useState, type FormEvent } from "react";
 import { AlertTriangle, CheckCircle2, ShieldAlert, ShieldCheck } from "lucide-react";
 
 import type { ConfigSeguranca, DiagnosticoSeguranca } from "@/lib/admin-tipos";
+import { LIMITE_ADMIN } from "@/lib/form-limits";
 import { BotaoSalvar, Cartao, MarcaAdmin, TextoAdmin, TituloBloco, Vazio } from "./admin-ui";
 
 /** O que cada motivo do Google quer dizer, e o que fazer com ele. */
@@ -200,6 +201,7 @@ export function SecaoSeguranca({
             aoMudar={(v) => setRascunho({ ...rascunho, minScore: v })}
             placeholder="0.3"
             inputMode="decimal"
+            maxLength={LIMITE_ADMIN.seguranca.minScore}
             dica={
               "De 0 a 1. Abaixo disso o envio é recusado. 0 não bloqueia por pontuação (o resto da " +
               "verificação continua). Vazio usa o valor da variável de ambiente."

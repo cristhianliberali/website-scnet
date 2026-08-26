@@ -17,6 +17,7 @@ import { Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { data as formatarData, telefone as formatarTelefone } from "@/lib/painel-formato";
+import { LIMITE, LIMITE_ADMIN } from "@/lib/form-limits";
 import {
   STATUS_INDICACAO_ADMIN,
   TIPOS_BONUS,
@@ -108,6 +109,7 @@ export function SecaoIndicacoes({
             value={busca}
             onChange={(e) => setBusca(e.target.value)}
             placeholder="Protocolo, indicado, quem indicou, campanha…"
+            maxLength={LIMITE.busca}
             className="pl-9"
           />
         </div>
@@ -204,14 +206,21 @@ function Editor({
           rotulo="Nome da indicação"
           valor={rascunho.nomeIndicacao}
           aoMudar={(v) => campo("nomeIndicacao", v)}
+          maxLength={LIMITE_ADMIN.indicacao.nome}
         />
         <TextoAdmin
           rotulo="WhatsApp"
           valor={rascunho.telefoneIndicacao}
           aoMudar={(v) => campo("telefoneIndicacao", v)}
           dica="Com DDI: 5549999998888"
+          maxLength={LIMITE_ADMIN.indicacao.telefone}
         />
-        <TextoAdmin rotulo="Cidade" valor={rascunho.cidade} aoMudar={(v) => campo("cidade", v)} />
+        <TextoAdmin
+          rotulo="Cidade"
+          valor={rascunho.cidade}
+          aoMudar={(v) => campo("cidade", v)}
+          maxLength={LIMITE_ADMIN.indicacao.cidade}
+        />
       </div>
 
       <div className="grid gap-3 sm:grid-cols-3">
@@ -226,12 +235,14 @@ function Editor({
           valor={rascunho.codNovoCliente}
           aoMudar={(v) => campo("codNovoCliente", v)}
           dica="Precisa existir no cadastro."
+          maxLength={LIMITE_ADMIN.indicacao.codigo}
         />
         <TextoAdmin
           rotulo="Contrato do novo cliente"
           valor={rascunho.codContratoNovoCliente}
           aoMudar={(v) => campo("codContratoNovoCliente", v)}
           dica="Precisa existir em contratos_web."
+          maxLength={LIMITE_ADMIN.indicacao.codigo}
         />
       </div>
 
@@ -247,6 +258,7 @@ function Editor({
             rotulo="Campanha"
             valor={rascunho.campanha}
             aoMudar={(v) => campo("campanha", v)}
+            maxLength={LIMITE_ADMIN.indicacao.campanha}
           />
           <SelecaoAdmin
             rotulo="Tipo de pagamento"
@@ -258,6 +270,7 @@ function Editor({
             rotulo="Valor"
             valor={rascunho.valorIndicacao}
             aoMudar={(v) => campo("valorIndicacao", v)}
+            maxLength={LIMITE_ADMIN.indicacao.valor}
             dica={
               emDinheiro
                 ? "Em reais: 50,00"
@@ -271,6 +284,7 @@ function Editor({
           valor={rascunho.descricaoBonus}
           aoMudar={(v) => campo("descricaoBonus", v)}
           rows={2}
+          maxLength={LIMITE_ADMIN.indicacao.descricaoBonus}
           className="mt-3"
           dica="É o texto que o cliente lê no extrato dele."
         />
@@ -281,6 +295,7 @@ function Editor({
         valor={rascunho.observacoes}
         aoMudar={(v) => campo("observacoes", v)}
         rows={2}
+        maxLength={LIMITE_ADMIN.indicacao.observacoes}
       />
 
       <div className="flex flex-wrap justify-end gap-2 border-t border-border pt-3">

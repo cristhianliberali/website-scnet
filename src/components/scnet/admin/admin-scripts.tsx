@@ -26,6 +26,7 @@ import {
   type PosicaoScript,
   type ScriptAdmin,
 } from "@/lib/admin-tipos";
+import { LIMITE_ADMIN } from "@/lib/form-limits";
 import {
   BotaoPerigo,
   BotaoSalvar,
@@ -200,6 +201,7 @@ function Formulario({
           rotulo="Nome"
           valor={rascunho.nome}
           aoMudar={(v) => campo("nome", v)}
+          maxLength={LIMITE_ADMIN.script.nome}
           placeholder="Google Tag Manager"
           dica="Só para você reconhecer na lista."
         />
@@ -217,6 +219,7 @@ function Formulario({
         valor={rascunho.codigo}
         aoMudar={(v) => campo("codigo", v)}
         rows={10}
+        maxLength={LIMITE_ADMIN.script.codigo}
         dica="Cole o trecho inteiro que a ferramenta forneceu, com as tags <script> ou <noscript>. Não inclua <html>, <head> ou <body>."
       />
 

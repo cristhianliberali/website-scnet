@@ -16,6 +16,7 @@ import { Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { data as formatarData } from "@/lib/painel-formato";
+import { LIMITE, LIMITE_ADMIN } from "@/lib/form-limits";
 import {
   STATUS_SOLICITACAO,
   type SolicitacaoAdmin,
@@ -111,6 +112,7 @@ export function SecaoSolicitacoes({
             value={busca}
             onChange={(e) => setBusca(e.target.value)}
             placeholder="Protocolo, cliente, assunto…"
+            maxLength={LIMITE.busca}
             className="pl-9"
           />
         </div>
@@ -213,6 +215,7 @@ function Editor({
           valor={rascunho.assunto}
           aoMudar={(v) => aoMudar({ ...rascunho, assunto: v })}
           dica="É o título na tela dele."
+          maxLength={LIMITE_ADMIN.solicitacao.assunto}
         />
       </div>
 
@@ -221,6 +224,7 @@ function Editor({
         valor={rascunho.observacaoInterna}
         aoMudar={(v) => aoMudar({ ...rascunho, observacaoInterna: v })}
         dica="Só para o time. Não aparece na área do cliente."
+        maxLength={LIMITE_ADMIN.solicitacao.observacaoInterna}
       />
 
       {solicitacao.campos && (

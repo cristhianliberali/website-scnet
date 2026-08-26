@@ -31,6 +31,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useErroPainel, useFormularioPainel } from "@/hooks/use-painel";
+import { LIMITE } from "@/lib/form-limits";
 import { textoDaResposta } from "@/lib/painel-normalizar";
 import type { Fatura, NotaFiscal } from "@/lib/painel-tipos";
 import { data, faturaEmAberto, moeda } from "@/lib/painel-formato";
@@ -326,6 +327,7 @@ export function TelaNotasFiscais({
               value={busca}
               onChange={(e) => setBusca(e.target.value)}
               placeholder="Filtrar por mês, número da nota ou contrato"
+              maxLength={LIMITE.busca}
               className="pl-9"
             />
           </div>
@@ -499,6 +501,7 @@ export function TelaPixDebito({ aoVoltar }: { aoVoltar: () => void }) {
                 valor={chave}
                 aoMudar={setChave}
                 placeholder="Informe a chave que será debitada"
+                maxLength={LIMITE.chavePix}
                 dica="A chave precisa ser de uma conta do titular do contrato."
               />
             </TabsContent>
@@ -526,12 +529,14 @@ export function TelaPixDebito({ aoVoltar }: { aoVoltar: () => void }) {
                   aoMudar={setAgencia}
                   placeholder="0000"
                   inputMode="numeric"
+                  maxLength={LIMITE.agencia}
                 />
                 <CampoTexto
                   rotulo="Conta com dígito"
                   valor={conta}
                   aoMudar={setConta}
                   placeholder="00000-0"
+                  maxLength={LIMITE.conta}
                 />
               </div>
 
@@ -552,6 +557,7 @@ export function TelaPixDebito({ aoVoltar }: { aoVoltar: () => void }) {
                 valor={documentoTitular}
                 aoMudar={setDocumentoTitular}
                 placeholder="000.000.000-00"
+                maxLength={LIMITE.documento}
               />
             </TabsContent>
           </Tabs>

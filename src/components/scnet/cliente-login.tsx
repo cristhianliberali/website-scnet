@@ -14,6 +14,7 @@ import {
 import { getRecaptchaToken } from "@/lib/recaptcha";
 import { whatsappSupportLink } from "@/lib/whatsapp";
 import { isValidDocumento, maskDocumento, type TipoDocumento } from "@/lib/form-utils";
+import { LIMITE } from "@/lib/form-limits";
 import {
   acessarComSenha,
   enviarCodigo,
@@ -349,6 +350,7 @@ export function ClienteLogin() {
                       value={documento}
                       inputMode="numeric"
                       autoComplete="off"
+                      maxLength={tipoDocumento === "cpf" ? LIMITE.cpf : LIMITE.cnpj}
                       placeholder={
                         tipoDocumento === "cpf" ? "000.000.000-00" : "00.000.000/0000-00"
                       }
@@ -459,9 +461,13 @@ export function ClienteLogin() {
                     value={codigo}
                     inputMode="numeric"
                     autoComplete="one-time-code"
-                    maxLength={6}
+                    maxLength={LIMITE.codigoVerificacao}
                     placeholder="000000"
-                    onChange={(e) => setCodigo(e.target.value.replace(/\D/g, "").slice(0, 6))}
+                    onChange={(e) =>
+                      setCodigo(
+                        e.target.value.replace(/\D/g, "").slice(0, LIMITE.codigoVerificacao),
+                      )
+                    }
                   />
                 </div>
 
@@ -513,6 +519,7 @@ export function ClienteLogin() {
                     className={inputCls(false)}
                     value={login}
                     autoComplete="username"
+                    maxLength={LIMITE.login}
                     placeholder="seu login do SAC"
                     onChange={(e) => setLogin(e.target.value)}
                   />
@@ -529,6 +536,7 @@ export function ClienteLogin() {
                       value={senha}
                       type={senhaVisivel ? "text" : "password"}
                       autoComplete="current-password"
+                      maxLength={LIMITE.senha}
                       placeholder="sua senha"
                       onChange={(e) => setSenha(e.target.value)}
                     />
@@ -675,6 +683,7 @@ function SolicitarLoginDialog({ aberto, onFechar }: { aberto: boolean; onFechar:
               value={documento}
               inputMode="numeric"
               autoComplete="off"
+              maxLength={tipoDocumento === "cpf" ? LIMITE.cpf : LIMITE.cnpj}
               placeholder={tipoDocumento === "cpf" ? "000.000.000-00" : "00.000.000/0000-00"}
               onChange={(e) => {
                 setDocumento(maskDocumento(e.target.value, tipoDocumento));

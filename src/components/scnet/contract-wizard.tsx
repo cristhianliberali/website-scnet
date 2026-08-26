@@ -30,6 +30,7 @@ import {
   maskPhone,
   nationalPhoneDigits,
 } from "@/lib/form-utils";
+import { LIMITE } from "@/lib/form-limits";
 import { LINK_FORMULARIO } from "@/lib/links";
 import { getAttribution } from "@/lib/utm";
 import { getRecaptchaToken } from "@/lib/recaptcha";
@@ -216,7 +217,10 @@ type Address = {
   condominio: string;
 };
 
-/** O telefone principal vem da etapa 1 (lead) — aqui só o segundo contato. */
+/**
+ * O telefone principal vem da etapa 1 (lead) — aqui só o segundo contato, que
+ * é opcional: quem tem um número só não fica preso na etapa de cadastro.
+ */
 type Person = {
   nome: string;
   cpf: string;
@@ -440,12 +444,13 @@ export function ContractWizard({
       if (!isValidCpf(person.cpf)) e["cpf"] = "CPF inválido";
       if (!isAdultBirthDate(person.nascimento)) e["nascimento"] = "Data inválida (18+)";
       if (!EMAIL_RE.test(person.email.trim())) e["email"] = "E-mail inválido";
-      if (!person.telefone2.trim()) {
-        e["telefone2"] = "Informe um segundo telefone";
-      } else if (!isValidPhone(person.telefone2)) {
-        e["telefone2"] = "DDD + 8 ou 9 dígitos";
-      } else if (onlyDigits(person.telefone2) === onlyDigits(lead.telefone)) {
-        e["telefone2"] = "Deve ser diferente do telefone principal";
+      // Campo opcional: vazio passa. Preenchido, vale a mesma regra de sempre.
+      if (person.telefone2.trim()) {
+        if (!isValidPhone(person.telefone2)) {
+          e["telefone2"] = "DDD + 8 ou 9 dígitos";
+        } else if (onlyDigits(person.telefone2) === onlyDigits(lead.telefone)) {
+          e["telefone2"] = "Deve ser diferente do telefone principal";
+        }
       }
     }
     if (target === 3) {
@@ -508,9 +513,10 @@ export function ContractWizard({
               cpf: person.cpf,
               nascimento: person.nascimento,
               email: person.email.trim(),
-              // principal informado na etapa 1; aqui só o contato adicional
+              // principal informado na etapa 1; aqui só o contato adicional,
+              // que é opcional e chega vazio quando o cliente não informa
               telefone: lead.telefone,
-              telefone2: person.telefone2,
+              telefone2: person.telefone2.trim(),
             },
           }
         : {}),
@@ -792,6 +798,7 @@ export function ContractWizard({
                           className={inputCls(!!errors["lead_nome"])}
                           value={lead.nome}
                           autoComplete="name"
+                          maxLength={LIMITE.nome}
                           placeholder="Maria Silva"
                           onChange={(e) => {
                             setLead((p) => ({ ...p, nome: capitalizeName(e.target.value) }));
@@ -808,6 +815,7 @@ export function ContractWizard({
                           value={lead.telefone}
                           inputMode="tel"
                           autoComplete="tel"
+                          maxLength={LIMITE.telefone}
                           placeholder="(49) 99999-9999"
                           onChange={(e) => {
                             setLead((p) => ({ ...p, telefone: maskPhone(e.target.value) }));
@@ -897,6 +905,7 @@ export function ContractWizard({
                   className={inputCls(!!errors["cep"])}
                   value={address.cep}
                   inputMode="numeric"
+                  maxLength={LIMITE.cep}
                   placeholder="89800-000"
                   onChange={(e) => {
                     const v = maskCep(e.target.value);
@@ -915,6 +924,7 @@ export function ContractWizard({
               <input
                 className={inputCls(!!errors["cidade"])}
                 value={address.cidade}
+                maxLength={LIMITE.cidade}
                 placeholder="Chapecó"
                 onChange={(e) => {
                   setAddress((p) => ({ ...p, cidade: e.target.value }));
@@ -927,6 +937,7 @@ export function ContractWizard({
               <input
                 className={inputCls(!!errors["bairro"])}
                 value={address.bairro}
+                maxLength={LIMITE.bairro}
                 placeholder="Centro"
                 onChange={(e) => {
                   setAddress((p) => ({ ...p, bairro: e.target.value }));
@@ -939,6 +950,7 @@ export function ContractWizard({
               <input
                 className={inputCls(!!errors["logradouro"])}
                 value={address.logradouro}
+                maxLength={LIMITE.logradouro}
                 placeholder="Rua Getúlio Vargas"
                 onChange={(e) => {
                   setAddress((p) => ({ ...p, logradouro: e.target.value }));
@@ -952,6 +964,7 @@ export function ContractWizard({
                 className={inputCls(!!errors["numero"])}
                 value={address.numero}
                 inputMode="numeric"
+                maxLength={LIMITE.numero}
                 placeholder="1234"
                 onChange={(e) => {
                   setAddress((p) => ({ ...p, numero: e.target.value }));
@@ -964,6 +977,7 @@ export function ContractWizard({
               <input
                 className={inputCls(!!errors["complemento"])}
                 value={address.complemento}
+                maxLength={LIMITE.complemento}
                 placeholder="Bloco B, apto 302"
                 onChange={(e) => {
                   setAddress((p) => ({ ...p, complemento: e.target.value }));
@@ -981,6 +995,7 @@ export function ContractWizard({
                 <input
                   className={inputCls(!!errors["condominio"])}
                   value={address.condominio}
+                  maxLength={LIMITE.condominio}
                   placeholder="Residencial Bela Vista"
                   onChange={(e) => {
                     setAddress((p) => ({ ...p, condominio: e.target.value }));
@@ -999,6 +1014,7 @@ export function ContractWizard({
                 className={inputCls(!!errors["nome"])}
                 value={person.nome}
                 autoComplete="name"
+                maxLength={LIMITE.nome}
                 placeholder="Maria Silva"
                 onChange={(e) => {
                   setPerson((p) => ({ ...p, nome: capitalizeName(e.target.value) }));
@@ -1012,6 +1028,7 @@ export function ContractWizard({
                 className={inputCls(!!errors["cpf"])}
                 value={person.cpf}
                 inputMode="numeric"
+                maxLength={LIMITE.cpf}
                 placeholder="000.000.000-00"
                 onChange={(e) => {
                   setPerson((p) => ({ ...p, cpf: maskCpf(e.target.value) }));
@@ -1038,6 +1055,7 @@ export function ContractWizard({
                 className={inputCls(!!errors["email"])}
                 value={person.email}
                 autoComplete="email"
+                maxLength={LIMITE.email}
                 placeholder="maria@email.com"
                 onChange={(e) => {
                   setPerson((p) => ({ ...p, email: e.target.value }));
@@ -1047,14 +1065,19 @@ export function ContractWizard({
             </Field>
 
             <Field
-              label="2° telefone para contato"
+              label="2° telefone para contato (opcional)"
               error={errors["telefone2"]}
-              hint={lead.telefone ? `Diferente do principal: ${lead.telefone}` : undefined}
+              hint={
+                lead.telefone
+                  ? `Se tiver outro número, diferente do principal: ${lead.telefone}`
+                  : "Se tiver outro número para contato."
+              }
             >
               <input
                 className={inputCls(!!errors["telefone2"])}
                 value={person.telefone2}
                 inputMode="tel"
+                maxLength={LIMITE.telefone}
                 placeholder="(49) 3333-3333"
                 onChange={(e) => {
                   setPerson((p) => ({ ...p, telefone2: maskPhone(e.target.value) }));
@@ -1147,11 +1170,15 @@ export function ContractWizard({
                 </div>
               </Field>
 
-              <Field label="Observação (opcional)">
+              <Field
+                label="Observação (opcional)"
+                hint={`${note.length}/${LIMITE.observacao} caracteres`}
+              >
                 <textarea
                   rows={3}
                   className={inputCls(false)}
                   value={note}
+                  maxLength={LIMITE.observacao}
                   placeholder="Estarei em casa a partir das 10h da manhã"
                   onChange={(e) => setNote(e.target.value)}
                 />

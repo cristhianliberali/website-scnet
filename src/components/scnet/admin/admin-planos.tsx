@@ -17,6 +17,7 @@ import { Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { moeda } from "@/lib/painel-formato";
 import { PLANO_VAZIO, type CatalogoPlanos, type PlanoAdmin } from "@/lib/admin-tipos";
+import { LIMITE_ADMIN } from "@/lib/form-limits";
 import {
   BotaoPerigo,
   BotaoSalvar,
@@ -173,34 +174,44 @@ function Formulario({
           aoMudar={(v) => campo("idPlano", v.replace(/\D/g, ""))}
           dica="Em branco = próximo livre."
           inputMode="numeric"
+          maxLength={LIMITE_ADMIN.plano.idPlano}
         />
         <TextoAdmin
           rotulo="Ordem na grade"
           valor={plano.ordemGrade}
           aoMudar={(v) => campo("ordemGrade", v)}
           inputMode="numeric"
+          maxLength={LIMITE_ADMIN.plano.ordemGrade}
         />
         <TextoAdmin
           rotulo="Valor mensal"
           valor={plano.valor}
           aoMudar={(v) => campo("valor", v)}
           dica="Só o número: 129,90"
+          maxLength={LIMITE_ADMIN.plano.valor}
         />
         <TextoAdmin
           rotulo="Nome do selo"
           valor={plano.nomeDestaque}
           aoMudar={(v) => campo("nomeDestaque", v)}
           dica='Ex: "Mais escolhido"'
+          maxLength={LIMITE_ADMIN.plano.nomeDestaque}
         />
       </div>
 
-      <TextoAdmin rotulo="Nome" valor={plano.nome} aoMudar={(v) => campo("nome", v)} />
+      <TextoAdmin
+        rotulo="Nome"
+        valor={plano.nome}
+        aoMudar={(v) => campo("nome", v)}
+        maxLength={LIMITE_ADMIN.plano.nome}
+      />
 
       <TextoLongoAdmin
         rotulo="Descrição"
         valor={plano.descricao}
         aoMudar={(v) => campo("descricao", v)}
         rows={2}
+        maxLength={LIMITE_ADMIN.plano.descricao}
       />
 
       <div className="grid gap-3 sm:grid-cols-2">
@@ -209,12 +220,14 @@ function Formulario({
           valor={plano.composicao}
           aoMudar={(v) => campo("composicao", v)}
           dica={DICA_LISTA}
+          maxLength={LIMITE_ADMIN.plano.composicao}
         />
         <TextoLongoAdmin
           rotulo="URLs das logos"
           valor={plano.urlLogoAgregados}
           aoMudar={(v) => campo("urlLogoAgregados", v)}
           dica='Endereços de imagem separados por ";" — https://…/paramount.webp'
+          maxLength={LIMITE_ADMIN.plano.urlLogoAgregados}
         />
       </div>
 
@@ -223,6 +236,7 @@ function Formulario({
         valor={plano.composicaoResumo}
         aoMudar={(v) => campo("composicaoResumo", v)}
         dica="A linha curta que aparece embaixo do preço."
+        maxLength={LIMITE_ADMIN.plano.composicaoResumo}
       />
 
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
@@ -231,18 +245,21 @@ function Formulario({
           valor={plano.valorPrimeirasFaturas}
           aoMudar={(v) => campo("valorPrimeirasFaturas", v)}
           dica="Deixe vazio se não houver promoção."
+          maxLength={LIMITE_ADMIN.plano.valor}
         />
         <TextoAdmin
           rotulo="Meses com desconto"
           valor={plano.quantMesesDesconto}
           aoMudar={(v) => campo("quantMesesDesconto", v.replace(/\D/g, ""))}
           inputMode="numeric"
+          maxLength={LIMITE_ADMIN.plano.quantMesesDesconto}
         />
         <TextoAdmin
           rotulo="Código MK"
           valor={plano.codigoMk}
           aoMudar={(v) => campo("codigoMk", v.replace(/\D/g, ""))}
           inputMode="numeric"
+          maxLength={LIMITE_ADMIN.plano.codigoMk}
         />
         <TextoAdmin
           rotulo="Código da oferta MK"
@@ -250,6 +267,7 @@ function Formulario({
           aoMudar={(v) => campo("codigoOfertaMk", v.replace(/\D/g, ""))}
           dica="Vai junto no pedido de troca."
           inputMode="numeric"
+          maxLength={LIMITE_ADMIN.plano.codigoOfertaMk}
         />
       </div>
 
@@ -259,6 +277,7 @@ function Formulario({
           valor={plano.codigoOferta ?? ""}
           aoMudar={(v) => campo("codigoOferta", v)}
           dica="Preenchido, o plano só aparece para quem chega com ?codigo_oferta= igual a este valor."
+          maxLength={LIMITE_ADMIN.plano.codigoOferta}
         />
       )}
 

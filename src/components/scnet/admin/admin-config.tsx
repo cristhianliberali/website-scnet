@@ -16,6 +16,7 @@
 import { useState, type FormEvent } from "react";
 
 import { TAMANHO_BANNER, type ConfigIndicacao, type TipoBonus } from "@/lib/admin-tipos";
+import { LIMITE_ADMIN } from "@/lib/form-limits";
 import { OPCOES_BONUS } from "./admin-indicacoes";
 import {
   BotaoSalvar,
@@ -73,6 +74,7 @@ export function SecaoConfig({
           rotulo="Título"
           valor={rascunho.titulo}
           aoMudar={(v) => campo("titulo", v)}
+          maxLength={LIMITE_ADMIN.config.titulo}
           dica="Aparece no banner da visão geral e no topo da tela de indicações."
         />
         <TextoLongoAdmin
@@ -80,6 +82,7 @@ export function SecaoConfig({
           valor={rascunho.descricao}
           aoMudar={(v) => campo("descricao", v)}
           rows={2}
+          maxLength={LIMITE_ADMIN.config.descricao}
         />
       </Cartao>
 
@@ -96,6 +99,7 @@ export function SecaoConfig({
             rotulo="Banner desktop (URL)"
             valor={rascunho.bannerDesktopUrl}
             aoMudar={(v) => campo("bannerDesktopUrl", v)}
+            maxLength={LIMITE_ADMIN.config.bannerUrl}
             placeholder="https://…/banner-indique.webp"
             dica={`${medida("desktop")} · JPG, PNG ou WebP · até ~300 KB`}
           />
@@ -103,6 +107,7 @@ export function SecaoConfig({
             rotulo="Banner celular (URL)"
             valor={rascunho.bannerMobileUrl}
             aoMudar={(v) => campo("bannerMobileUrl", v)}
+            maxLength={LIMITE_ADMIN.config.bannerUrl}
             placeholder="https://…/banner-indique-mobile.webp"
             dica={`${medida("mobile")} · JPG, PNG ou WebP · até ~200 KB`}
           />
@@ -110,12 +115,14 @@ export function SecaoConfig({
             rotulo="Texto alternativo"
             valor={rascunho.bannerAlt}
             aoMudar={(v) => campo("bannerAlt", v)}
+            maxLength={LIMITE_ADMIN.config.bannerAlt}
             dica="Descreve a imagem para quem usa leitor de tela. Vazio = decoração, e o leitor pula."
           />
           <TextoAdmin
             rotulo="Link do banner (opcional)"
             valor={rascunho.bannerLink}
             aoMudar={(v) => campo("bannerLink", v)}
+            maxLength={LIMITE_ADMIN.config.bannerLink}
             placeholder="https://…/regulamento"
             dica="Para onde o banner leva. Vazio, ele é só imagem."
           />
@@ -136,6 +143,7 @@ export function SecaoConfig({
             rotulo="Nome da campanha"
             valor={rascunho.campanhaNome}
             aoMudar={(v) => campo("campanhaNome", v)}
+            maxLength={LIMITE_ADMIN.config.campanhaNome}
             placeholder="Ex: Indique e Ganhe 2026"
           />
           <SelecaoAdmin
@@ -148,6 +156,7 @@ export function SecaoConfig({
             rotulo="Valor por indicação"
             valor={rascunho.campanhaValor}
             aoMudar={(v) => campo("campanhaValor", v)}
+            maxLength={LIMITE_ADMIN.config.campanhaValor}
             placeholder="50,00"
             disabled={!emDinheiro}
             dica={emDinheiro ? "Em reais." : "Só para PIX e desconto em fatura."}
@@ -159,6 +168,7 @@ export function SecaoConfig({
           valor={rascunho.campanhaDescricaoBonus}
           aoMudar={(v) => campo("campanhaDescricaoBonus", v)}
           rows={2}
+          maxLength={LIMITE_ADMIN.config.campanhaDescricaoBonus}
           dica="O texto que o cliente lê no extrato, ao lado de cada indicação desta campanha."
         />
       </Cartao>
