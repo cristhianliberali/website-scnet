@@ -703,8 +703,8 @@ export function Footer() {
           ))}
         </nav>
         <div className="font-body text-sm text-primary-foreground/80">
-          <p>Atendimento: 0800 000 0000</p>
-          <p className="mt-1">contato@scnet.com.br</p>
+          <p>Atendimento: (49) 3664-5600</p>
+          <p className="mt-1">comercial@scnet.com.br</p>
           {REDES_SOCIAIS.length > 0 && (
             <div className="mt-4 flex gap-3">
               {REDES_SOCIAIS.map((item) => (
