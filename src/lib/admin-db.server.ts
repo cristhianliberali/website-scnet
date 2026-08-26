@@ -23,6 +23,7 @@
  */
 
 import { env, getClient, identifier, type Sql } from "./postgres.server";
+import { contarEnviosDeHoje } from "./envios-db.server";
 import type {
   CatalogoPlanos,
   IndicacaoAdmin,
@@ -568,6 +569,8 @@ export type ResumoAdmin = {
   planosUpgrade: number;
   solicitacoesAbertas: number;
   indicacoesAbertas: number;
+  /** Envios do site que entraram hoje — o pulso do formulário. */
+  enviosHoje: number;
 };
 
 /**
@@ -589,18 +592,22 @@ export async function resumoAdmin(): Promise<ResumoAdmin> {
     }
   };
 
-  const [planosSite, planosUpgrade, solicitacoesAbertas, indicacoesAbertas] = await Promise.all([
-    contar(sql`select count(*)::int as n from ${sql(schema())}.${sql(tabelaPlanos("site"))}`),
-    contar(sql`select count(*)::int as n from ${sql(schema())}.${sql(tabelaPlanos("upgrade"))}`),
-    contar(
-      sql`select count(*)::int as n from ${sql(schema())}.${sql(tabelaFormularios())}
+  const [planosSite, planosUpgrade, solicitacoesAbertas, indicacoesAbertas, enviosHoje] =
+    await Promise.all([
+      contar(sql`select count(*)::int as n from ${sql(schema())}.${sql(tabelaPlanos("site"))}`),
+      contar(sql`select count(*)::int as n from ${sql(schema())}.${sql(tabelaPlanos("upgrade"))}`),
+      contar(
+        sql`select count(*)::int as n from ${sql(schema())}.${sql(tabelaFormularios())}
           where status = 'em_aberto'`,
-    ),
-    contar(
-      sql`select count(*)::int as n from ${sql(schema())}.${sql(tabelaIndicacoes())}
+      ),
+      contar(
+        sql`select count(*)::int as n from ${sql(schema())}.${sql(tabelaIndicacoes())}
           where status = 'em_aberto'`,
-    ),
-  ]);
+      ),
+      // A tabela dos envios é nova: quem ainda não rodou o SQL vê zero, e a
+      // tela abre igual — `contarEnviosDeHoje` engole o erro sozinha.
+      contarEnviosDeHoje(),
+    ]);
 
-  return { planosSite, planosUpgrade, solicitacoesAbertas, indicacoesAbertas };
+  return { planosSite, planosUpgrade, solicitacoesAbertas, indicacoesAbertas, enviosHoje };
 }

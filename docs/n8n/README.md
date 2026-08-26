@@ -11,6 +11,7 @@ painel enquanto esse token estiver válido.
 | `schema.sql`                  | As estruturas que ele espera no Postgres                        |
 | `painel-cliente.md`           | O contrato JSON de cada evento de `/cliente/painel`             |
 | `schema-painel.sql`           | As tabelas que alimentam o painel (rode depois do `schema.sql`) |
+| `schema-envios.sql`           | Os envios dos formulários do site, e os anexos deles            |
 
 `schema-painel.sql` também cria `planos_web`, que alimenta a grade de planos da
 home. A troca de plano do painel lê `planos_upgrade`, que é outra tabela.
@@ -29,6 +30,13 @@ uma tabela de conferência com o que existe e quantas linhas tem cada coisa.
 Ele funciona nas duas instalações: com `clientes_web` como **tabela** (o caso da
 SCNET) ele acrescenta as colunas e as chaves estrangeiras; como **view**, pula
 esses dois blocos avisando o porquê, e o resto entra igual.
+
+**[`schema-envios.sql`](./schema-envios.sql)** fica de fora daquele arquivo, e de
+propósito: ele não é do painel do cliente nem do n8n. É a caixa de entrada do
+COMERCIAL — cada formulário preenchido na home e na `/contratacao`, com os
+anexos, gravado pelo próprio site e lido na aba "Envios do site" do /admin. Rode
+os dois; a ordem entre eles não importa. Ele traz também a limpeza periódica e um
+usuário de banco só para o site, sem poder criar nem apagar nada.
 
 Os arquivos por assunto continuam aqui, para aplicar em partes ou para ler o
 porquê de cada decisão: `schema.sql` (login), `schema-painel.sql` (cadastro,

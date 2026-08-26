@@ -495,20 +495,67 @@ botão sem o servidor conferir é uma porta trancada com o vidro aberto.
 
 O que dá para fazer:
 
-| Aba                | O que muda                                                                 |
-| ------------------ | -------------------------------------------------------------------------- |
-| Planos do site     | `planos_web` — a home e a /contratacao                                     |
-| Planos de upgrade  | `planos_upgrade` — a troca de plano do painel                              |
-| Solicitações       | a fila de `web_formularios`: status, assunto, data da visita, observação   |
-| Indicações         | `indicacoes_web`: status, bônus, campanha, vínculo com o novo contrato     |
-| Seção de indicação | título, descrição, banner, campanha vigente e o liga/desliga               |
-| Scripts e tags     | Tag Manager, pixels e chat colados no `<head>`, no `<body>` ou no rodapé   |
-| Anti-robô          | diagnóstico do reCAPTCHA, corte de pontuação e o interruptor de emergência |
-| Área do cliente    | liga/desliga a área de membros inteira e a mensagem de manutenção          |
+| Aba                | O que muda                                                                  |
+| ------------------ | --------------------------------------------------------------------------- |
+| Planos do site     | `planos_web` — a home e a /contratacao                                      |
+| Planos de upgrade  | `planos_upgrade` — a troca de plano do painel                               |
+| Envios do site     | `web_envios` — leitura: cada formulário preenchido na home e na contratação |
+| Solicitações       | a fila de `web_formularios`: status, assunto, data da visita, observação    |
+| Indicações         | `indicacoes_web`: status, bônus, campanha, vínculo com o novo contrato      |
+| Seção de indicação | título, descrição, banner, campanha vigente e o liga/desliga                |
+| Scripts e tags     | Tag Manager, pixels e chat colados no `<head>`, no `<body>` ou no rodapé    |
+| Anti-robô          | diagnóstico do reCAPTCHA, corte de pontuação e o interruptor de emergência  |
+| Área do cliente    | liga/desliga a área de membros inteira e a mensagem de manutenção           |
 
 **Sem upload de arquivo.** As logos dos planos e os banners entram como URL, do
 mesmo jeito que já entravam pelo Postgres. Guardar arquivo pede storage, limite
 de tamanho e limpeza do que ficou órfão; colar um endereço não pede nada disso.
+
+#### Envios do site (`web_envios`)
+
+Antes, o que a pessoa preenchia na home e na `/contratacao` ia para o webhook do
+n8n e acabava ali: se o fluxo do outro lado não guardasse, o envio não existia
+em lugar nenhum que alguém do provedor pudesse abrir. Agora **todo envio vira
+uma linha** — inclusive os que o n8n recusou, que são justamente os que mais
+somem.
+
+**A contratação é UMA linha que cresce.** O assistente manda o mesmo `id_sessao`
+nas quatro etapas, com o retrato completo do que já foi preenchido, e a linha vai
+sendo atualizada. Quem parou na etapa 2 fica registrado como quem parou na etapa
+2 — com nome e telefone. É a lista que vale uma ligação.
+
+**A forma da linha.** Quatro colunas de verdade — `data`, `nome`, `telefone` e o
+plano —, porque é por elas que se lista, se ordena e se procura; todo o resto do
+formulário (endereço, cadastro, agendamento, UTMs) vive em `dados jsonb`. É o
+meio-termo entre uma tabela com quarenta colunas, que pede migração a cada campo
+novo, e um JSON puro, em que achar "os envios deste telefone" varre a tabela.
+
+**Os anexos ficam em `web_envios_anexos`.** A linha do envio guarda só a ficha de
+cada arquivo (nome, tipo, tamanho, sha256); os bytes moram numa tabela ao lado,
+com `ON DELETE CASCADE`. É o que permite listar 300 envios sem arrastar um único
+documento do disco — a lista custa kilobytes, e o arquivo só é lido quando
+alguém clica para baixar.
+
+**A tela é só leitura, e isso é uma decisão.** As outras abas editam o que o
+provedor controla; aqui o conteúdo é o que a pessoa digitou, e registro que
+alguém corrige deixa de ser registro.
+
+**Três camadas de segurança, e a última é o banco.** Na entrada valem as
+proteções que já existiam (corpo acima de 30MB recusado antes de ser lido, 15
+envios por minuto por IP, CSRF, reCAPTCHA, zod em cada campo, anexo conferido
+pelos bytes iniciais e nome reescrito pelo servidor). Na consulta, tudo é
+parametrizado — nenhum valor do cliente vira texto de SQL. E na tabela, as
+restrições recusam arquivo acima de 10MB, tipo que não seja PDF/PNG/JPEG, campo
+de anexo desconhecido, JSON gigante e dois arquivos no mesmo campo — mesmo vindo
+de um `INSERT` feito à mão no pgAdmin. `docs/n8n/schema-envios.sql` traz também
+um usuário de banco só para o site, sem poder criar, apagar nem truncar nada.
+
+**O IP nunca é gravado em claro**: fica um SHA-256 com o sal de `IP_HASH_SALT`,
+que responde "estes 400 envios vieram do mesmo lugar" sem guardar o endereço de
+ninguém. E `ENVIOS_GRAVAR_ANEXOS=false` mantém a ficha dos arquivos e descarta os
+bytes, para quem não quer documento de identidade dentro do banco. A seção 4 do
+mesmo SQL traz a limpeza periódica — apagar os arquivos com mais de 90 dias e os
+envios abandonados com mais de 30.
 
 #### Scripts e tags (Tag Manager, pixels, chat)
 

@@ -17,6 +17,8 @@ import {
   verifyRecaptcha,
 } from "./verify-recaptcha";
 import { postToWebhook, type WebhookOutcome } from "./webhook";
+import { registrarEnvio } from "./envios-db.server";
+import { statusDoWebhook } from "./envios-status";
 
 /**
  * Per-step webhook for the /contratacao wizard.
@@ -100,15 +102,46 @@ export const submitContractStep = createServerFn({ method: "POST" })
 
     // O token do reCAPTCHA fica no servidor — o webhook recebe só o score.
     const { recaptchaToken: _token, anexos: _anexos, dados, ...stepData } = data;
-    return postToWebhook(
+    const dadosSaneados = neutralizeDeep(dados) as Record<string, unknown>;
+
+    const outcome = await postToWebhook(
       {
         formulario: FORM_ID,
         ...stepData,
-        dados: neutralizeDeep(dados),
+        dados: dadosSaneados,
         ...(anexos?.length ? { anexos } : {}),
         submitted_at: new Date().toISOString(),
         recaptcha_score: recaptchaScore(recaptcha),
       },
       `Contract step ${data.etapa}`,
     );
+
+    /*
+     * A MESMA linha das quatro etapas, atualizada a cada uma.
+     *
+     * O assistente manda o retrato completo do que já foi preenchido em toda
+     * etapa, e a chave é o `id_sessao` — então a etapa 3 não cria uma linha
+     * nova, ela completa a que a etapa 1 abriu. É o que faz uma contratação
+     * abandonada no meio ficar registrada como abandonada no meio, com o nome e
+     * o telefone de quem parou.
+     *
+     * Grava mesmo com o webhook recusando, e pelo mesmo motivo do lead: quando
+     * o n8n está fora, esta linha é o único lugar onde a contratação existe.
+     * Vai para `dados` o que o webhook recebeu, e nada do que ele não recebeu —
+     * o token do reCAPTCHA continua sem sair do servidor.
+     */
+    await registrarEnvio({
+      idSessao: data.id_sessao,
+      formulario: "contratacao",
+      etapa: data.etapa,
+      etapaId: data.etapa_id,
+      totalEtapas: data.total_etapas,
+      concluido: data.final,
+      statusEnvio: statusDoWebhook(outcome),
+      dados: { ...dadosSaneados, attribution: data.attribution ?? {}, page: data.page },
+      anexos,
+      ip: clientIp,
+    });
+
+    return outcome;
   });

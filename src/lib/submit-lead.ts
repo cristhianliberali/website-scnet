@@ -12,6 +12,8 @@ import {
   verifyRecaptcha,
 } from "./verify-recaptcha";
 import { postToWebhook, type WebhookOutcome } from "./webhook";
+import { registrarEnvio } from "./envios-db.server";
+import { statusDoWebhook } from "./envios-status";
 
 /** Identifica a origem do envio para quem consome o webhook. */
 const FORM_ID = "lead";
@@ -139,6 +141,8 @@ export const submitLead = createServerFn({ method: "POST" })
       };
     }
 
+    const idSessao = randomUUID();
+
     // Mesmo envelope das etapas de /contratacao — quem consome o webhook lê
     // os dois formulários do mesmo jeito.
     const payload = {
@@ -148,7 +152,7 @@ export const submitLead = createServerFn({ method: "POST" })
       etapa_nome: "Lead",
       total_etapas: 1,
       final: true,
-      id_sessao: randomUUID(),
+      id_sessao: idSessao,
       page: data.page,
       dados: {
         planos: data.plan
@@ -175,6 +179,29 @@ export const submitLead = createServerFn({ method: "POST" })
     };
 
     const outcome = await postToWebhook(payload, "Lead");
+
+    /*
+     * O lead é gravado mesmo quando o webhook recusa — e é aí que ele mais
+     * vale. Um n8n fora do ar, um token vencido, um fluxo republicado: sem esta
+     * linha, o lead da pessoa que preencheu tudo certo simplesmente não
+     * existiria em lugar nenhum quando alguém fosse procurar.
+     *
+     * O que NÃO chega aqui é o que o reCAPTCHA reprovou: o handler já devolveu
+     * lá em cima. Robô não é envio, e gravá-lo só encheria a caixa de entrada
+     * do comercial com o que ninguém vai ligar.
+     */
+    await registrarEnvio({
+      idSessao,
+      formulario: "lead",
+      etapa: 1,
+      etapaId: "lead",
+      totalEtapas: 1,
+      concluido: true,
+      statusEnvio: statusDoWebhook(outcome),
+      dados: { ...payload.dados, attribution: payload.attribution, page: payload.page },
+      ip: clientIp,
+    });
+
     if (outcome.ok) await sendFacebookCapiEvent(data);
     return outcome;
   });
