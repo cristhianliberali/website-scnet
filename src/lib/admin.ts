@@ -35,6 +35,7 @@ import {
   salvarPlano,
   type ResumoAdmin,
 } from "./admin-db.server";
+import { lerArquivoDoEnvio, listarEnvios, type ArquivoDoEnvio } from "./envios-db.server";
 import { gravarConfigIndicacao, lerConfigIndicacao } from "./config-db.server";
 import { gravarSeguranca, lerSegurancaFresca } from "./seguranca-db.server";
 import { gravarAreaCliente, lerAreaClienteFresca } from "./area-cliente-db.server";
@@ -52,6 +53,7 @@ import type {
   SessaoAdmin,
   SolicitacaoAdmin,
 } from "./admin-tipos";
+import type { EnvioAdmin } from "./envios-tipos";
 
 /* ---------------- schemas ---------------- */
 
@@ -238,6 +240,8 @@ export type DadosAdmin = {
   planosSite: PlanoAdmin[];
   planosUpgrade: PlanoAdmin[];
   solicitacoes: SolicitacaoAdmin[];
+  /** Os envios dos formulários do site — a home e a /contratacao. */
+  envios: EnvioAdmin[];
   indicacoes: IndicacaoAdmin[];
   config: ConfigIndicacao;
   scripts: ScriptAdmin[];
@@ -264,6 +268,7 @@ export const carregarAdmin = createServerFn({ method: "GET" }).handler(
       planosSite,
       planosUpgrade,
       solicitacoes,
+      envios,
       indicacoes,
       config,
       scripts,
@@ -274,6 +279,7 @@ export const carregarAdmin = createServerFn({ method: "GET" }).handler(
       listaSegura("planos do site", listarPlanos("site")),
       listaSegura("planos de upgrade", listarPlanos("upgrade")),
       listaSegura("solicitações", listarSolicitacoes({})),
+      listaSegura("envios do site", listarEnvios()),
       listaSegura("indicações", listarIndicacoes({})),
       lerConfigIndicacao(),
       listaSegura("scripts", listarScripts()),
@@ -286,6 +292,7 @@ export const carregarAdmin = createServerFn({ method: "GET" }).handler(
       planosSite,
       planosUpgrade,
       solicitacoes,
+      envios,
       indicacoes,
       config,
       scripts,
@@ -333,6 +340,38 @@ export const excluirPlanoAdmin = createServerFn({ method: "POST" })
       return `Plano ${data.idPlano} excluído.`;
     }),
   );
+
+/* ---------------- envios do site ---------------- */
+
+/**
+ * O anexo de um envio, para o /admin baixar.
+ *
+ * **Este é o endpoint mais sensível do painel**: é o único que devolve um
+ * documento de identidade. Por isso ele não é diferente dos outros em nada que
+ * importe — `acao()` confere a sessão de admin ANTES de tocar no banco, e o
+ * `id` chega como número validado pelo zod, não como texto solto que vira
+ * consulta.
+ *
+ * O arquivo volta em base64 porque uma server function devolve JSON; quem pediu
+ * monta um `data:` e baixa. Um envio sem aquele anexo devolve `null`, e não um
+ * erro: anexo faltando é o normal para quem parou antes da última etapa.
+ */
+export const baixarAnexoAdmin = createServerFn({ method: "POST" })
+  .validator(
+    z.object({
+      id: z.string().regex(/^\d+$/, "Envio inválido."),
+      campo: z.enum(["comprovante_residencia", "documento_com_foto"]),
+    }),
+  )
+  .handler(async ({ data }): Promise<ArquivoDoEnvio | null> => {
+    await exigirSessaoAdmin();
+    try {
+      return await lerArquivoDoEnvio(data.id, data.campo);
+    } catch (err) {
+      console.error(`/admin: não foi possível ler o anexo do envio ${data.id}.`, err);
+      return null;
+    }
+  });
 
 /* ---------------- solicitações ---------------- */
 

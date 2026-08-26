@@ -18,7 +18,7 @@
 
 import { createFileRoute, notFound, useRouter } from "@tanstack/react-router";
 import { useState, type FormEvent } from "react";
-import { FileText, LogOut, RefreshCw, ShieldCheck, Users, Zap } from "lucide-react";
+import { FileText, Inbox, LogOut, RefreshCw, ShieldCheck, Users, Zap } from "lucide-react";
 import { toast } from "sonner";
 import { z } from "zod";
 
@@ -33,12 +33,14 @@ import {
   SecaoSolicitacoes,
   type EdicaoSolicitacaoForm,
 } from "@/components/scnet/admin/admin-solicitacoes";
+import { SecaoEnvios } from "@/components/scnet/admin/admin-envios";
 import { SecaoIndicacoes } from "@/components/scnet/admin/admin-indicacoes";
 import { SecaoConfig } from "@/components/scnet/admin/admin-config";
 import { SecaoScripts } from "@/components/scnet/admin/admin-scripts";
 import { SecaoSeguranca } from "@/components/scnet/admin/admin-seguranca";
 import { SecaoAreaCliente } from "@/components/scnet/admin/admin-area-cliente";
 import {
+  baixarAnexoAdmin,
   carregarAdmin,
   entrarAdmin,
   estadoAdmin,
@@ -69,6 +71,7 @@ import type {
 const ABAS = [
   "planos-site",
   "planos-upgrade",
+  "envios",
   "solicitacoes",
   "indicacoes",
   "indicacao",
@@ -322,7 +325,10 @@ function Painel({ sessao, dados }: { sessao: { usuario: string }; dados: DadosAd
         </div>
       </header>
 
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+        {/* Primeiro o número que muda todo dia: quantas pessoas preencheram
+            um formulário hoje. Os outros quatro são estoque. */}
+        <Indicador rotulo="envios do site hoje" valor={dados.resumo.enviosHoje} icone={Inbox} />
         <Indicador rotulo="planos no site" valor={dados.resumo.planosSite} icone={Zap} />
         <Indicador rotulo="planos de upgrade" valor={dados.resumo.planosUpgrade} icone={Zap} />
         <Indicador
@@ -345,6 +351,7 @@ function Painel({ sessao, dados }: { sessao: { usuario: string }; dados: DadosAd
         <TabsList className="flex h-auto w-full flex-wrap justify-start gap-1">
           <TabsTrigger value="planos-site">Planos do site</TabsTrigger>
           <TabsTrigger value="planos-upgrade">Planos de upgrade</TabsTrigger>
+          <TabsTrigger value="envios">Envios do site</TabsTrigger>
           <TabsTrigger value="solicitacoes">Solicitações</TabsTrigger>
           <TabsTrigger value="indicacoes">Indicações</TabsTrigger>
           <TabsTrigger value="indicacao">Seção de indicação</TabsTrigger>
@@ -371,6 +378,17 @@ function Painel({ sessao, dados }: { sessao: { usuario: string }; dados: DadosAd
               salvando={salvando}
               aoSalvar={salvarPlano("upgrade")}
               aoExcluir={excluirPlano("upgrade")}
+            />
+          </TabsContent>
+
+          <TabsContent value="envios">
+            <SecaoEnvios
+              envios={dados.envios}
+              aoBaixarAnexo={(id, campo) =>
+                baixarAnexoAdmin({
+                  data: { id, campo: campo as "comprovante_residencia" | "documento_com_foto" },
+                })
+              }
             />
           </TabsContent>
 
