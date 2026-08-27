@@ -71,6 +71,7 @@ import { consultarPainel, getSessaoCliente, logoutCliente } from "@/lib/cliente-
 import { faturaEmAberto } from "@/lib/painel-formato";
 import { normalizarPainel } from "@/lib/painel-normalizar";
 import { cn } from "@/lib/utils";
+import { waLinkCentral } from "@/lib/whatsapp";
 import type { PainelSnapshot } from "@/lib/painel-tipos";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 
@@ -505,7 +506,17 @@ function FalhaAoCarregar({
           {recarregando ? "Tentando..." : "Tentar de novo"}
         </Button>
         <Button type="button" variant="outline" asChild>
-          <a href="https://wa.me/5549999999999" target="_blank" rel="noopener">
+          {/*
+            A central de atendimento (VITE_WHATSAPP_NUMBER_CENTRAL), e não o
+            comercial: quem vê esta tela já é cliente e o painel dele não
+            abriu. O número estava escrito aqui à mão, e era o do exemplo do
+            .env — um link para um WhatsApp que não existe.
+          */}
+          <a
+            href={waLinkCentral("Sou cliente e meu painel não está carregando")}
+            target="_blank"
+            rel="noopener"
+          >
             Falar no WhatsApp
           </a>
         </Button>
