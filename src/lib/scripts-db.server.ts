@@ -39,6 +39,7 @@ import { randomUUID } from "node:crypto";
 
 import { env, getClient, identifier } from "./postgres.server";
 import { POSICOES_SCRIPT, type PosicaoScript, type ScriptAdmin } from "./admin-tipos";
+import { LIMITE_ADMIN } from "./form-limits";
 
 const DEFAULT_SCHEMA = "public";
 const DEFAULT_CONFIG = "web_config";
@@ -46,7 +47,7 @@ const DEFAULT_CONFIG = "web_config";
 export const CHAVE_SCRIPTS = "scripts";
 
 /** Teto por trecho e no total — um `web_config` gigante atrasaria o arranque. */
-export const MAX_CODIGO = 20_000;
+export const MAX_CODIGO = LIMITE_ADMIN.script.codigo;
 export const MAX_SCRIPTS = 30;
 
 const schema = () => identifier(env("POSTGRES_SCHEMA"), DEFAULT_SCHEMA, "POSTGRES_SCHEMA");

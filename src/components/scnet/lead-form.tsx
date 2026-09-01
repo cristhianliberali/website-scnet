@@ -144,6 +144,8 @@ export function LeadForm({ variant = "hero" }: { variant?: "hero" | "light" }) {
               aria-label="DDI"
               className={field(!!errors.phone) + " text-center"}
               value={ddi}
+              inputMode="tel"
+              maxLength={LIMITES.ddi}
               onChange={(e) => setDdi("+" + e.target.value.replace(/\D/g, "").slice(0, 3))}
             />
             <input
@@ -151,6 +153,7 @@ export function LeadForm({ variant = "hero" }: { variant?: "hero" | "light" }) {
               className={field(!!errors.phone)}
               value={phone}
               inputMode="tel"
+              maxLength={LIMITES.telefone}
               onChange={(e) => {
                 setPhone(maskPhone(e.target.value));
                 if (errors.phone) setErrors((prev) => ({ ...prev, phone: false }));

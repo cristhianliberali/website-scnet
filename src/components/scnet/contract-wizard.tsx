@@ -874,6 +874,7 @@ export function ContractWizard({
                           value={lead.telefone}
                           inputMode="tel"
                           autoComplete="tel"
+                          maxLength={LIMITES.telefone}
                           placeholder="(49) 99999-9999"
                           onChange={(e) => {
                             setLead((p) => ({ ...p, telefone: maskPhone(e.target.value) }));
@@ -963,6 +964,7 @@ export function ContractWizard({
                   className={inputCls(!!errors["cep"])}
                   value={address.cep}
                   inputMode="numeric"
+                  maxLength={LIMITES.cep}
                   placeholder="89800-000"
                   onChange={(e) => {
                     const v = maskCep(e.target.value);
@@ -1097,6 +1099,7 @@ export function ContractWizard({
                 className={inputCls(!!errors["cpf"])}
                 value={person.cpf}
                 inputMode="numeric"
+                maxLength={LIMITES.cpf}
                 placeholder="000.000.000-00"
                 onChange={(e) => {
                   setPerson((p) => ({ ...p, cpf: maskCpf(e.target.value) }));
@@ -1145,6 +1148,7 @@ export function ContractWizard({
                 className={inputCls(!!errors["telefone2"])}
                 value={person.telefone2}
                 inputMode="tel"
+                maxLength={LIMITES.telefone}
                 placeholder="(49) 3333-3333"
                 onChange={(e) => {
                   setPerson((p) => ({ ...p, telefone2: maskPhone(e.target.value) }));

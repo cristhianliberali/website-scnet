@@ -41,6 +41,7 @@ import { gravarSeguranca, lerSegurancaFresca } from "./seguranca-db.server";
 import { gravarAreaCliente, lerAreaClienteFresca } from "./area-cliente-db.server";
 import { minScore, ultimosVereditos } from "./verify-recaptcha";
 import { MAX_CODIGO, excluirScript, listarScripts, salvarScript } from "./scripts-db.server";
+import { LIMITE_ADMIN } from "./form-limits";
 import { TAGS_PROIBIDAS } from "./admin-tipos";
 import type {
   ConfigAreaCliente,
@@ -62,26 +63,33 @@ import type { EnvioAdmin } from "./envios-tipos";
  *
  * Não é paranoia: são endpoints públicos, e sem teto um POST direto despeja
  * megabytes de texto arbitrário dentro de um `INSERT`.
+ *
+ * Os números vêm de `LIMITE_ADMIN`, o mesmo objeto que as telas usam no
+ * `maxLength` dos campos — assim o que o formulário deixa digitar é exatamente
+ * o que o schema aceita, e ninguém preenche um campo para vê-lo recusado no
+ * salvar.
  */
 const texto = (max: number) => z.string().max(max).default("");
 
+const L = LIMITE_ADMIN;
+
 const planoSchema = z.object({
-  idPlano: texto(20),
+  idPlano: texto(L.plano.idPlano),
   ativo: z.boolean(),
-  ordemGrade: texto(10),
+  ordemGrade: texto(L.plano.ordemGrade),
   destaque: z.boolean(),
-  codigoMk: texto(20),
-  nome: z.string().min(1, "O plano precisa de um nome.").max(150),
-  descricao: texto(2000),
-  valor: texto(20),
-  valorPrimeirasFaturas: texto(20),
-  quantMesesDesconto: texto(10),
-  composicaoResumo: texto(500),
-  composicao: texto(4000),
-  urlLogoAgregados: texto(4000),
-  nomeDestaque: texto(60),
-  codigoOfertaMk: texto(30),
-  codigoOferta: texto(60).optional(),
+  codigoMk: texto(L.plano.codigoMk),
+  nome: z.string().min(1, "O plano precisa de um nome.").max(L.plano.nome),
+  descricao: texto(L.plano.descricao),
+  valor: texto(L.plano.valor),
+  valorPrimeirasFaturas: texto(L.plano.valor),
+  quantMesesDesconto: texto(L.plano.quantMesesDesconto),
+  composicaoResumo: texto(L.plano.composicaoResumo),
+  composicao: texto(L.plano.composicao),
+  urlLogoAgregados: texto(L.plano.urlLogoAgregados),
+  nomeDestaque: texto(L.plano.nomeDestaque),
+  codigoOfertaMk: texto(L.plano.codigoOfertaMk),
+  codigoOferta: texto(L.plano.codigoOferta).optional(),
 });
 
 const catalogoSchema = z.enum(["site", "upgrade"]);
@@ -91,54 +99,54 @@ const statusSolicitacaoSchema = z.enum(["em_aberto", "cancelado", "concluido"]);
 const solicitacaoSchema = z.object({
   id: z.string().regex(/^\d+$/, "Solicitação inválida."),
   status: statusSolicitacaoSchema,
-  assunto: texto(180),
+  assunto: texto(L.solicitacao.assunto),
   // vazio ou AAAA-MM-DD, que é o que o <input type="date"> produz
   agendadoPara: z
     .string()
     .max(10)
     .regex(/^(\d{4}-\d{2}-\d{2})?$/, "Data inválida.")
     .default(""),
-  observacaoInterna: texto(4000),
+  observacaoInterna: texto(L.solicitacao.observacaoInterna),
 });
 
 const indicacaoSchema = z.object({
   id: z.string().regex(/^\d+$/, "Indicação inválida."),
-  nomeIndicacao: z.string().min(1, "A indicação precisa de um nome.").max(150),
-  telefoneIndicacao: texto(20),
-  cidade: texto(120),
-  observacoes: texto(4000),
-  codNovoCliente: texto(60),
-  codContratoNovoCliente: texto(60),
+  nomeIndicacao: z.string().min(1, "A indicação precisa de um nome.").max(L.indicacao.nome),
+  telefoneIndicacao: texto(L.indicacao.telefone),
+  cidade: texto(L.indicacao.cidade),
+  observacoes: texto(L.indicacao.observacoes),
+  codNovoCliente: texto(L.indicacao.codigo),
+  codContratoNovoCliente: texto(L.indicacao.codigo),
   status: z.enum(["em_aberto", "sem_sucesso", "dados_invalidos", "concluido"]),
-  campanha: texto(120),
+  campanha: texto(L.indicacao.campanha),
   tipoBonus: z.enum(["", "desconto_fatura", "premio", "pix"]),
-  descricaoBonus: texto(2000),
-  valorIndicacao: texto(20),
+  descricaoBonus: texto(L.indicacao.descricaoBonus),
+  valorIndicacao: texto(L.indicacao.valor),
 });
 
 const areaClienteSchema = z.object({
   ativa: z.boolean(),
-  mensagem: texto(600),
+  mensagem: texto(L.areaCliente.mensagem),
 });
 
 const segurancaSchema = z.object({
   recaptchaAtivo: z.boolean(),
   // vazio = "usa a variável de ambiente". O número é conferido na leitura.
-  minScore: texto(10),
+  minScore: texto(L.seguranca.minScore),
 });
 
 const configSchema = z.object({
   ativo: z.boolean(),
-  titulo: z.string().min(1, "A seção precisa de um título.").max(120),
-  descricao: texto(500),
-  bannerDesktopUrl: texto(600),
-  bannerMobileUrl: texto(600),
-  bannerAlt: texto(200),
-  bannerLink: texto(600),
-  campanhaNome: texto(120),
+  titulo: z.string().min(1, "A seção precisa de um título.").max(L.config.titulo),
+  descricao: texto(L.config.descricao),
+  bannerDesktopUrl: texto(L.config.bannerUrl),
+  bannerMobileUrl: texto(L.config.bannerUrl),
+  bannerAlt: texto(L.config.bannerAlt),
+  bannerLink: texto(L.config.bannerLink),
+  campanhaNome: texto(L.config.campanhaNome),
   campanhaTipoBonus: z.enum(["", "desconto_fatura", "premio", "pix"]),
-  campanhaDescricaoBonus: texto(500),
-  campanhaValor: texto(20),
+  campanhaDescricaoBonus: texto(L.config.campanhaDescricaoBonus),
+  campanhaValor: texto(L.config.campanhaValor),
 });
 
 /**
@@ -154,8 +162,8 @@ const configSchema = z.object({
  * de injeção e cortaria o final da página para todos os visitantes.
  */
 const scriptSchema = z.object({
-  id: texto(80),
-  nome: texto(120),
+  id: texto(L.script.id),
+  nome: texto(L.script.nome),
   posicao: z.enum(["head", "body_inicio", "body_fim"]),
   // O teto de tamanho fica aqui, como barreira contra POST direto. As regras
   // que a pessoa pode violar sem querer são conferidas no handler — veja abaixo.
@@ -225,7 +233,12 @@ export const estadoAdmin = createServerFn({ method: "GET" }).handler(
 );
 
 export const entrarAdmin = createServerFn({ method: "POST" })
-  .validator(z.object({ usuario: z.string().max(120), senha: z.string().max(200) }))
+  .validator(
+    z.object({
+      usuario: z.string().max(L.login.usuario),
+      senha: z.string().max(L.login.senha),
+    }),
+  )
   .handler(async ({ data }) => loginAdminServer(data));
 
 export const sairAdmin = createServerFn({ method: "POST" }).handler(async () => {

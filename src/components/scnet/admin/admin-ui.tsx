@@ -138,6 +138,7 @@ export function TextoLongoAdmin({
   dica,
   className,
   rows = 3,
+  ...props
 }: {
   rotulo: string;
   valor: string;
@@ -145,11 +146,17 @@ export function TextoLongoAdmin({
   dica?: ReactNode | undefined;
   className?: string | undefined;
   rows?: number;
-}) {
+} & Omit<React.ComponentProps<typeof Textarea>, "value" | "onChange" | "className" | "rows">) {
   const [id] = useState(proximoId);
   return (
     <CampoAdmin rotulo={rotulo} dica={dica} className={className} htmlFor={id}>
-      <Textarea id={id} value={valor} onChange={(e) => aoMudar(e.target.value)} rows={rows} />
+      <Textarea
+        id={id}
+        value={valor}
+        onChange={(e) => aoMudar(e.target.value)}
+        rows={rows}
+        {...props}
+      />
     </CampoAdmin>
   );
 }

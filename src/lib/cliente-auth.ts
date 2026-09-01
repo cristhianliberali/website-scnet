@@ -16,6 +16,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 
+import { LIMITES } from "./form-limits";
 import {
   acessarComSenhaServer,
   consultarPainelServer,
@@ -42,7 +43,7 @@ import type {
 
 const documentoSchema = z.object({
   tipoDocumento: z.enum(["cpf", "cnpj"]),
-  documento: z.string().min(11).max(20),
+  documento: z.string().min(11).max(LIMITES.documento),
   recaptchaToken: z.string().optional(),
 });
 
@@ -52,7 +53,7 @@ const canalSchema = z.object({
 });
 
 const codigoSchema = z.object({
-  codigo: z.string().min(4).max(10),
+  codigo: z.string().min(4).max(LIMITES.codigoVerificacao),
   recaptchaToken: z.string().optional(),
 });
 
@@ -62,14 +63,14 @@ const codigoSchema = z.object({
  * ao n8n; quem diz se as credenciais existem é o cadastro.
  */
 const senhaSchema = z.object({
-  login: z.string().min(1).max(160),
-  senha: z.string().min(1).max(200),
+  login: z.string().min(1).max(LIMITES.login),
+  senha: z.string().min(1).max(LIMITES.senha),
   recaptchaToken: z.string().optional(),
 });
 
 const solicitacaoSchema = z.object({
   tipoDocumento: z.enum(["cpf", "cnpj"]),
-  documento: z.string().min(11).max(20),
+  documento: z.string().min(11).max(LIMITES.documento),
   metodo: z.enum(["whatsapp", "email"]),
   recaptchaToken: z.string().optional(),
 });

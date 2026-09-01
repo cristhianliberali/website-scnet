@@ -4,6 +4,7 @@ import { createHash, randomUUID } from "node:crypto";
 import { z } from "zod";
 import { isValidPhone } from "./form-utils";
 import { NAME_RE, attributionSchema } from "./form-schemas";
+import { LIMITES } from "./form-limits";
 import { clientIpFromHeaders } from "./rate-limit";
 import {
   isLikelyBot,
@@ -41,10 +42,14 @@ export type LeadResult = WebhookOutcome;
 // e segue para o n8n e para a Conversions API do Meta, então cada campo tem
 // formato e tamanho fechados.
 const leadInputSchema = z.object({
-  name: z.string().min(1).max(120).regex(NAME_RE),
-  ddi: z.string().regex(/^\+?\d{1,3}$/),
+  // Os tetos são os mesmos que o `maxLength` do formulário aplica (LIMITES).
+  name: z.string().min(1).max(LIMITES.nome).regex(NAME_RE),
+  ddi: z
+    .string()
+    .max(LIMITES.ddi)
+    .regex(/^\+?\d{1,3}$/),
   // Mesma regra do formulário (DDD + 8 ou 9 dígitos), agora também no servidor.
-  phone: z.string().min(1).max(20).refine(isValidPhone),
+  phone: z.string().min(1).max(LIMITES.telefone).refine(isValidPhone),
   page: z.string().max(300),
   intent: z.enum(["quero_contratar", "ja_sou_cliente"]).optional(),
   plan: z.string().max(60).optional(),
