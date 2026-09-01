@@ -1307,36 +1307,18 @@ export function ContractWizard({
               {sending ? <Loader2 className="animate-spin" /> : null} Continuar <ChevronRight />
             </Button>
           ) : (
-            /* Fim do formulário: além de finalizar por aqui, dá para terminar
-               conversando — e a conversa já abre com tudo o que foi preenchido. */
-            <div className="flex flex-col-reverse gap-3 sm:flex-row sm:items-center">
-              <Button
-                variant="whats"
-                size="xl"
-                asChild
-                onClick={() => {
-                  eventoDeClique("continuar_whatsapp", {
-                    texto: "Continuar no WhatsApp",
-                    local: "contratacao",
-                  });
-                  eventoWhatsapp("contratacao_formulario", { etapa: LAST_STEP + 1 });
-                }}
-              >
-                <a href={linkWhatsApp} target="_blank" rel="noopener noreferrer">
-                  <MessageCircle className="size-5" />
-                  Continuar no WhatsApp
-                </a>
-              </Button>
-              <Button
-                type="button"
-                variant="zap"
-                size="xl"
-                onClick={finish}
-                disabled={sending || redirecting}
-              >
-                {sending ? <Loader2 className="animate-spin" /> : <Check />} Finalizar contratação
-              </Button>
-            </div>
+            /* A última etapa tem uma saída só: finalizar. O "Continuar no
+               WhatsApp" espera a tela de obrigado — oferecê-lo aqui competiria
+               com o envio, e quem saísse por ele nunca concluiria. */
+            <Button
+              type="button"
+              variant="zap"
+              size="xl"
+              onClick={finish}
+              disabled={sending || redirecting}
+            >
+              {sending ? <Loader2 className="animate-spin" /> : <Check />} Finalizar contratação
+            </Button>
           )}
         </div>
       )}
