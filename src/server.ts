@@ -3,6 +3,7 @@ import "./lib/error-capture";
 import { consumeLastCapturedError } from "./lib/error-capture";
 import { renderErrorPage } from "./lib/error-page";
 import { blocosParaRequisicao, injetarScripts } from "./lib/injetar-scripts.server";
+import { respostaRobots } from "./lib/robots.server";
 
 type ServerEntry = {
   fetch: (request: Request, env: unknown, ctx: unknown) => Promise<Response> | Response;
@@ -48,6 +49,15 @@ function isH3SwallowedErrorBody(body: string): boolean {
 export default {
   async fetch(request: Request, env: unknown, ctx: unknown) {
     try {
+      /*
+       * O robots.txt é montado aqui, e não servido de `public/`: o domínio do
+       * `Sitemap:` vem de VITE_SITE_URL (ou do host da requisição, no preview),
+       * e arquivo estático não tem onde ler variável. Vem antes de tudo porque
+       * não depende do app nem das tags do /admin.
+       */
+      const robots = respostaRobots(request);
+      if (robots) return robots;
+
       const handler = await getServerEntry();
       /*
        * As tags do /admin são buscadas EM PARALELO com a renderização, não
