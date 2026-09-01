@@ -6,6 +6,7 @@ import { getRecaptchaToken } from "@/lib/recaptcha";
 import { getFacebookCookies, trackLeadEvent } from "@/lib/facebook-pixel";
 import { RECAPTCHA_ACTION_LEAD, submitLead } from "@/lib/submit-lead";
 import { capitalizeName, isValidPhone, maskPhone } from "@/lib/form-utils";
+import { LIMITES, limitar } from "@/lib/form-limits";
 import { isRateLimited } from "@/lib/http-errors";
 import { cn } from "@/lib/utils";
 import { waLink } from "@/lib/whatsapp";
@@ -125,8 +126,9 @@ export function LeadForm({ variant = "hero" }: { variant?: "hero" | "light" }) {
             id={`nome-${variant}`}
             className={field(!!errors.name)}
             value={name}
+            maxLength={LIMITES.nome}
             onChange={(e) => {
-              setName(capitalizeName(e.target.value));
+              setName(limitar(capitalizeName(e.target.value), LIMITES.nome));
               if (errors.name) setErrors((prev) => ({ ...prev, name: false }));
             }}
             placeholder="Maria Silva"
