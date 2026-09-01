@@ -8,6 +8,7 @@ import {
   ChevronRight,
   Circle,
   Loader2,
+  MessageCircle,
   Paperclip,
   Sun,
   Sunset,
@@ -35,8 +36,15 @@ import { LINK_FORMULARIO } from "@/lib/links";
 import { getAttribution } from "@/lib/utm";
 import { getRecaptchaToken } from "@/lib/recaptcha";
 import { submitContractStep } from "@/lib/submit-contract-step";
-import { redirectToWhatsAppSupport, whatsappSupportLink } from "@/lib/whatsapp";
-import { dispararEvento, eventoDaEtapa, eventoDeClique, EVENTO } from "@/lib/datalayer";
+import { redirectToWhatsAppSupport, waLink, whatsappSupportLink } from "@/lib/whatsapp";
+import { mensagemContratacao, type ResumoContratacao } from "@/lib/mensagem-contratacao";
+import {
+  dispararEvento,
+  eventoDaEtapa,
+  eventoDeClique,
+  eventoWhatsapp,
+  EVENTO,
+} from "@/lib/datalayer";
 import { AreaClienteDesligada } from "./area-cliente-desligada";
 import { cn } from "@/lib/utils";
 import type { ContractHandoff } from "@/lib/contract-handoff";
@@ -369,6 +377,36 @@ export function ContractWizard({
   const planoPosDesconto = plan
     ? textoPosDesconto(plan.valor, plan.valor_primeiras_faturas, plan.quant_meses_desconto)
     : null;
+
+  /**
+   * O destino do "Continuar no WhatsApp": a conversa abre já com o resumo de
+   * tudo o que a pessoa preencheu.
+   *
+   * É um `href` pronto, e não algo montado dentro do clique, porque o botão é
+   * um link de verdade: sai do formulário sem passar por `window.open`, que o
+   * navegador bloquearia se viesse depois de um await.
+   */
+  const linkWhatsApp = useMemo(() => {
+    const resumo: ResumoContratacao = {
+      lead: { nome: lead.nome, telefone: lead.telefone },
+      plano: plan
+        ? {
+            nome: plan.nome,
+            preco: precoVigente(plan.valor, plan.valor_primeiras_faturas),
+            posDesconto: planoPosDesconto,
+          }
+        : null,
+      endereco: address,
+      cadastro: person,
+      agendamento: { data: date, periodo: period, observacao: note },
+      // Só a menção: o arquivo em si não cabe num link do WhatsApp.
+      anexos: [
+        ...(proofFile ? ["o comprovante de residência"] : []),
+        ...(idFile ? ["o documento com foto"] : []),
+      ],
+    };
+    return waLink(mensagemContratacao(resumo));
+  }, [lead, plan, planoPosDesconto, address, person, date, period, note, proofFile, idFile]);
 
   /* ----- CEP lookup ----- */
   async function lookupCep(value: string) {
@@ -727,6 +765,26 @@ export function ContractWizard({
           </strong>
           . Nosso time confirma tudo no WhatsApp em instantes.
         </p>
+        {/* Quem não quiser esperar a confirmação começa a conversa agora — e
+            começa com o resumo, sem ter de repetir nada ao atendente. */}
+        <Button
+          variant="whats"
+          size="xl"
+          className="mt-6 w-full sm:w-auto"
+          asChild
+          onClick={() => {
+            eventoDeClique("continuar_whatsapp", {
+              texto: "Continuar no WhatsApp",
+              local: "contratacao_concluida",
+            });
+            eventoWhatsapp("contratacao_concluida");
+          }}
+        >
+          <a href={linkWhatsApp} target="_blank" rel="noopener noreferrer">
+            <MessageCircle className="size-5" />
+            Continuar no WhatsApp
+          </a>
+        </Button>
       </div>
     );
   }
@@ -1245,15 +1303,36 @@ export function ContractWizard({
               {sending ? <Loader2 className="animate-spin" /> : null} Continuar <ChevronRight />
             </Button>
           ) : (
-            <Button
-              type="button"
-              variant="zap"
-              size="xl"
-              onClick={finish}
-              disabled={sending || redirecting}
-            >
-              {sending ? <Loader2 className="animate-spin" /> : <Check />} Finalizar contratação
-            </Button>
+            /* Fim do formulário: além de finalizar por aqui, dá para terminar
+               conversando — e a conversa já abre com tudo o que foi preenchido. */
+            <div className="flex flex-col-reverse gap-3 sm:flex-row sm:items-center">
+              <Button
+                variant="whats"
+                size="xl"
+                asChild
+                onClick={() => {
+                  eventoDeClique("continuar_whatsapp", {
+                    texto: "Continuar no WhatsApp",
+                    local: "contratacao",
+                  });
+                  eventoWhatsapp("contratacao_formulario", { etapa: LAST_STEP + 1 });
+                }}
+              >
+                <a href={linkWhatsApp} target="_blank" rel="noopener noreferrer">
+                  <MessageCircle className="size-5" />
+                  Continuar no WhatsApp
+                </a>
+              </Button>
+              <Button
+                type="button"
+                variant="zap"
+                size="xl"
+                onClick={finish}
+                disabled={sending || redirecting}
+              >
+                {sending ? <Loader2 className="animate-spin" /> : <Check />} Finalizar contratação
+              </Button>
+            </div>
           )}
         </div>
       )}
