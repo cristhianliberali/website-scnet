@@ -15,7 +15,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { LIMITE } from "@/lib/form-limits";
+import { LIMITES } from "@/lib/form-limits";
 import { maskPhone } from "@/lib/form-utils";
 import { cn } from "@/lib/utils";
 import { waLink } from "@/lib/whatsapp";
@@ -294,7 +294,7 @@ export function CampoTelefone({
           onChange={(e) => aoMudar(e.target.value.replace(/\D/g, "").slice(0, 11))}
           inputMode="tel"
           autoComplete="tel-national"
-          maxLength={LIMITE.telefone}
+          maxLength={LIMITES.telefone}
           placeholder="(49) 99999-8888"
           className="rounded-l-none"
         />

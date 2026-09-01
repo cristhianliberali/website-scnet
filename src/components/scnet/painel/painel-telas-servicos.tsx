@@ -37,7 +37,7 @@ import {
 } from "@/components/ui/select";
 import { useErroPainel, useFormularioPainel } from "@/hooks/use-painel";
 import { isValidPhone } from "@/lib/form-utils";
-import { LIMITE } from "@/lib/form-limits";
+import { LIMITES } from "@/lib/form-limits";
 import { textoDaResposta } from "@/lib/painel-normalizar";
 import type {
   AdicionalPlano,
@@ -516,7 +516,7 @@ export function TelaIndicacoes({
               aoMudar={setNome}
               placeholder="Ex: Pedro Henrique"
               autoComplete="off"
-              maxLength={LIMITE.nome}
+              maxLength={LIMITES.nome}
             />
             <CampoTelefone
               rotulo="WhatsApp do amigo"
@@ -530,7 +530,7 @@ export function TelaIndicacoes({
               aoMudar={setCidade}
               placeholder="Ex: Maravilha"
               autoComplete="off"
-              maxLength={LIMITE.cidade}
+              maxLength={LIMITES.cidade}
             />
             <CampoTexto
               rotulo="Observações (opcional)"
@@ -538,7 +538,7 @@ export function TelaIndicacoes({
               aoMudar={setObservacoes}
               placeholder="Ex: melhor horário para ligar, bairro, referência"
               autoComplete="off"
-              maxLength={LIMITE.observacao}
+              maxLength={LIMITES.observacao}
             />
           </div>
           <div className="flex justify-end">
@@ -729,7 +729,7 @@ export function TelaMudancaEndereco({
               aoMudar={setCep}
               placeholder="00000-000"
               inputMode="numeric"
-              maxLength={LIMITE.cep}
+              maxLength={LIMITES.cep}
             />
             <Button
               type="button"
@@ -751,13 +751,13 @@ export function TelaMudancaEndereco({
               rotulo="Rua / avenida"
               valor={logradouro}
               aoMudar={setLogradouro}
-              maxLength={LIMITE.logradouro}
+              maxLength={LIMITES.logradouro}
             />
             <CampoTexto
               rotulo="Número"
               valor={numero}
               aoMudar={setNumero}
-              maxLength={LIMITE.numero}
+              maxLength={LIMITES.numero}
             />
           </div>
 
@@ -767,13 +767,13 @@ export function TelaMudancaEndereco({
               valor={complemento}
               aoMudar={setComplemento}
               placeholder="Apto, bloco, casa..."
-              maxLength={LIMITE.complemento}
+              maxLength={LIMITES.complemento}
             />
             <CampoTexto
               rotulo="Bairro"
               valor={bairro}
               aoMudar={setBairro}
-              maxLength={LIMITE.bairro}
+              maxLength={LIMITES.bairro}
             />
           </div>
 
@@ -782,13 +782,13 @@ export function TelaMudancaEndereco({
               rotulo="Cidade"
               valor={cidade}
               aoMudar={setCidade}
-              maxLength={LIMITE.cidade}
+              maxLength={LIMITES.cidade}
             />
             <CampoTexto
               rotulo="UF"
               valor={uf}
               aoMudar={setUf}
-              maxLength={LIMITE.uf}
+              maxLength={LIMITES.uf}
               placeholder="SC"
             />
           </div>
@@ -929,20 +929,20 @@ export function TelaTrocarTitular({
               aoMudar={setNome}
               placeholder="Ex: Mariana Silva Rocha"
               className="sm:col-span-2"
-              maxLength={LIMITE.nome}
+              maxLength={LIMITES.nome}
             />
             <CampoTexto
               rotulo="CPF ou CNPJ"
               valor={documento}
               aoMudar={setDocumento}
               placeholder="000.000.000-00"
-              maxLength={LIMITE.documento}
+              maxLength={LIMITES.documento}
             />
             <CampoTexto
               rotulo="RG / órgão emissor"
               valor={rg}
               aoMudar={setRg}
-              maxLength={LIMITE.rg}
+              maxLength={LIMITES.rg}
             />
             <CampoTexto
               rotulo="Data de nascimento"
@@ -969,7 +969,7 @@ export function TelaTrocarTitular({
               aoMudar={setEmail}
               type="email"
               placeholder="email@exemplo.com.br"
-              maxLength={LIMITE.email}
+              maxLength={LIMITES.email}
             />
             <CampoTexto
               rotulo="WhatsApp do novo titular"
@@ -977,7 +977,7 @@ export function TelaTrocarTitular({
               aoMudar={setTelefone}
               placeholder="(49) 99999-8888"
               inputMode="tel"
-              maxLength={LIMITE.telefone}
+              maxLength={LIMITES.telefone}
             />
           </div>
 
@@ -1100,7 +1100,7 @@ export function TelaSuporte({
             valor={assunto}
             aoMudar={setAssunto}
             placeholder="Ex: sinal cai toda noite por volta das 20h"
-            maxLength={LIMITE.assunto}
+            maxLength={LIMITES.assunto}
           />
 
           <CampoTextoLongo
@@ -1109,8 +1109,8 @@ export function TelaSuporte({
             aoMudar={setDescricao}
             rows={4}
             placeholder="Conte desde quando começou, em quais aparelhos acontece e quais luzes do equipamento estão acesas."
-            maxLength={LIMITE.descricao}
-            dica={`${descricao.length}/${LIMITE.descricao} caracteres`}
+            maxLength={LIMITES.descricao}
+            dica={`${descricao.length}/${LIMITES.descricao} caracteres`}
           />
 
           <AcoesFormulario

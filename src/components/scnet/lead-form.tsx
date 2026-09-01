@@ -6,7 +6,7 @@ import { getRecaptchaToken } from "@/lib/recaptcha";
 import { getFacebookCookies, trackLeadEvent } from "@/lib/facebook-pixel";
 import { RECAPTCHA_ACTION_LEAD, submitLead } from "@/lib/submit-lead";
 import { capitalizeName, isValidPhone, maskPhone } from "@/lib/form-utils";
-import { LIMITE } from "@/lib/form-limits";
+import { LIMITES, limitar } from "@/lib/form-limits";
 import { isRateLimited } from "@/lib/http-errors";
 import { cn } from "@/lib/utils";
 import { waLink } from "@/lib/whatsapp";
@@ -126,13 +126,13 @@ export function LeadForm({ variant = "hero" }: { variant?: "hero" | "light" }) {
             id={`nome-${variant}`}
             className={field(!!errors.name)}
             value={name}
+            maxLength={LIMITES.nome}
             onChange={(e) => {
-              setName(capitalizeName(e.target.value));
+              setName(limitar(capitalizeName(e.target.value), LIMITES.nome));
               if (errors.name) setErrors((prev) => ({ ...prev, name: false }));
             }}
             placeholder="Maria Silva"
             autoComplete="name"
-            maxLength={LIMITE.nome}
           />
         </div>
         <div className="space-y-1.5">
@@ -145,7 +145,7 @@ export function LeadForm({ variant = "hero" }: { variant?: "hero" | "light" }) {
               className={field(!!errors.phone) + " text-center"}
               value={ddi}
               inputMode="tel"
-              maxLength={LIMITE.ddi}
+              maxLength={LIMITES.ddi}
               onChange={(e) => setDdi("+" + e.target.value.replace(/\D/g, "").slice(0, 3))}
             />
             <input
@@ -153,7 +153,7 @@ export function LeadForm({ variant = "hero" }: { variant?: "hero" | "light" }) {
               className={field(!!errors.phone)}
               value={phone}
               inputMode="tel"
-              maxLength={LIMITE.telefone}
+              maxLength={LIMITES.telefone}
               onChange={(e) => {
                 setPhone(maskPhone(e.target.value));
                 if (errors.phone) setErrors((prev) => ({ ...prev, phone: false }));

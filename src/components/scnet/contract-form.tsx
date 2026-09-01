@@ -8,7 +8,7 @@ import { getRecaptchaToken } from "@/lib/recaptcha";
 import { getFacebookCookies, trackLeadEvent } from "@/lib/facebook-pixel";
 import { RECAPTCHA_ACTION_LEAD, submitLead } from "@/lib/submit-lead";
 import { capitalizeName, isValidPhone, maskPhone } from "@/lib/form-utils";
-import { LIMITE } from "@/lib/form-limits";
+import { LIMITES } from "@/lib/form-limits";
 import { writeContractHandoffCookie } from "@/lib/contract-handoff";
 import { redirectToWhatsAppSupport, whatsappSupportLink } from "@/lib/whatsapp";
 import { dispararEvento, EVENTO, eventoDeClique } from "@/lib/datalayer";
@@ -268,7 +268,7 @@ export function ContractForm({
             }}
             placeholder="Maria Silva"
             autoComplete="name"
-            maxLength={LIMITE.nome}
+            maxLength={LIMITES.nome}
           />
         </div>
         <div className="space-y-1.5">
@@ -281,7 +281,7 @@ export function ContractForm({
               className={field(!!errors.phone) + " text-center"}
               value={ddi}
               inputMode="tel"
-              maxLength={LIMITE.ddi}
+              maxLength={LIMITES.ddi}
               onChange={(e) => setDdi("+" + e.target.value.replace(/\D/g, "").slice(0, 3))}
             />
             <input
@@ -289,7 +289,7 @@ export function ContractForm({
               className={field(!!errors.phone)}
               value={phone}
               inputMode="tel"
-              maxLength={LIMITE.telefone}
+              maxLength={LIMITES.telefone}
               onChange={(e) => {
                 setPhone(maskPhone(e.target.value));
                 if (errors.phone) setErrors((prev) => ({ ...prev, phone: false }));

@@ -17,7 +17,7 @@ import { Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { data as formatarData, telefone as formatarTelefone } from "@/lib/painel-formato";
-import { LIMITE, LIMITE_ADMIN } from "@/lib/form-limits";
+import { LIMITES, LIMITE_ADMIN } from "@/lib/form-limits";
 import {
   STATUS_INDICACAO_ADMIN,
   TIPOS_BONUS,
@@ -109,7 +109,7 @@ export function SecaoIndicacoes({
             value={busca}
             onChange={(e) => setBusca(e.target.value)}
             placeholder="Protocolo, indicado, quem indicou, campanha…"
-            maxLength={LIMITE.busca}
+            maxLength={LIMITES.busca}
             className="pl-9"
           />
         </div>

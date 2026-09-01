@@ -9,6 +9,7 @@ import {
   type SafeAnexo,
 } from "./attachment-validation";
 import { attributionSchema, dadosSchema, neutralizeDeep } from "./form-schemas";
+import { limitarCampos } from "./form-limits";
 import { clientIpFromHeaders } from "./rate-limit";
 import {
   isLikelyBot,
@@ -102,7 +103,10 @@ export const submitContractStep = createServerFn({ method: "POST" })
 
     // O token do reCAPTCHA fica no servidor — o webhook recebe só o score.
     const { recaptchaToken: _token, anexos: _anexos, dados, ...stepData } = data;
-    const dadosSaneados = neutralizeDeep(dados) as Record<string, unknown>;
+    // O teto de 64KB do `dados` inteiro não impede um único campo gigante: um
+    // POST direto aqui poderia mandar 60KB de "complemento". `limitarCampos`
+    // aplica campo a campo o mesmo teto que o formulário aplica na digitação.
+    const dadosSaneados = neutralizeDeep(limitarCampos(dados)) as Record<string, unknown>;
 
     const outcome = await postToWebhook(
       {
