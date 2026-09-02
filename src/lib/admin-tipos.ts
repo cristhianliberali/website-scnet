@@ -225,6 +225,113 @@ export const CONFIG_AREA_CLIENTE_PADRAO: ConfigAreaCliente = {
     "A área do cliente está em manutenção no momento. Nossa central resolve com você agora mesmo pelo WhatsApp.",
 };
 
+/* ---------------- agendamento da instalação ---------------- */
+
+/**
+ * O expediente técnico de um dia da semana.
+ *
+ * São as **horas de atendimento** da equipe de campo naquele dia — o
+ * combustível do cálculo da agenda. Elas respondem duas perguntas ao mesmo
+ * tempo, e é por isso que são horários e não um número solto:
+ *
+ * 1. *Quantas horas de instalação existem naquele dia?* É o que faz o prazo em
+ *    horas andar (48 horas de atendimento não são 48 horas de relógio).
+ * 2. *Quais períodos o cliente pode escolher naquele dia?* Um sábado com equipe
+ *    só de manhã não oferece a tarde no formulário.
+ *
+ * Os horários são texto "HH:MM", que é o que o `<input type="time">` produz.
+ */
+export type ExpedienteDia = {
+  atendeManha: boolean;
+  manhaInicio: string;
+  manhaFim: string;
+  atendeTarde: boolean;
+  tardeInicio: string;
+  tardeFim: string;
+};
+
+/** O prazo de uma cidade, em horas de atendimento técnico. */
+export type PrazoCidade = {
+  cidade: string;
+  /** Texto, como todo campo de formulário — convertido na borda. */
+  horas: string;
+};
+
+/**
+ * O que o /admin configura da agenda de instalação.
+ *
+ * **Por que isto existe.** O calendário do formulário liberava toda data a
+ * partir de "hoje + 2 dias", fixo no código. Não é assim que um provedor
+ * trabalha: a fila de instalação muda de semana para semana, e é diferente em
+ * cada cidade — a sede instala em 24 horas, o distrito a 60 km espera a próxima
+ * saída da equipe. Uma data que o site promete e a operação não cumpre é uma
+ * reclamação garantida.
+ *
+ * Agora o prazo é um número de **horas de atendimento** que o admin alimenta:
+ * por cidade quando há uma linha para ela, e o padrão para todo o resto.
+ */
+export type ConfigAgendamento = {
+  /** Usado quando a cidade do cliente não está na tabela. */
+  prazoPadraoHoras: string;
+  /** Uma linha por cidade. A busca é aproximada — ver `agenda-calculo.ts`. */
+  cidades: PrazoCidade[];
+  /** Sete posições, de domingo (0) a sábado (6). */
+  expediente: ExpedienteDia[];
+  /** Até quantos dias à frente o calendário oferece data. */
+  horizonteDias: string;
+};
+
+export const DIAS_SEMANA = [
+  "Domingo",
+  "Segunda-feira",
+  "Terça-feira",
+  "Quarta-feira",
+  "Quinta-feira",
+  "Sexta-feira",
+  "Sábado",
+] as const;
+
+const DIA_UTIL: ExpedienteDia = {
+  atendeManha: true,
+  manhaInicio: "08:00",
+  manhaFim: "12:00",
+  atendeTarde: true,
+  tardeInicio: "13:00",
+  tardeFim: "18:00",
+};
+
+const DIA_FECHADO: ExpedienteDia = {
+  atendeManha: false,
+  manhaInicio: "08:00",
+  manhaFim: "12:00",
+  atendeTarde: false,
+  tardeInicio: "13:00",
+  tardeFim: "18:00",
+};
+
+/**
+ * O padrão é o expediente que o formulário já anunciava antes desta tela
+ * existir — 08h às 12h e 13h às 18h, de segunda a sexta —, mais o sábado de
+ * manhã. Quem nunca abrir a aba continua com o comportamento de sempre.
+ */
+export const CONFIG_AGENDAMENTO_PADRAO: ConfigAgendamento = {
+  prazoPadraoHoras: "48",
+  cidades: [],
+  expediente: [
+    DIA_FECHADO,
+    DIA_UTIL,
+    DIA_UTIL,
+    DIA_UTIL,
+    DIA_UTIL,
+    DIA_UTIL,
+    { ...DIA_UTIL, atendeTarde: false },
+  ],
+  horizonteDias: "60",
+};
+
+/** Quantas cidades a tabela aceita — teto de tamanho da linha de `web_config`. */
+export const MAX_CIDADES_PRAZO = 200;
+
 /* ---------------- segurança (reCAPTCHA) ---------------- */
 
 /**

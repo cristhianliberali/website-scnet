@@ -8,7 +8,7 @@
 --   1. `web_formularios` deixa de ser um registro morto e vira a fila de
 --      atendimento: ganha protocolo, status e as colunas que um humano mexe.
 --   2. Nasce `web_config`, onde ficam os ajustes que o admin edita sem deploy —
---      hoje, os da seção de indicação.
+--      a seção de indicação e o prazo de instalação da /contratacao.
 --
 -- Tudo é idempotente: rodar duas vezes não quebra nada e não duplica dado.
 --
@@ -221,6 +221,61 @@ INSERT INTO public.web_config (chave, valor) VALUES (
     'campanha_tipo_bonus', 'desconto_fatura',
     'campanha_descricao_bonus', 'Desconto na próxima fatura quando a indicação instalar.',
     'campanha_valor', ''
+  )
+)
+ON CONFLICT (chave) DO NOTHING;
+
+/*
+ * O prazo de instalação (aba "Prazo de instalação" do /admin).
+ *
+ *   expediente          sete posições, de domingo (0) a sábado (6), cada uma
+ *                       com as faixas de atendimento técnico daquele dia. São
+ *                       elas que fazem o prazo andar (o prazo é contado em
+ *                       horas de ATENDIMENTO, não de relógio) e são também os
+ *                       períodos que o cliente pode escolher: um dia sem faixa
+ *                       não aparece no calendário da contratação.
+ *   prazo_padrao_horas  a espera de toda cidade que não estiver em `cidades`
+ *   cidades             a exceção, uma entrada {cidade, horas} por cidade. A
+ *                       busca é aproximada: acento, caixa, pontuação e o estado
+ *                       no fim não separam a mesma cidade.
+ *   horizonte_dias      até quantos dias à frente o calendário oferece data
+ *
+ * Nada disto é obrigatório: sem a linha, vale `CONFIG_AGENDAMENTO_PADRAO` em
+ * `src/lib/admin-tipos.ts` — o mesmo expediente que o formulário anunciava
+ * antes desta tela existir. O INSERT abaixo só adianta o trabalho da tela.
+ */
+INSERT INTO public.web_config (chave, valor) VALUES (
+  'agendamento',
+  jsonb_build_object(
+    'prazo_padrao_horas', '48',
+    'horizonte_dias', '60',
+    'cidades', '[]'::jsonb,
+    'expediente', jsonb_build_array(
+      -- domingo: sem atendimento
+      jsonb_build_object('atende_manha', false, 'manha_inicio', '08:00',
+                         'manha_fim', '12:00', 'atende_tarde', false,
+                         'tarde_inicio', '13:00', 'tarde_fim', '18:00'),
+      -- segunda a sexta: 08h-12h e 13h-18h
+      jsonb_build_object('atende_manha', true, 'manha_inicio', '08:00',
+                         'manha_fim', '12:00', 'atende_tarde', true,
+                         'tarde_inicio', '13:00', 'tarde_fim', '18:00'),
+      jsonb_build_object('atende_manha', true, 'manha_inicio', '08:00',
+                         'manha_fim', '12:00', 'atende_tarde', true,
+                         'tarde_inicio', '13:00', 'tarde_fim', '18:00'),
+      jsonb_build_object('atende_manha', true, 'manha_inicio', '08:00',
+                         'manha_fim', '12:00', 'atende_tarde', true,
+                         'tarde_inicio', '13:00', 'tarde_fim', '18:00'),
+      jsonb_build_object('atende_manha', true, 'manha_inicio', '08:00',
+                         'manha_fim', '12:00', 'atende_tarde', true,
+                         'tarde_inicio', '13:00', 'tarde_fim', '18:00'),
+      jsonb_build_object('atende_manha', true, 'manha_inicio', '08:00',
+                         'manha_fim', '12:00', 'atende_tarde', true,
+                         'tarde_inicio', '13:00', 'tarde_fim', '18:00'),
+      -- sábado: só de manhã
+      jsonb_build_object('atende_manha', true, 'manha_inicio', '08:00',
+                         'manha_fim', '12:00', 'atende_tarde', false,
+                         'tarde_inicio', '13:00', 'tarde_fim', '18:00')
+    )
   )
 )
 ON CONFLICT (chave) DO NOTHING;

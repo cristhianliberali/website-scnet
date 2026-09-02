@@ -547,6 +547,54 @@ INSERT INTO public.web_config (chave, valor) VALUES (
 )
 ON CONFLICT (chave) DO NOTHING;
 
+-- O prazo de instalação, editado na aba "Prazo de instalação" do /admin. É ele
+-- que monta o calendário da última etapa da /contratacao:
+--
+--   expediente          uma posição por dia da semana, de domingo (0) a sábado
+--                       (6), com as faixas de atendimento técnico. O prazo é
+--                       contado em horas de ATENDIMENTO (não de relógio), e as
+--                       faixas são também os períodos que o cliente escolhe:
+--                       dia sem faixa não aparece no calendário
+--   prazo_padrao_horas  a espera de toda cidade fora de `cidades`
+--   cidades             a exceção, {cidade, horas} por cidade — a busca é
+--                       aproximada (acento, caixa, pontuação e "/SC" não
+--                       separam a mesma cidade)
+--   horizonte_dias      até quantos dias à frente o calendário oferece data
+--
+-- Sem esta linha vale `CONFIG_AGENDAMENTO_PADRAO` (src/lib/admin-tipos.ts).
+INSERT INTO public.web_config (chave, valor) VALUES (
+  'agendamento',
+  jsonb_build_object(
+    'prazo_padrao_horas', '48',
+    'horizonte_dias', '60',
+    'cidades', '[]'::jsonb,
+    'expediente', jsonb_build_array(
+      jsonb_build_object('atende_manha', false, 'manha_inicio', '08:00',
+                         'manha_fim', '12:00', 'atende_tarde', false,
+                         'tarde_inicio', '13:00', 'tarde_fim', '18:00'),
+      jsonb_build_object('atende_manha', true, 'manha_inicio', '08:00',
+                         'manha_fim', '12:00', 'atende_tarde', true,
+                         'tarde_inicio', '13:00', 'tarde_fim', '18:00'),
+      jsonb_build_object('atende_manha', true, 'manha_inicio', '08:00',
+                         'manha_fim', '12:00', 'atende_tarde', true,
+                         'tarde_inicio', '13:00', 'tarde_fim', '18:00'),
+      jsonb_build_object('atende_manha', true, 'manha_inicio', '08:00',
+                         'manha_fim', '12:00', 'atende_tarde', true,
+                         'tarde_inicio', '13:00', 'tarde_fim', '18:00'),
+      jsonb_build_object('atende_manha', true, 'manha_inicio', '08:00',
+                         'manha_fim', '12:00', 'atende_tarde', true,
+                         'tarde_inicio', '13:00', 'tarde_fim', '18:00'),
+      jsonb_build_object('atende_manha', true, 'manha_inicio', '08:00',
+                         'manha_fim', '12:00', 'atende_tarde', true,
+                         'tarde_inicio', '13:00', 'tarde_fim', '18:00'),
+      jsonb_build_object('atende_manha', true, 'manha_inicio', '08:00',
+                         'manha_fim', '12:00', 'atende_tarde', false,
+                         'tarde_inicio', '13:00', 'tarde_fim', '18:00')
+    )
+  )
+)
+ON CONFLICT (chave) DO NOTHING;
+
 -- ---------------------------------------------------------------------------
 -- 11. As chaves estrangeiras
 -- ---------------------------------------------------------------------------

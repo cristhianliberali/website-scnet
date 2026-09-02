@@ -38,6 +38,11 @@ export type ResumoContratacao = {
     telefone2: string;
   };
   agendamento: { data: string; periodo: string; observacao: string };
+  /**
+   * Já com os rótulos que o cliente leu na tela ("Débito em conta", "Sicredi"),
+   * e não os códigos: quem recebe a mensagem é um atendente, não o n8n.
+   */
+  pagamento: { metodo: string; banco: string; agencia: string; conta: string };
   /** Rótulos dos documentos já escolhidos — os arquivos não vão, só a menção. */
   anexos: string[];
 };
@@ -72,7 +77,7 @@ function lista(itens: string[]): string {
 }
 
 export function mensagemContratacao(resumo: ResumoContratacao): string {
-  const { lead, plano, endereco, cadastro, agendamento, anexos } = resumo;
+  const { lead, plano, endereco, cadastro, agendamento, pagamento, anexos } = resumo;
   const nome = cadastro.nome.trim() || lead.nome.trim();
 
   const blocos = [
@@ -107,10 +112,23 @@ export function mensagemContratacao(resumo: ResumoContratacao): string {
       ["2° telefone", cadastro.telefone2],
     ]),
 
-    secao("Agendamento da instalação", [
+    /*
+     * "Pré-agendamento", e não "agendamento": a ordem de serviço só é garantida
+     * depois da assinatura digital do contrato. É o mesmo aviso que a última
+     * etapa do formulário mostra — a conversa no WhatsApp não pode prometer
+     * mais do que a tela prometeu.
+     */
+    secao("PRÉ-AGENDAMENTO (Essa data será confirmada após assinatura do contrato)", [
       ["Data", dataBr(agendamento.data)],
       ["Período", PERIODOS[agendamento.periodo] ?? agendamento.periodo],
       ["Observação", agendamento.observacao],
+    ]),
+
+    secao("Forma de pagamento", [
+      ["Método", pagamento.metodo],
+      ["Banco", pagamento.banco],
+      ["Agência", pagamento.agencia],
+      ["Conta", pagamento.conta],
     ]),
 
     // Os arquivos não cabem num link do WhatsApp — o atendente pede na conversa.
