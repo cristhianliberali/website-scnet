@@ -128,7 +128,13 @@ export function errosPagamento(pagamento: DadosPagamento): Record<string, string
 /* ---------------- saída ---------------- */
 
 /**
- * O bloco que vai ao webhook e para a linha de `web_envios`.
+ * Os campos que vão ao webhook e para a linha de `web_envios`.
+ *
+ * Eles são espalhados DENTRO de `anexos_agendamento`, e não num grupo
+ * `pagamento` à parte: cada grupo de `dados` é o retrato de uma etapa do
+ * formulário, e a cobrança é preenchida na mesma etapa do agendamento. Daí os
+ * nomes já virem prefixados pelo assunto (`metodo`, `banco`...) — eles convivem
+ * com `data` e `periodo` sem ambiguidade.
  *
  * O código e o nome do banco viajam juntos: o fluxo do n8n casa pelo código, e
  * quem abre o envio no /admin lê o nome sem precisar de uma tabela de-para.

@@ -654,9 +654,12 @@ bancária é pedido.
 
 Era o único dado do contrato que ninguém informava: alguém ligava depois só para
 perguntar "boleto ou débito?", e quem escolhia débito ditava a conta por
-telefone — que é onde nasce o débito devolvido por um dígito trocado. Vai ao
-webhook e para `web_envios` no grupo `pagamento`, e entra também no resumo do
-"Continuar no WhatsApp".
+telefone — que é onde nasce o débito devolvido por um dígito trocado.
+
+Vai ao webhook e para `web_envios` **dentro de `anexos_agendamento`**, junto com
+a data: cada grupo de `dados` é o retrato de uma etapa do formulário, e o
+pagamento é preenchido nessa mesma etapa — um grupo à parte faria o fluxo do n8n
+parecer ter cinco. Entra também no resumo do "Continuar no WhatsApp".
 
 #### Ligar e desligar a área de membros
 
