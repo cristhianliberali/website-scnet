@@ -62,6 +62,8 @@ export const LIMITES = {
   /* pagamento */
   /** Chave aleatória e e-mail são as maiores que o PIX aceita: 77. */
   chavePix: 77,
+  /** Código do banco do débito em conta ("banco_do_brasil"). */
+  banco: 60,
   agencia: 10,
   conta: 20,
 
@@ -147,6 +149,11 @@ export const LIMITE_ADMIN = {
     valor: 20,
   },
   areaCliente: { mensagem: 600 },
+  /**
+   * A agenda de instalação. São campos curtos por natureza: um prazo é um
+   * número de horas, um horário é "HH:MM" e o nome de uma cidade cabe em 120.
+   */
+  agendamento: { horas: 6, cidade: 120, horario: 5, horizonteDias: 4 },
   seguranca: { minScore: 10 },
   config: {
     titulo: 120,

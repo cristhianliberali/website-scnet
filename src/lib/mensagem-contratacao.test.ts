@@ -31,6 +31,12 @@ const COMPLETO: ResumoContratacao = {
     telefone2: "(49) 3333-3333",
   },
   agendamento: { data: "2026-09-10", periodo: "manha", observacao: "Chego em casa às 10h" },
+  pagamento: {
+    metodo: "Débito em conta",
+    banco: "Sicredi",
+    agencia: "0710",
+    conta: "12345-6",
+  },
   anexos: ["o comprovante de residência", "o documento com foto"],
 };
 
@@ -61,6 +67,10 @@ describe("mensagemContratacao", () => {
       "(49) 99999-9999",
       "(49) 3333-3333",
       "Chego em casa às 10h",
+      "Débito em conta",
+      "Sicredi",
+      "0710",
+      "12345-6",
     ]) {
       expect(texto).toContain(valor);
     }
@@ -114,7 +124,31 @@ describe("mensagemContratacao", () => {
     const texto = mensagemContratacao(
       vazio({ agendamento: { data: "", periodo: "", observacao: "" } }),
     );
-    expect(texto).not.toContain("PRÉ-AGENDAMENTO (Essa data será confirmada após assinatura do contrato)");
+    expect(texto).not.toContain(
+      "PRÉ-AGENDAMENTO (Essa data será confirmada após assinatura do contrato)",
+    );
+  });
+
+  test("quem paga por boleto não leva conta bancária para a conversa", () => {
+    const texto = mensagemContratacao(
+      vazio({ pagamento: { metodo: "Pix ou Boleto", banco: "", agencia: "", conta: "" } }),
+    );
+    expect(texto).toContain("Método: Pix ou Boleto");
+    expect(texto).not.toContain("Agência");
+    expect(texto).not.toContain("Conta:");
+  });
+
+  test("sem forma de pagamento escolhida, a seção não aparece", () => {
+    const texto = mensagemContratacao(
+      vazio({ pagamento: { metodo: "", banco: "", agencia: "", conta: "" } }),
+    );
+    expect(texto).not.toContain("Forma de pagamento");
+  });
+
+  test("a data vai como pré-agendamento, que é o que a última etapa promete", () => {
+    expect(mensagemContratacao(COMPLETO)).toContain(
+      "*PRÉ-AGENDAMENTO (Essa data será confirmada após assinatura do contrato)*",
+    );
   });
 
   test("sem nome nenhum, a abertura ainda faz sentido", () => {

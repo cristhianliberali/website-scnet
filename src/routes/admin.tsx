@@ -39,6 +39,7 @@ import { SecaoConfig } from "@/components/scnet/admin/admin-config";
 import { SecaoScripts } from "@/components/scnet/admin/admin-scripts";
 import { SecaoSeguranca } from "@/components/scnet/admin/admin-seguranca";
 import { SecaoAreaCliente } from "@/components/scnet/admin/admin-area-cliente";
+import { SecaoAgendamento } from "@/components/scnet/admin/admin-agendamento";
 import {
   baixarAnexoAdmin,
   carregarAdmin,
@@ -51,6 +52,7 @@ import {
   salvarConfigAdmin,
   salvarIndicacaoAdmin,
   salvarPlanoAdmin,
+  salvarAgendamentoAdmin,
   salvarAreaClienteAdmin,
   salvarScriptAdmin,
   salvarSegurancaAdmin,
@@ -60,6 +62,7 @@ import {
 } from "@/lib/admin";
 import type {
   CatalogoPlanos,
+  ConfigAgendamento,
   ConfigAreaCliente,
   ConfigIndicacao,
   ConfigSeguranca,
@@ -77,6 +80,7 @@ const ABAS = [
   "indicacoes",
   "indicacao",
   "scripts",
+  "agendamento",
   "seguranca",
   "area-cliente",
 ] as const;
@@ -292,6 +296,9 @@ function Painel({ sessao, dados }: { sessao: { usuario: string }; dados: DadosAd
   const salvarSeguranca = (config: ConfigSeguranca) =>
     void executar(() => salvarSegurancaAdmin({ data: config }));
 
+  const salvarAgendamento = (config: ConfigAgendamento) =>
+    void executar(() => salvarAgendamentoAdmin({ data: config }));
+
   const salvarAreaCliente = (config: ConfigAreaCliente) =>
     void executar(() => salvarAreaClienteAdmin({ data: config }));
 
@@ -359,6 +366,7 @@ function Painel({ sessao, dados }: { sessao: { usuario: string }; dados: DadosAd
           <TabsTrigger value="indicacoes">Indicações</TabsTrigger>
           <TabsTrigger value="indicacao">Seção de indicação</TabsTrigger>
           <TabsTrigger value="scripts">Scripts e tags</TabsTrigger>
+          <TabsTrigger value="agendamento">Prazo de instalação</TabsTrigger>
           <TabsTrigger value="seguranca">Anti-robô</TabsTrigger>
           <TabsTrigger value="area-cliente">Área do cliente</TabsTrigger>
         </TabsList>
@@ -432,6 +440,15 @@ function Painel({ sessao, dados }: { sessao: { usuario: string }; dados: DadosAd
               salvando={salvando}
               aoSalvar={salvarScript}
               aoExcluir={excluirScript}
+            />
+          </TabsContent>
+
+          <TabsContent value="agendamento">
+            <SecaoAgendamento
+              key={JSON.stringify(dados.agendamento)}
+              config={dados.agendamento}
+              salvando={salvando}
+              aoSalvar={salvarAgendamento}
             />
           </TabsContent>
 

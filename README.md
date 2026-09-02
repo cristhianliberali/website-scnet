@@ -504,6 +504,7 @@ O que dá para fazer:
 | Indicações         | `indicacoes_web`: status, bônus, campanha, vínculo com o novo contrato      |
 | Seção de indicação | título, descrição, banner, campanha vigente e o liga/desliga                |
 | Scripts e tags     | Tag Manager, pixels e chat colados no `<head>`, no `<body>` ou no rodapé    |
+| Prazo de instalação| expediente técnico da semana e as horas de espera de cada cidade            |
 | Anti-robô          | diagnóstico do reCAPTCHA, corte de pontuação e o interruptor de emergência  |
 | Área do cliente    | liga/desliga a área de membros inteira e a mensagem de manutenção           |
 
@@ -594,6 +595,68 @@ Tags de estrutura (`<html>`, `<head>`, `<body>`) são recusadas ao salvar, com o
 motivo na tela: coladas por engano — acontece ao copiar a página inteira em vez
 do trecho — elas embaralhariam o ponto de injeção e cortariam o fim da página
 para todos os visitantes.
+
+#### Prazo de instalação (o calendário da contratação)
+
+O calendário da última etapa liberava qualquer data a partir de "hoje + 2 dias",
+fixo no código, com manhã e tarde sempre disponíveis. Isso é uma promessa que a
+operação não assinou: a fila muda de semana para semana e é diferente em cada
+cidade — a sede instala em 24 horas, o distrito a 60 km espera a próxima saída
+da equipe. Data prometida e não cumprida é reclamação garantida.
+
+A aba **Prazo de instalação** troca a constante por três coisas que você
+alimenta:
+
+1. **Expediente técnico da semana** — as horas em que existe equipe instalando,
+   por dia da semana, em duas faixas (manhã e tarde). Elas fazem dois trabalhos
+   ao mesmo tempo: são o combustível do cálculo e são os períodos que o cliente
+   pode escolher naquele dia. Um sábado com equipe só de manhã não oferece a
+   tarde; um dia sem faixa nenhuma não aparece no calendário.
+2. **Prazo padrão**, em horas de atendimento — vale para toda cidade fora da
+   tabela.
+3. **Prazo por cidade** — a exceção, uma linha por cidade.
+
+**O prazo anda em horas de ATENDIMENTO, não de relógio.** Com 9 horas de
+expediente por dia, "48 horas" cai no quinto dia útil, e não em dois dias. É o
+que faz o número significar a mesma coisa para quem o alimenta ("tenho dois dias
+e meio de equipe na frente dessa instalação") e para quem o cumpre.
+
+A cidade é encontrada **por aproximação**: acento, maiúscula, pontuação e o
+estado no fim não atrapalham ("CHAPECO", "Chapecó - SC" e "Chapecó" são a mesma
+linha), e um erro de digitação curto ainda encontra a cidade. Sem
+correspondência, vale o prazo padrão — que é o comportamento certo para uma
+cidade que não é atendida.
+
+Na tela do cliente, a última etapa consulta o servidor com a cidade do endereço
+e mostra "Buscando horários disponíveis para instalação da sua internet..."
+enquanto isso. A consulta é real; a espera mínima de um segundo é deliberada,
+para a busca ser percebida. Depois dela, só as datas com equipe ficam clicáveis
+e os períodos saem do expediente daquele dia — com a faixa de horário que vale
+ali, e não uma fixa do código.
+
+Duas redes de proteção, porque a última etapa é onde uma contratação pronta
+morre: se a consulta falhar, o formulário usa o expediente padrão (seg. a sex.,
+08h–12h e 13h–18h) em vez de mostrar um calendário vazio; e uma semana salva sem
+nenhuma hora de atendimento cai nesse mesmo padrão. O cálculo é feito no fuso de
+`AGENDA_TIMEZONE` (padrão `America/Sao_Paulo`) — o container roda em UTC, e sem
+isso o dia viraria três horas antes para todo mundo.
+
+O que vai ao n8n junto com o agendamento: `prazo_horas` e `cidade_prazo`, para
+o CRM saber por que a data é aquela.
+
+#### Método de pagamento
+
+A última etapa também pergunta como o cliente quer pagar — **Pix ou Boleto** ou
+**Débito em conta**. Escolhido o débito, abrem-se banco, agência e conta, os
+três obrigatórios; o banco é uma lista fechada (Banco do Brasil, Sicoob e
+Sicredi), porque são os que têm convênio de débito. No Pix/boleto nada de conta
+bancária é pedido.
+
+Era o único dado do contrato que ninguém informava: alguém ligava depois só para
+perguntar "boleto ou débito?", e quem escolhia débito ditava a conta por
+telefone — que é onde nasce o débito devolvido por um dígito trocado. Vai ao
+webhook e para `web_envios` no grupo `pagamento`, e entra também no resumo do
+"Continuar no WhatsApp".
 
 #### Ligar e desligar a área de membros
 

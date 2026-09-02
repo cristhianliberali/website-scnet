@@ -38,12 +38,14 @@ import {
 import { lerArquivoDoEnvio, listarEnvios, type ArquivoDoEnvio } from "./envios-db.server";
 import { gravarConfigIndicacao, lerConfigIndicacao } from "./config-db.server";
 import { gravarSeguranca, lerSegurancaFresca } from "./seguranca-db.server";
+import { gravarAgendamento, lerAgendamentoFresco } from "./agenda-db.server";
 import { gravarAreaCliente, lerAreaClienteFresca } from "./area-cliente-db.server";
 import { minScore, ultimosVereditos } from "./verify-recaptcha";
 import { MAX_CODIGO, excluirScript, listarScripts, salvarScript } from "./scripts-db.server";
 import { LIMITE_ADMIN } from "./form-limits";
-import { TAGS_PROIBIDAS } from "./admin-tipos";
+import { MAX_CIDADES_PRAZO, TAGS_PROIBIDAS } from "./admin-tipos";
 import type {
+  ConfigAgendamento,
   ConfigAreaCliente,
   ConfigIndicacao,
   ConfigSeguranca,
@@ -127,6 +129,39 @@ const indicacaoSchema = z.object({
 const areaClienteSchema = z.object({
   ativa: z.boolean(),
   mensagem: texto(L.areaCliente.mensagem),
+});
+
+/**
+ * A agenda de instalação.
+ *
+ * Horas e horários chegam como texto — é o que o formulário edita —, e o
+ * cálculo (`agenda-calculo.ts`) já trata número inválido e faixa invertida
+ * caindo no padrão. O que o schema faz aqui é o de sempre: fechar tamanho e
+ * quantidade, para um POST direto não gravar mil cidades no `web_config`.
+ */
+const expedienteDiaSchema = z.object({
+  atendeManha: z.boolean(),
+  manhaInicio: texto(LIMITE_ADMIN.agendamento.horario),
+  manhaFim: texto(LIMITE_ADMIN.agendamento.horario),
+  atendeTarde: z.boolean(),
+  tardeInicio: texto(LIMITE_ADMIN.agendamento.horario),
+  tardeFim: texto(LIMITE_ADMIN.agendamento.horario),
+});
+
+const agendamentoSchema = z.object({
+  prazoPadraoHoras: texto(L.agendamento.horas),
+  horizonteDias: texto(L.agendamento.horizonteDias),
+  cidades: z
+    .array(
+      z.object({
+        cidade: texto(L.agendamento.cidade),
+        horas: texto(L.agendamento.horas),
+      }),
+    )
+    .max(MAX_CIDADES_PRAZO)
+    .default([]),
+  // Sete dias, domingo a sábado — a tela nunca manda outra coisa.
+  expediente: z.array(expedienteDiaSchema).length(7),
 });
 
 const segurancaSchema = z.object({
@@ -260,6 +295,8 @@ export type DadosAdmin = {
   scripts: ScriptAdmin[];
   seguranca: ConfigSeguranca;
   areaCliente: ConfigAreaCliente;
+  /** O prazo de instalação: expediente técnico e horas por cidade. */
+  agendamento: ConfigAgendamento;
   /** Leitura, não ajuste: o estado do anti-robô como o servidor o enxerga. */
   diagnosticoSeguranca: DiagnosticoSeguranca;
 };
@@ -287,6 +324,7 @@ export const carregarAdmin = createServerFn({ method: "GET" }).handler(
       scripts,
       seguranca,
       areaCliente,
+      agendamento,
     ] = await Promise.all([
       resumoAdmin(),
       listaSegura("planos do site", listarPlanos("site")),
@@ -298,6 +336,7 @@ export const carregarAdmin = createServerFn({ method: "GET" }).handler(
       listaSegura("scripts", listarScripts()),
       lerSegurancaFresca(),
       lerAreaClienteFresca(),
+      lerAgendamentoFresco(),
     ]);
 
     return {
@@ -311,6 +350,7 @@ export const carregarAdmin = createServerFn({ method: "GET" }).handler(
       scripts,
       seguranca,
       areaCliente,
+      agendamento,
       diagnosticoSeguranca: diagnosticoDaSeguranca(seguranca),
     };
   },
@@ -498,6 +538,22 @@ export const salvarSegurancaAdmin = createServerFn({ method: "POST" })
       return data.recaptchaAtivo
         ? "Anti-robô ligado."
         : "Anti-robô DESLIGADO. Os formulários voltaram a aceitar envios.";
+    }),
+  );
+
+/* ---------------- agenda de instalação ---------------- */
+
+export const salvarAgendamentoAdmin = createServerFn({ method: "POST" })
+  .validator(agendamentoSchema)
+  .handler(async ({ data }) =>
+    acao(async () => {
+      await gravarAgendamento(data as ConfigAgendamento);
+      // A gravação já esvazia o cache, então o próximo cliente que chegar à
+      // última etapa já vê a agenda nova — sem deploy e sem esperar o prazo.
+      const comPrazo = data.cidades.filter((c) => c.cidade.trim() !== "").length;
+      return comPrazo
+        ? `Prazo de instalação salvo (${comPrazo} cidade${comPrazo > 1 ? "s" : ""} com prazo próprio).`
+        : "Prazo de instalação salvo.";
     }),
   );
 
