@@ -701,14 +701,14 @@ export function ContractWizard({
               // O prazo que gerou a data, para o CRM saber por que ela é essa.
               prazo_horas: agenda?.prazoHoras ?? null,
               cidade_prazo: agenda?.cidadeReferencia || null,
+              /*
+               * A forma de cobrança entra AQUI, e não como grupo próprio: cada
+               * grupo de `dados` é o retrato de uma etapa do formulário, e o
+               * pagamento é preenchido nesta mesma etapa. Um grupo `pagamento`
+               * à parte faria o fluxo do n8n parecer ter cinco etapas.
+               */
+              ...pagamentoWebhook(pagamento),
             },
-            /*
-             * A forma de cobrança. Vai como grupo próprio, e não dentro do
-             * agendamento, porque é dado de contrato: quem lê no n8n para
-             * cadastrar a cobrança não deveria ter de procurá-lo no meio do
-             * horário da visita.
-             */
-            pagamento: pagamentoWebhook(pagamento),
           }
         : {}),
     };
