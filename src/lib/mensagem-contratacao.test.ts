@@ -114,7 +114,7 @@ describe("mensagemContratacao", () => {
     const texto = mensagemContratacao(
       vazio({ agendamento: { data: "", periodo: "", observacao: "" } }),
     );
-    expect(texto).not.toContain("Agendamento da instalação");
+    expect(texto).not.toContain("PRÉ-AGENDAMENTO (Essa data será confirmada após assinatura do contrato)");
   });
 
   test("sem nome nenhum, a abertura ainda faz sentido", () => {
