@@ -166,10 +166,15 @@ export function HeroLeads({
             </span>
           </Reveal>
           <Reveal delay={80}>
-            <h1 className="mt-4 font-display text-[2rem] font-extrabold leading-[1.08] tracking-tight text-primary-foreground sm:text-5xl lg:text-[3.4rem]">
+            {/* Um degrau abaixo da home: aqui a chamada divide a tela com o
+                formulário, e o preço vem menor que ela — é complemento, não
+                segunda manchete. */}
+            <h1 className="mt-4 font-display text-[1.75rem] font-extrabold leading-[1.1] tracking-tight text-primary-foreground sm:text-4xl lg:text-[2.75rem]">
               Wi-Fi rápido e estável na casa toda
               {precoMinimo && (
-                <span className="mt-2 block text-zap">a partir de R$&nbsp;{precoMinimo}/mês</span>
+                <span className="mt-1.5 block text-[1.3rem] text-zap sm:text-2xl lg:text-3xl">
+                  a partir de R$&nbsp;{precoMinimo}/mês
+                </span>
               )}
             </h1>
           </Reveal>
@@ -284,7 +289,7 @@ export function DiferenciaisLeads() {
     <section className="bg-background py-12 sm:py-16">
       <div className="mx-auto max-w-7xl px-4">
         <Reveal className="text-center">
-          <SectionTitle className="text-brand-deep">
+          <SectionTitle className="text-brand-deep text-2xl sm:text-3xl md:text-4xl">
             Por que a galera daqui escolhe a SCNET
           </SectionTitle>
         </Reveal>
@@ -326,7 +331,7 @@ export function PlanosLeads({
     <section id="planos" className="bg-muted py-12 sm:py-16">
       <div className="mx-auto max-w-7xl px-4">
         <Reveal className="text-center">
-          <SectionTitle className="text-brand-deep">
+          <SectionTitle className="text-brand-deep text-2xl sm:text-3xl md:text-4xl">
             Escolha o plano e garanta a instalação
           </SectionTitle>
           <p className="mx-auto mt-3 max-w-2xl font-body text-base text-muted-foreground sm:text-lg">
@@ -398,7 +403,7 @@ export function ComoFuncionaLeads() {
       <Blobs />
       <div className="relative mx-auto max-w-7xl px-4">
         <Reveal className="text-center">
-          <SectionTitle className="text-primary-foreground">
+          <SectionTitle className="text-primary-foreground text-2xl sm:text-3xl md:text-4xl">
             Contratar é rápido e simples. Sério.
           </SectionTitle>
         </Reveal>
@@ -461,7 +466,7 @@ export function DuvidasLeads() {
     <section id="duvidas" className="bg-background py-12 sm:py-16">
       <div className="mx-auto max-w-3xl px-4">
         <Reveal className="text-center">
-          <SectionTitle className="text-brand-deep">
+          <SectionTitle className="text-brand-deep text-2xl sm:text-3xl md:text-4xl">
             Perguntas rápidas, respostas diretas
           </SectionTitle>
         </Reveal>
@@ -490,7 +495,7 @@ export function CtaFinalLeads({ precoMinimo }: { precoMinimo: string | null }) {
       <Blobs />
       <div className="relative mx-auto max-w-3xl px-4 text-center">
         <Reveal>
-          <SectionTitle className="text-primary-foreground">
+          <SectionTitle className="text-primary-foreground text-2xl sm:text-3xl md:text-4xl">
             Chegou a sua vez de ter Wi-Fi que pega na casa toda
           </SectionTitle>
           <p className="mt-4 font-body text-base text-primary-foreground/90 sm:text-lg">
