@@ -268,7 +268,14 @@ export function Diferenciais() {
 
 /* ---------------- Planos ---------------- */
 
-function PlanoCard({ plan, onSelect }: { plan: Plan; onSelect: (plan: SelectedPlan) => void }) {
+/** O card de plano da grade — a /leads reaproveita o mesmo, com o mesmo destino. */
+export function PlanoCard({
+  plan,
+  onSelect,
+}: {
+  plan: Plan;
+  onSelect: (plan: SelectedPlan) => void;
+}) {
   return (
     <div
       className={cn(

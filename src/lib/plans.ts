@@ -130,3 +130,30 @@ export function textoPosDesconto(
 /** Preço em destaque: o das primeiras faturas quando existe, senão o padrão. */
 export const precoVigente = (valor: string, valorPrimeirasFaturas: string | null) =>
   valorPrimeirasFaturas ?? valor;
+
+/**
+ * O preço formatado ("1.234,56") de volta a número (1234.56).
+ *
+ * É o que vai como `value` nos eventos do Meta e do GTM — plataforma de anúncio
+ * não lê "139,90", lê 139.9. Devolve `undefined` quando o texto não é um preço.
+ */
+export function precoNumerico(preco: string | null | undefined): number | undefined {
+  if (!preco) return undefined;
+  const n = Number(preco.replace(/\./g, "").replace(",", "."));
+  return Number.isFinite(n) ? n : undefined;
+}
+
+/**
+ * O menor preço vigente da grade — o "a partir de R$ 109,90" das chamadas.
+ * `null` sem plano nenhum.
+ */
+export function menorPreco(plans: Plan[]): string | null {
+  let menor: { texto: string; valor: number } | null = null;
+  for (const plan of plans) {
+    const texto = precoVigente(plan.valor, plan.valor_primeiras_faturas);
+    const valor = precoNumerico(texto);
+    if (valor === undefined) continue;
+    if (!menor || valor < menor.valor) menor = { texto, valor };
+  }
+  return menor?.texto ?? null;
+}

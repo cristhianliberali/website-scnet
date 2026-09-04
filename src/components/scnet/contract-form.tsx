@@ -5,7 +5,7 @@ import { Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { getAttribution } from "@/lib/utm";
 import { getRecaptchaToken } from "@/lib/recaptcha";
-import { getFacebookCookies, trackLeadEvent } from "@/lib/facebook-pixel";
+import { gerarEventId, getFacebookCookies, trackPixelEvent } from "@/lib/facebook-pixel";
 import { RECAPTCHA_ACTION_LEAD, submitLead } from "@/lib/submit-lead";
 import { capitalizeName, isValidPhone, maskPhone } from "@/lib/form-utils";
 import { LIMITES } from "@/lib/form-limits";
@@ -13,7 +13,7 @@ import { writeContractHandoffCookie } from "@/lib/contract-handoff";
 import { redirectToWhatsAppSupport, whatsappSupportLink } from "@/lib/whatsapp";
 import { dispararEvento, EVENTO, eventoDeClique } from "@/lib/datalayer";
 import { AreaClienteDesligada } from "@/components/scnet/area-cliente-desligada";
-import { precoVigente, textoPosDesconto, type PlanoWebhook } from "@/lib/plans";
+import { precoNumerico, precoVigente, textoPosDesconto, type PlanoWebhook } from "@/lib/plans";
 import { cn } from "@/lib/utils";
 
 /** Plano escolhido na home — é o recorte que segue para o webhook. */
@@ -33,6 +33,8 @@ async function sendLead(input: {
   phone: string;
   intent: Intent;
   plan?: SelectedPlan | undefined;
+  /** O id do evento do Meta — o mesmo que o Pixel vai usar no navegador. */
+  eventId: string;
 }): Promise<{ ok: boolean; message?: string | undefined }> {
   try {
     // A action VEM do endpoint (`RECAPTCHA_ACTION_LEAD`), e não é escrita aqui:
@@ -58,6 +60,7 @@ async function sendLead(input: {
         recaptchaToken,
         fbc,
         fbp,
+        eventId: input.eventId,
         attribution: getAttribution(),
       },
     });
@@ -72,8 +75,20 @@ export function ContractForm({
   selectedPlan,
   codigoOferta,
   areaClienteAtiva = true,
+  origem = "formulario_home",
+  titulo = "Contrate agora (Leva menos de 2 minutos...)",
+  rodape = "Mude para a conexão n°1 da região",
 }: {
   selectedPlan: SelectedPlan | null;
+  /**
+   * De onde o formulário está sendo usado (`formulario_home`, `formulario_leads`).
+   * Vai nos eventos do GTM, para o relatório separar a home da landing page.
+   */
+  origem?: string;
+  /** O título do cartão. A landing page usa uma chamada mais direta. */
+  titulo?: string;
+  /** A frase abaixo do botão. */
+  rodape?: string;
   /**
    * Se a área do cliente está no ar (vem do /admin, pelo loader da rota).
    *
@@ -149,6 +164,10 @@ export function ContractForm({
     const whatsapp = `${ddi}${phone.replace(/\D/g, "")}`;
     const chosenIntent = intent;
 
+    // Um id só para o Pixel (aqui) e a Conversions API (no servidor): é por
+    // ele que o Meta sabe que os dois são o mesmo lead e conta uma vez.
+    const eventId = gerarEventId();
+
     setSending(true);
     try {
       const result = await sendLead({
@@ -157,6 +176,7 @@ export function ContractForm({
         phone,
         intent: chosenIntent,
         plan: selectedPlan ?? undefined,
+        eventId,
       });
 
       if (!result.ok) {
@@ -169,7 +189,27 @@ export function ContractForm({
         return;
       }
 
-      trackLeadEvent();
+      /*
+       * `Lead` para quem quer contratar, `Contact` para quem já é cliente — o
+       * servidor manda os mesmos nomes pela CAPI. Um cliente da base como
+       * `Lead` ensinaria a campanha a procurar quem já contratou.
+       */
+      const valor = selectedPlan
+        ? precoNumerico(precoVigente(selectedPlan.preco, selectedPlan.valor_primeiras_faturas))
+        : undefined;
+      trackPixelEvent(
+        chosenIntent === "ja_sou_cliente" ? "Contact" : "Lead",
+        {
+          content_name: selectedPlan?.nome,
+          content_ids:
+            selectedPlan?.codigo_mk != null ? [String(selectedPlan.codigo_mk)] : undefined,
+          content_type: selectedPlan ? "product" : undefined,
+          content_category: "internet_fibra",
+          value: valor,
+          currency: valor !== undefined ? "BRL" : undefined,
+        },
+        eventId,
+      );
 
       /*
        * DOIS eventos, de propósito.
@@ -183,6 +223,7 @@ export function ContractForm({
        */
       const dadosDoLead = {
         intencao: chosenIntent,
+        origem,
         ...(selectedPlan ? { plano: selectedPlan.nome, preco: selectedPlan.preco } : {}),
       };
       dispararEvento(EVENTO.leadHome, dadosDoLead);
@@ -250,9 +291,7 @@ export function ContractForm({
           )}
         </div>
       )}
-      <p className="font-display text-2xl font-extrabold text-brand-deep">
-        Contrate agora (Leva menos de 2 minutos...)
-      </p>
+      <p className="font-display text-2xl font-extrabold text-brand-deep">{titulo}</p>
       <div className="mt-4 space-y-3">
         <div className="space-y-1.5">
           <label className={label(!!errors.name)} htmlFor="nome-contrate">
@@ -315,11 +354,13 @@ export function ContractForm({
                   if (errors.intent) setErrors((prev) => ({ ...prev, intent: false }));
                   // A escolha aqui separa aquisição de atendimento; medir o
                   // clique mostra a proporção mesmo de quem não termina o envio.
-                  eventoDeClique(`intencao_${value}`, { texto: text, local: "formulario_home" });
+                  eventoDeClique(`intencao_${value}`, { texto: text, local: origem });
                 }}
                 className={cn(
-                  // px/py/leading iguais aos inputs acima — mesma altura de caixa
-                  "rounded-lg border px-3 py-3 font-ui text-sm font-semibold leading-6 transition",
+                  // px/py/leading iguais aos inputs acima — mesma altura de caixa.
+                  // px-2 no celular: com px-3, "Quero contratar" quebrava em
+                  // duas linhas num aparelho de 390px.
+                  "rounded-lg border px-2 py-3 font-ui text-sm font-semibold leading-6 transition sm:px-3",
                   intent === value
                     ? "border-brand bg-brand/10 text-brand-deep"
                     : errors.intent
@@ -362,9 +403,7 @@ export function ContractForm({
         {sending || redirecting ? <Loader2 className="animate-spin" /> : null}
         {redirecting ? "Abrindo o WhatsApp..." : sending ? "Enviando..." : "Quero contratar agora"}
       </Button>
-      <p className="mt-3 text-center font-body text-sm text-muted-foreground">
-        Mude para a conexão n°1 da região
-      </p>
+      <p className="mt-3 text-center font-body text-sm text-muted-foreground">{rodape}</p>
     </form>
   );
 }

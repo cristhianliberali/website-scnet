@@ -15,7 +15,13 @@ import {
   Sunset,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { planoWebhook, precoVigente, textoPosDesconto, type Plan } from "@/lib/plans";
+import {
+  planoWebhook,
+  precoNumerico,
+  precoVigente,
+  textoPosDesconto,
+  type Plan,
+} from "@/lib/plans";
 import { ItensPlano, LogosAgregados, PlanosIndisponiveis, PrecoPlano, SeloDestaque } from "./plano";
 import {
   ACCEPTED_TYPES,
@@ -58,6 +64,7 @@ import {
 import { LINK_FORMULARIO } from "@/lib/links";
 import { getAttribution } from "@/lib/utm";
 import { getRecaptchaToken } from "@/lib/recaptcha";
+import { gerarEventId, getFacebookCookies, trackPixelEvent } from "@/lib/facebook-pixel";
 import { submitContractStep } from "@/lib/submit-contract-step";
 import { redirectToWhatsAppSupport, waLink, whatsappSupportLink } from "@/lib/whatsapp";
 import { mensagemContratacao, type ResumoContratacao } from "@/lib/mensagem-contratacao";
@@ -248,6 +255,8 @@ function Stepper({
 type Address = {
   tipo: "casa" | "apartamento" | "";
   cep: string;
+  /** Preenchida pelo ViaCEP, sem campo na tela — vai ao webhook e ao Meta. */
+  uf: string;
   cidade: string;
   bairro: string;
   logradouro: string;
@@ -379,6 +388,7 @@ export function ContractWizard({
   const [address, setAddress] = useState<Address>({
     tipo: "",
     cep: "",
+    uf: "",
     cidade: "",
     bairro: "",
     logradouro: "",
@@ -538,6 +548,7 @@ export function ContractWizard({
       const res = await fetch(`https://viacep.com.br/ws/${d}/json/`);
       const json = (await res.json()) as {
         erro?: boolean;
+        uf?: string;
         localidade?: string;
         bairro?: string;
         logradouro?: string;
@@ -548,6 +559,7 @@ export function ContractWizard({
       }
       setAddress((prev) => ({
         ...prev,
+        uf: json.uf || prev.uf,
         cidade: json.localidade || prev.cidade,
         bairro: json.bairro || prev.bairro,
         logradouro: json.logradouro || prev.logradouro,
@@ -665,6 +677,7 @@ export function ContractWizard({
             endereco: {
               tipo: address.tipo,
               cep: address.cep,
+              uf: address.uf,
               cidade: address.cidade,
               bairro: address.bairro,
               logradouro: address.logradouro,
@@ -749,11 +762,16 @@ export function ContractWizard({
       return false;
     };
 
+    // Um id por etapa, para o Pixel e a Conversions API deduplicarem o
+    // InitiateCheckout (etapa 1) e o Purchase (última).
+    const metaEventId = gerarEventId();
+
     try {
       const [anexos, recaptchaToken] = await Promise.all([
         buildAnexos(index),
         getRecaptchaToken(`contratacao_${stepInfo.id}`),
       ]);
+      const { fbc, fbp } = getFacebookCookies();
       const result = await submitContractStep({
         data: {
           etapa: index + 1,
@@ -767,10 +785,14 @@ export function ContractWizard({
           ...(anexos && anexos.length ? { anexos } : {}),
           attribution: getAttribution(),
           ...(recaptchaToken ? { recaptchaToken } : {}),
+          fbc,
+          fbp,
+          metaEventId,
         },
       });
       if (result.ok) {
         setStepBlock(null);
+        dispararEventoMeta(index, chosenPlan, metaEventId);
         /*
          * `contratacao_1`, `contratacao_2`... um por etapa CONCLUÍDA.
          *
@@ -817,6 +839,37 @@ export function ContractWizard({
       }
       return block("Falha de conexão ao enviar esta etapa. Tente novamente.");
     }
+  }
+
+  /**
+   * O Pixel do Meta nas duas etapas que interessam à campanha: o plano
+   * escolhido (`InitiateCheckout`) e a contratação enviada (`Purchase`, com o
+   * valor do plano). O servidor manda os mesmos dois pela CAPI com o mesmo id.
+   */
+  function dispararEventoMeta(index: number, chosenPlan: Plan | null, eventId: string) {
+    const nome = index === LAST_STEP ? "Purchase" : index === 0 ? "InitiateCheckout" : null;
+    if (!nome) return;
+    const valor = chosenPlan
+      ? precoNumerico(precoVigente(chosenPlan.valor, chosenPlan.valor_primeiras_faturas))
+      : undefined;
+    const idPlano = chosenPlan
+      ? chosenPlan.codigo_mk != null
+        ? String(chosenPlan.codigo_mk)
+        : chosenPlan.nome
+      : undefined;
+    trackPixelEvent(
+      nome,
+      {
+        content_name: chosenPlan?.nome,
+        content_ids: idPlano ? [idPlano] : undefined,
+        content_type: "product",
+        content_category: "internet_fibra",
+        num_items: 1,
+        value: valor,
+        currency: valor !== undefined ? "BRL" : undefined,
+      },
+      eventId,
+    );
   }
 
   async function advance(index: number, chosenPlan: Plan | null) {

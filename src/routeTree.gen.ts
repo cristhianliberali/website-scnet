@@ -13,6 +13,7 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as AdminRouteImport } from './routes/admin'
 import { Route as ContratacaoRouteImport } from './routes/contratacao'
 import { Route as DiagnosticoRouteImport } from './routes/diagnostico'
+import { Route as LeadsRouteImport } from './routes/leads'
 import { Route as ClienteIndexRouteImport } from './routes/cliente/index'
 import { Route as ClientePainelRouteImport } from './routes/cliente/painel'
 
@@ -36,6 +37,11 @@ const DiagnosticoRoute = DiagnosticoRouteImport.update({
   path: '/diagnostico',
   getParentRoute: () => rootRouteImport,
 } as any)
+const LeadsRoute = LeadsRouteImport.update({
+  id: '/leads',
+  path: '/leads',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ClienteIndexRoute = ClienteIndexRouteImport.update({
   id: '/cliente/',
   path: '/cliente/',
@@ -52,6 +58,7 @@ export interface FileRoutesByFullPath {
   '/admin': typeof AdminRoute
   '/contratacao': typeof ContratacaoRoute
   '/diagnostico': typeof DiagnosticoRoute
+  '/leads': typeof LeadsRoute
   '/cliente/painel': typeof ClientePainelRoute
   '/cliente/': typeof ClienteIndexRoute
 }
@@ -60,6 +67,7 @@ export interface FileRoutesByTo {
   '/admin': typeof AdminRoute
   '/contratacao': typeof ContratacaoRoute
   '/diagnostico': typeof DiagnosticoRoute
+  '/leads': typeof LeadsRoute
   '/cliente/painel': typeof ClientePainelRoute
   '/cliente': typeof ClienteIndexRoute
 }
@@ -69,6 +77,7 @@ export interface FileRoutesById {
   '/admin': typeof AdminRoute
   '/contratacao': typeof ContratacaoRoute
   '/diagnostico': typeof DiagnosticoRoute
+  '/leads': typeof LeadsRoute
   '/cliente/painel': typeof ClientePainelRoute
   '/cliente/': typeof ClienteIndexRoute
 }
@@ -79,6 +88,7 @@ export interface FileRouteTypes {
     | '/admin'
     | '/contratacao'
     | '/diagnostico'
+    | '/leads'
     | '/cliente/painel'
     | '/cliente/'
   fileRoutesByTo: FileRoutesByTo
@@ -87,6 +97,7 @@ export interface FileRouteTypes {
     | '/admin'
     | '/contratacao'
     | '/diagnostico'
+    | '/leads'
     | '/cliente/painel'
     | '/cliente'
   id:
@@ -95,6 +106,7 @@ export interface FileRouteTypes {
     | '/admin'
     | '/contratacao'
     | '/diagnostico'
+    | '/leads'
     | '/cliente/painel'
     | '/cliente/'
   fileRoutesById: FileRoutesById
@@ -104,6 +116,7 @@ export interface RootRouteChildren {
   AdminRoute: typeof AdminRoute
   ContratacaoRoute: typeof ContratacaoRoute
   DiagnosticoRoute: typeof DiagnosticoRoute
+  LeadsRoute: typeof LeadsRoute
   ClientePainelRoute: typeof ClientePainelRoute
   ClienteIndexRoute: typeof ClienteIndexRoute
 }
@@ -138,6 +151,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DiagnosticoRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/leads': {
+      id: '/leads'
+      path: '/leads'
+      fullPath: '/leads'
+      preLoaderRoute: typeof LeadsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/cliente/': {
       id: '/cliente/'
       path: '/cliente'
@@ -160,6 +180,7 @@ const rootRouteChildren: RootRouteChildren = {
   AdminRoute: AdminRoute,
   ContratacaoRoute: ContratacaoRoute,
   DiagnosticoRoute: DiagnosticoRoute,
+  LeadsRoute: LeadsRoute,
   ClientePainelRoute: ClientePainelRoute,
   ClienteIndexRoute: ClienteIndexRoute,
 }

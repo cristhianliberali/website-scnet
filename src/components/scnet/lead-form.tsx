@@ -3,7 +3,7 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { getAttribution } from "@/lib/utm";
 import { getRecaptchaToken } from "@/lib/recaptcha";
-import { getFacebookCookies, trackLeadEvent } from "@/lib/facebook-pixel";
+import { gerarEventId, getFacebookCookies, trackPixelEvent } from "@/lib/facebook-pixel";
 import { RECAPTCHA_ACTION_LEAD, submitLead } from "@/lib/submit-lead";
 import { capitalizeName, isValidPhone, maskPhone } from "@/lib/form-utils";
 import { LIMITES, limitar } from "@/lib/form-limits";
@@ -16,7 +16,7 @@ import { waLink } from "@/lib/whatsapp";
  * WhatsApp redirect — a slow or failing backend should never stop someone
  * from reaching out.
  */
-async function submitLeadInBackground(name: string, ddi: string, phone: string) {
+async function submitLeadInBackground(name: string, ddi: string, phone: string, eventId: string) {
   try {
     // Mesma fonte que o servidor confere — ver RECAPTCHA_ACTION_LEAD.
     const recaptchaToken = await getRecaptchaToken(RECAPTCHA_ACTION_LEAD);
@@ -30,6 +30,7 @@ async function submitLeadInBackground(name: string, ddi: string, phone: string) 
         recaptchaToken,
         fbc,
         fbp,
+        eventId,
         attribution: getAttribution(),
       },
     });
@@ -65,8 +66,10 @@ export function LeadForm({ variant = "hero" }: { variant?: "hero" | "light" }) {
       return;
     }
     toast.success("Show! Estamos te levando pro WhatsApp da SCNET.");
-    trackLeadEvent();
-    void submitLeadInBackground(name.trim(), ddi, phone);
+    // O mesmo id vai ao servidor: o Meta deduplica o Pixel com a CAPI por ele.
+    const eventId = gerarEventId();
+    trackPixelEvent("Lead", { content_category: "internet_fibra" }, eventId);
+    void submitLeadInBackground(name.trim(), ddi, phone, eventId);
     window.open(
       waLink(
         `Oi! Sou ${name.trim()} (${ddi} ${phone}). Quero contratar a internet da SCNET e saber a cobertura no meu endereço.`,

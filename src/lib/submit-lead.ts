@@ -1,11 +1,14 @@
 import { createServerFn } from "@tanstack/react-start";
 import { getRequest } from "@tanstack/react-start/server";
-import { createHash, randomUUID } from "node:crypto";
+import { randomUUID } from "node:crypto";
 import { z } from "zod";
 import { isValidPhone } from "./form-utils";
 import { NAME_RE, attributionSchema } from "./form-schemas";
 import { LIMITES } from "./form-limits";
 import { clientIpFromHeaders } from "./rate-limit";
+import { enviarEventoMeta } from "./meta-capi.server";
+import { precoNumerico, precoVigente } from "./plans";
+import { origemDaRequisicao } from "./robots.server";
 import {
   isLikelyBot,
   mensagemRecaptcha,
@@ -68,71 +71,71 @@ const leadInputSchema = z.object({
   recaptchaToken: z.string().max(4096).optional(),
   fbc: z.string().max(255).optional(),
   fbp: z.string().max(255).optional(),
+  /** O `eventID` que o Pixel usou no navegador — a CAPI repete para deduplicar. */
+  eventId: z.string().max(64).optional(),
   attribution: attributionSchema.optional(),
 });
 
 type LeadInput = z.infer<typeof leadInputSchema>;
 
-function sha256(value: string) {
-  return createHash("sha256").update(value.trim().toLowerCase()).digest("hex");
-}
+/**
+ * O evento do Meta para este lead, do servidor.
+ *
+ * `Lead` para quem quer contratar; `Contact` para quem já é cliente. Os dois
+ * viajam com tudo o que o formulário sabe da pessoa (nome, telefone, cookies do
+ * Pixel, IP, navegador) e com o plano escolhido em `custom_data` — é o que faz
+ * o Meta reconhecer quem converteu e otimizar a campanha para gente parecida.
+ */
+async function enviarLeadParaMeta(input: LeadInput, request: Request, clientIp: string) {
+  const preco = input.price
+    ? precoNumerico(precoVigente(input.price, input.valorPrimeirasFaturas ?? null))
+    : undefined;
+  const atribuicao = input.attribution ?? {};
 
-function parsePrice(price: string): number | undefined {
-  const n = Number(price.replace(/\./g, "").replace(",", "."));
-  return Number.isFinite(n) ? n : undefined;
-}
-
-async function sendFacebookCapiEvent(input: LeadInput) {
-  const pixelId = import.meta.env["VITE_FACEBOOK_PIXEL_ID"] as string | undefined;
-  const accessToken = process.env["FACEBOOK_CAPI_ACCESS_TOKEN"];
-  if (!pixelId || !accessToken) return;
-
-  const digits = `${input.ddi}${input.phone}`.replace(/\D/g, "");
-  try {
-    const res = await fetch(`https://graph.facebook.com/v21.0/${pixelId}/events`, {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({
-        access_token: accessToken,
-        data: [
-          {
-            event_name: "Lead",
-            event_time: Math.floor(Date.now() / 1000),
-            action_source: "website",
-            event_source_url: input.page,
-            user_data: {
-              ph: digits ? [sha256(digits)] : undefined,
-              fbc: input.fbc,
-              fbp: input.fbp,
-            },
-            ...(input.plan
-              ? {
-                  custom_data: {
-                    content_name: input.plan,
-                    ...(input.price ? { value: parsePrice(input.price), currency: "BRL" } : {}),
-                  },
-                }
-              : {}),
-          },
-        ],
-      }),
-    });
-    if (!res.ok) console.error(`Facebook CAPI responded ${res.status}`);
-  } catch (err) {
-    console.error("Facebook CAPI request failed", err);
-  }
+  await enviarEventoMeta({
+    nome: input.intent === "ja_sou_cliente" ? "Contact" : "Lead",
+    eventId: input.eventId,
+    pagina: input.page,
+    origem: origemDaRequisicao(request),
+    usuario: {
+      nome: input.name,
+      telefone: `${input.ddi}${input.phone}`,
+      fbc: input.fbc,
+      fbp: input.fbp,
+      fbclid: atribuicao["fbclid"],
+      fbclidEm: atribuicao["first_visit_at"],
+      ip: clientIp,
+      userAgent: request.headers.get("user-agent"),
+    },
+    dados: {
+      content_name: input.plan,
+      content_ids: input.codigoMk != null ? [String(input.codigoMk)] : undefined,
+      content_type: input.plan ? "product" : undefined,
+      content_category: "internet_fibra",
+      value: preco,
+      currency: preco !== undefined ? "BRL" : undefined,
+      intencao: input.intent ?? "quero_contratar",
+      pagina: input.page.split("?")[0],
+      codigo_oferta: input.codigoOferta,
+      utm_source: atribuicao["utm_source"],
+      utm_medium: atribuicao["utm_medium"],
+      utm_campaign: atribuicao["utm_campaign"],
+      utm_content: atribuicao["utm_content"],
+    },
+  });
 }
 
 /**
  * Verifica o reCAPTCHA (quando configurado) e envia o lead ao webhook,
  * devolvendo o veredito para o formulário: o cliente só segue adiante com
  * `status: "ok"`, e a mensagem de erro do webhook volta para ser exibida.
- * O evento da Conversions API só é disparado para leads aceitos.
+ * O evento da Conversions API só é disparado para leads aceitos pelo webhook.
  */
 export const submitLead = createServerFn({ method: "POST" })
   .validator(leadInputSchema)
   .handler(async ({ data }): Promise<LeadResult> => {
-    const clientIp = clientIpFromHeaders(getRequest().headers);
+    const request = getRequest();
+    const clientIp = clientIpFromHeaders(request.headers);
 
     const recaptcha = await verifyRecaptcha(data.recaptchaToken, RECAPTCHA_ACTION_LEAD, clientIp);
     if (isLikelyBot(recaptcha)) {
@@ -207,6 +210,6 @@ export const submitLead = createServerFn({ method: "POST" })
       ip: clientIp,
     });
 
-    if (outcome.ok) await sendFacebookCapiEvent(data);
+    if (outcome.ok) await enviarLeadParaMeta(data, request, clientIp);
     return outcome;
   });

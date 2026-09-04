@@ -3,16 +3,17 @@ import {
   Outlet,
   Link,
   createRootRouteWithContext,
+  useLocation,
   useRouter,
   HeadContent,
   Scripts,
 } from "@tanstack/react-router";
-import { useEffect, type ReactNode } from "react";
+import { useEffect, useRef, type ReactNode } from "react";
 
 import appCss from "../styles.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
 import { useAttributionCapture } from "../lib/use-attribution-capture";
-import { initFacebookPixel } from "../lib/facebook-pixel";
+import { initFacebookPixel, trackPageView } from "../lib/facebook-pixel";
 
 function NotFoundComponent() {
   return (
@@ -133,9 +134,22 @@ function RootShell({ children }: { children: ReactNode }) {
 function RootComponent() {
   const { queryClient } = Route.useRouteContext();
   useAttributionCapture();
+
+  /*
+   * O Pixel carrega uma vez e dispara PageView no primeiro carregamento; cada
+   * navegação interna depois disso (home → /contratacao, por exemplo) dispara
+   * o seu próprio PageView. O `ultimoHref` evita o disparo dobrado que o
+   * StrictMode provocaria em desenvolvimento.
+   */
+  const href = useLocation({ select: (location) => location.href });
+  const ultimoHref = useRef<string | null>(null);
   useEffect(() => {
-    initFacebookPixel();
-  }, []);
+    if (ultimoHref.current === href) return;
+    const primeira = ultimoHref.current === null;
+    ultimoHref.current = href;
+    if (primeira) initFacebookPixel();
+    else trackPageView();
+  }, [href]);
 
   return (
     <QueryClientProvider client={queryClient}>
