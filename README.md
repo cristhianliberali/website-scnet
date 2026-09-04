@@ -690,7 +690,7 @@ configura como gatilho.
 
 | Evento                            | Quando dispara                               | Parâmetros                                          |
 | --------------------------------- | -------------------------------------------- | --------------------------------------------------- |
-| `lead_form`                       | Formulário da home enviado e aceito          | `intencao`, `plano`, `preco`                        |
+| `lead_form`                       | Formulário da home ou da `/leads` aceito     | `intencao`, `origem`, `plano`, `preco`              |
 | `lead_form_novo_cliente`          | ...e a pessoa marcou "Quero contratar"       | idem                                                |
 | `lead_form_cliente_base`          | ...e marcou "Já sou cliente"                 | idem                                                |
 | `contratacao_1` … `contratacao_4` | Cada etapa da `/contratacao` **concluída**   | `etapa`, `etapa_id`, `etapa_nome`, `plano`, `preco` |
@@ -716,6 +716,71 @@ e use `texto` só para ler o rótulo no relatório.
 
 A ordem de carregamento não importa: o array é criado no primeiro evento, e o
 GTM processa tudo o que já estiver nele quando carregar.
+
+O parâmetro `origem` de `lead_form` diz de qual formulário o lead veio:
+`formulario_home` ou `formulario_leads`. Os cliques da landing page chegam com
+`local` prefixado por `leads_` (`leads_cabecalho`, `leads_planos`,
+`leads_barra_fixa`...).
+
+### EVENTOS PARA O META (Pixel + Conversions API)
+
+Diferente do GTM, os eventos do Meta saem **dos dois lados**: o Pixel dispara
+no navegador e a Conversions API (`src/lib/meta-capi.server.ts`) manda o mesmo
+evento do servidor, com o mesmo `event_id`. O Meta deduplica pelos ids e fica
+com o que tiver mais dados — e o do servidor sempre tem, porque leva a pessoa
+inteira em SHA-256: telefone, nome, e-mail, nascimento, cidade, UF, CEP, país e
+CPF (como `external_id`), mais `fbc`/`fbp`, IP e navegador. É essa lista que
+sobe a "qualidade de correspondência" no Gerenciador de Eventos e baixa o custo
+por lead.
+
+| Evento             | Quando                                                      | `custom_data`                                          |
+| ------------------ | ----------------------------------------------------------- | ------------------------------------------------------ |
+| `PageView`         | Toda página, inclusive navegação interna (SPA)              | —                                                      |
+| `Lead`             | Formulário da home/`/leads` aceito, "Quero contratar"       | plano (`content_name`, `content_ids`), `value`, UTMs   |
+| `Contact`          | Mesmo formulário, "Já sou cliente"                          | idem                                                   |
+| `InitiateCheckout` | Etapa 1 da `/contratacao` (plano) aceita pelo webhook       | plano, `value`                                         |
+| `Purchase`         | Última etapa da `/contratacao` aceita — contratação enviada | plano, `value`, `currency`, `order_id` (= `id_sessao`) |
+
+**Por que `Contact` para quem já é cliente.** Um cliente da base marcado como
+`Lead` ensinaria a campanha a procurar quem já contratou. Separando, a
+otimização do Meta olha só para aquisição.
+
+**Só evento de envio aceito.** Como no GTM, um `Purchase` de uma etapa que o
+webhook recusou seria uma venda que não existe.
+
+**Sem o cookie `_fbc`** (bloqueador, iOS), o servidor reconstrói o `fbc` a
+partir do `fbclid` guardado na atribuição — o formato `fb.1.<timestamp>.<fbclid>`
+é o documentado pelo Meta.
+
+Variáveis: `VITE_FACEBOOK_PIXEL_ID` (build arg), `FACEBOOK_CAPI_ACCESS_TOKEN`
+(servidor) e, só para conferir a implantação, `FACEBOOK_CAPI_TEST_EVENT_CODE`.
+Para testar: defina o código da aba "Testar eventos", envie o formulário da
+`/leads` e veja o `Lead` chegar com os campos e o `event_id` repetido nas duas
+origens (navegador e servidor).
+
+### A LANDING PAGE DE TRÁFEGO PAGO (`/leads`)
+
+A página para onde os anúncios (Meta, Google, TikTok) apontam. Usa as mesmas
+peças da home — formulário, cards de plano, depoimentos — recombinadas para uma
+coisa só: o formulário.
+
+- **Sem menu.** Cabeçalho com a logo e o botão do formulário. Todo link que
+  sai da página é um lead que foi embora.
+- **Formulário na primeira tela.** No celular (75% do tráfego) ele vem logo
+  depois da chamada, antes de qualquer seção.
+- **Preço na chamada.** "A partir de R$ X/mês" sai do menor plano do banco.
+- **Barra fixa no celular** com o preço e o botão; some enquanto o formulário
+  está na tela.
+- **Cada seção responde uma objeção**, e todas terminam no formulário:
+  diferenciais, planos, como funciona, depoimentos, dúvidas, CTA final.
+- **`?plano=Infinity`** na URL do anúncio abre o formulário com esse plano já
+  pinado. `?codigo_oferta=` libera os planos de campanha, como na home. UTMs
+  e click ids (`fbclid`, `gclid`, `ttclid`) são capturados como em toda página.
+- **`noindex`**: página de anúncio não concorre com a home no buscador.
+
+O lead da `/leads` entra pelo mesmo `submitLead`: mesmo webhook, mesma linha em
+`web_envios`, mesmos eventos do GTM (com `origem: formulario_leads` e `page`
+começando por `/leads`) e do Meta.
 
 ### TODA SOLICITAÇÃO VIRA UM ATENDIMENTO
 

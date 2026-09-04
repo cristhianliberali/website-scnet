@@ -20,6 +20,9 @@ import {
 import { postToWebhook, type WebhookOutcome } from "./webhook";
 import { registrarEnvio } from "./envios-db.server";
 import { statusDoWebhook } from "./envios-status";
+import { enviarEventoMeta, type MetaEventName } from "./meta-capi.server";
+import { precoNumerico, precoVigente } from "./plans";
+import { origemDaRequisicao } from "./robots.server";
 
 /**
  * Per-step webhook for the /contratacao wizard.
@@ -62,14 +65,113 @@ const stepInputSchema = z.object({
   anexos: z.array(anexoSchema).max(MAX_ANEXOS).optional(),
   attribution: attributionSchema.optional(),
   recaptchaToken: z.string().max(4096).optional(),
+  // Para a Conversions API do Meta: os cookies do Pixel e o id do evento que o
+  // navegador disparou, para o Meta deduplicar com o que sai daqui.
+  fbc: z.string().max(255).optional(),
+  fbp: z.string().max(255).optional(),
+  metaEventId: z.string().max(64).optional(),
 });
 
+type StepInput = z.infer<typeof stepInputSchema>;
+
 export type ContractStepResult = WebhookOutcome;
+
+type Registro = Record<string, unknown>;
+
+const objeto = (valor: unknown): Registro =>
+  valor !== null && typeof valor === "object" && !Array.isArray(valor) ? (valor as Registro) : {};
+
+const texto = (valor: unknown): string | undefined =>
+  typeof valor === "string" && valor.trim() ? valor.trim() : undefined;
+
+/** Qual evento do Meta esta etapa aceita representa — ou nenhum. */
+function eventoDaEtapa(data: StepInput): MetaEventName | null {
+  if (data.final) return "Purchase";
+  if (data.etapa_id === "planos") return "InitiateCheckout";
+  return null;
+}
+
+/**
+ * O evento do Meta desta etapa, com TUDO que o formulário já sabe da pessoa.
+ *
+ * `InitiateCheckout` na etapa do plano e `Purchase` na última — é o `Purchase`
+ * que a campanha otimiza, e é aqui que ele leva mais dados: nome do documento,
+ * e-mail, nascimento, endereço, CPF em hash como `external_id`. Cada campo a
+ * mais sobe a correspondência no Gerenciador de Eventos.
+ */
+async function enviarEtapaParaMeta(
+  data: StepInput,
+  dados: Registro,
+  request: Request,
+  clientIp: string,
+) {
+  const nome = eventoDaEtapa(data);
+  if (!nome) return;
+
+  const planos = objeto(dados["planos"]);
+  const origem = objeto(dados["origem"]);
+  const endereco = objeto(dados["endereco"]);
+  const cadastro = objeto(dados["cadastro"]);
+  const agendamento = objeto(dados["anexos_agendamento"]);
+  const atribuicao = data.attribution ?? {};
+
+  const precoTexto = texto(planos["preco"]);
+  const preco = precoTexto
+    ? precoNumerico(precoVigente(precoTexto, texto(planos["valor_primeiras_faturas"]) ?? null))
+    : undefined;
+  const codigoMk = planos["codigo_mk"];
+  const idPlano = codigoMk != null ? String(codigoMk) : texto(planos["nome"]);
+
+  await enviarEventoMeta({
+    nome,
+    eventId: data.metaEventId,
+    pagina: data.page,
+    origem: origemDaRequisicao(request),
+    usuario: {
+      // O nome do cadastro é o do documento; o da origem é o que a pessoa
+      // digitou correndo na home. Vale o primeiro quando existe.
+      nome: texto(cadastro["nome"]) ?? texto(origem["nome"]),
+      telefone: texto(origem["whatsapp"]) ?? texto(cadastro["telefone"]),
+      email: texto(cadastro["email"]),
+      nascimento: texto(cadastro["nascimento"]),
+      externalId: texto(cadastro["cpf"]),
+      cidade: texto(endereco["cidade"]),
+      uf: texto(endereco["uf"]),
+      cep: texto(endereco["cep"]),
+      fbc: data.fbc,
+      fbp: data.fbp,
+      fbclid: atribuicao["fbclid"],
+      fbclidEm: atribuicao["first_visit_at"],
+      ip: clientIp,
+      userAgent: request.headers.get("user-agent"),
+    },
+    dados: {
+      content_name: texto(planos["nome"]),
+      content_ids: idPlano ? [idPlano] : undefined,
+      content_type: "product",
+      content_category: "internet_fibra",
+      contents: idPlano ? [{ id: idPlano, quantity: 1, item_price: preco }] : undefined,
+      num_items: 1,
+      value: preco,
+      currency: preco !== undefined ? "BRL" : undefined,
+      order_id: nome === "Purchase" ? data.id_sessao : undefined,
+      etapa: data.etapa_id,
+      metodo_pagamento: texto(agendamento["metodo"]),
+      cidade: texto(endereco["cidade"]),
+      codigo_oferta: texto(planos["codigo_oferta"]),
+      utm_source: atribuicao["utm_source"],
+      utm_medium: atribuicao["utm_medium"],
+      utm_campaign: atribuicao["utm_campaign"],
+      utm_content: atribuicao["utm_content"],
+    },
+  });
+}
 
 export const submitContractStep = createServerFn({ method: "POST" })
   .validator(stepInputSchema)
   .handler(async ({ data }): Promise<ContractStepResult> => {
-    const clientIp = clientIpFromHeaders(getRequest().headers);
+    const request = getRequest();
+    const clientIp = clientIpFromHeaders(request.headers);
 
     const recaptcha = await verifyRecaptcha(
       data.recaptchaToken,
@@ -101,12 +203,23 @@ export const submitContractStep = createServerFn({ method: "POST" })
       anexos = result.anexos;
     }
 
-    // O token do reCAPTCHA fica no servidor — o webhook recebe só o score.
-    const { recaptchaToken: _token, anexos: _anexos, dados, ...stepData } = data;
+    // O token do reCAPTCHA fica no servidor — o webhook recebe só o score. Os
+    // campos do Meta (cookies do Pixel e id do evento) também ficam: são do
+    // evento de conversão, não do formulário.
+    const {
+      recaptchaToken: _token,
+      anexos: _anexos,
+      fbc: _fbc,
+      fbp: _fbp,
+      metaEventId: _metaEventId,
+      dados,
+      ...stepData
+    } = data;
     // O teto de 64KB do `dados` inteiro não impede um único campo gigante: um
     // POST direto aqui poderia mandar 60KB de "complemento". `limitarCampos`
     // aplica campo a campo o mesmo teto que o formulário aplica na digitação.
-    const dadosSaneados = neutralizeDeep(limitarCampos(dados)) as Record<string, unknown>;
+    const dadosLimitados = limitarCampos(dados) as Record<string, unknown>;
+    const dadosSaneados = neutralizeDeep(dadosLimitados) as Record<string, unknown>;
 
     const outcome = await postToWebhook(
       {
@@ -146,6 +259,12 @@ export const submitContractStep = createServerFn({ method: "POST" })
       anexos,
       ip: clientIp,
     });
+
+    // Só a etapa ACEITA vira evento: um `Purchase` de uma contratação que o
+    // webhook recusou ensinaria a campanha a procurar quem não contratou. Lê
+    // os dados antes da neutralização de fórmula — "+55..." precisa chegar ao
+    // Meta sem o apóstrofo.
+    if (outcome.ok) await enviarEtapaParaMeta(data, dadosLimitados, request, clientIp);
 
     return outcome;
   });
